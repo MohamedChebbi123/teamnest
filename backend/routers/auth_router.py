@@ -3,7 +3,7 @@ from fastapi import APIRouter, Form, File, Depends, UploadFile
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter()
 
 
 @router.post("/register")
