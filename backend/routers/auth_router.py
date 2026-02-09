@@ -14,16 +14,18 @@ async def register_new_user(
     phone_number: str = Form(...),
     country: str = Form(...),
     password: str = Form(...),
+    captcha_token: str = Form(...),
     avatar: UploadFile = File(...),
     db: Session = Depends(connect_databse)
 ):
-    new_user = register_user_service(
+    new_user = await register_user_service(
         first_name=first_name,
         last_name=last_name,
         email=email,
         phone_number=phone_number,
         country=country,
         password=password,
+        captcha_token=captcha_token,
         image=avatar,
         db=db
     )

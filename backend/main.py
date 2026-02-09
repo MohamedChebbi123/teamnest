@@ -4,9 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router
 from models import Users
 
+
+
 app = FastAPI()
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
