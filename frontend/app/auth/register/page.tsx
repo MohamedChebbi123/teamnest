@@ -10,10 +10,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
-import { Check, User, Mail, Phone, Lock, Upload, Loader2, Eye, EyeOff } from "lucide-react"
+import { Check, User, Mail, Phone, Lock, Upload, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import countryList from "country-list"
 import PhoneInput from "react-phone-input-2"
@@ -48,6 +56,10 @@ export default function Register() {
   const [phoneError, setPhoneError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [recaptchaToken, setRecaptchaToken] = useState("")
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false)
+  const [verificationCode, setVerificationCode] = useState("")
+  const [userEmail, setUserEmail] = useState("")
+  const [isVerifying, setIsVerifying] = useState(false)
   
   const countries = countryList.getData()
 
@@ -204,13 +216,14 @@ export default function Register() {
         throw new Error(data.detail || "Registration failed")
       }
 
+      setUserEmail(formData.email)
+      
       toast.success("Account created successfully!", {
-        description: `Welcome ${data.user?.first_name || formData.firstName}! Your account has been created.`,
-        action: {
-          label: "Login",
-          onClick: () => console.log("Redirect to login"),
-        },
+        description: `We've sent a verification code to ${formData.email}`,
       })
+      
+      setShowVerificationDialog(true)
+      
       console.log("User registered:", data)
     } catch (err) {
       console.error("Registration error:", err)
@@ -219,6 +232,60 @@ export default function Register() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleVerification = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (verificationCode.length !== 6) {
+      toast.error("Invalid Code", {
+        description: "Please enter a valid 6-digit verification code"
+      })
+      return
+    }
+    
+    setIsVerifying(true)
+    
+    try {
+      const formDataToSend = new FormData()
+      formDataToSend.append("email", userEmail)
+      formDataToSend.append("verification_code", verificationCode)
+      
+      const response = await fetch("http://localhost:8000/verify-email", {
+        method: "POST",
+        body: formDataToSend,
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.detail || "Verification failed")
+      }
+      
+      toast.success("Email Verified!", {
+        description: "Your account has been verified successfully. You can now login.",
+        action: {
+          label: "Login",
+          onClick: () => window.location.href = "/auth/login",
+        },
+      })
+      
+      setShowVerificationDialog(false)
+      setVerificationCode("")
+      
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        window.location.href = "/auth/login"
+      }, 2000)
+      
+    } catch (err) {
+      console.error("Verification error:", err)
+      toast.error("Verification failed", {
+        description: err instanceof Error ? err.message : "Invalid or expired verification code"
+      })
+    } finally {
+      setIsVerifying(false)
     }
   }
 
@@ -583,6 +650,77 @@ export default function Register() {
         </CardFooter>
       </Card>
       </div>
+      
+      {/* Verification Dialog */}
+      <Dialog open={showVerificationDialog} onOpenChange={setShowVerificationDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex justify-center mb-4">
+              <div className="rounded-full bg-primary/10 p-3">
+                <ShieldCheck className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-2xl">Verify Your Email</DialogTitle>
+            <DialogDescription className="text-center">
+              We've sent a 6-digit verification code to <br />
+              <span className="font-semibold text-foreground">{userEmail}</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleVerification} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="verification_code" className="text-center block">
+                Enter Verification Code
+              </Label>
+              <Input
+                id="verification_code"
+                type="text"
+                placeholder="000000"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  setVerificationCode(value)
+                }}
+                className="text-center text-2xl font-bold tracking-widest"
+                required
+              />
+              <p className="text-xs text-muted-foreground text-center">
+                Code expires in 10 minutes
+              </p>
+            </div>
+            
+            <DialogFooter className="flex-col gap-2 sm:flex-col">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isVerifying || verificationCode.length !== 6}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify Email"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  toast.info("Resend Feature", {
+                    description: "Resend functionality will be available soon"
+                  })
+                }}
+              >
+                Resend Code
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

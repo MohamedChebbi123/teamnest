@@ -5,3 +5,6 @@ python-multipart
 cloudinary
 httpx
 python-dotenv
+fastapi-mail
+bcrypt
+pydantic[email]
