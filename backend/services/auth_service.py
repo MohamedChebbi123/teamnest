@@ -8,6 +8,9 @@ from utils.email_sender import simple_send
 from datetime import datetime, timedelta, UTC
 import re
 import random
+from schemas.Logininput import Logininput
+from utils.hasher import verify_password
+from utils.jwt_handler import create_access_token,create_refresh_token
 
 async def register_user_service(
     first_name: str,
@@ -115,3 +118,24 @@ async def verify_email_service(
     db.refresh(user)
     
     return user
+
+async def login_user_service(validator:Logininput,db: Session):
+    
+    found_user=db.query(Users).filter(Users.email==validator.email).first()
+    
+    if not found_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not verify_password(validator.password,found_user.password_hashed):
+        raise HTTPException(status_code=401,detail="wrong password")
+    
+    refresh_token=create_refresh_token({"sub": str(found_user.user_id)})
+    access_token=create_access_token({"sub": str(found_user.user_id)})
+    print(refresh_token)
+    print(access_token)
+    
+    return{
+        "message":"user logged in successfully",
+        "refresh token":refresh_token,
+        "access token":access_token
+    }

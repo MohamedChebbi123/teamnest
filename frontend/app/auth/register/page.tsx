@@ -29,6 +29,9 @@ import { toast } from "sonner"
 import "react-phone-input-2/lib/style.css"
 import "flag-icons/css/flag-icons.min.css"
 import Image from "next/image"
+import Link from "next/link"
+import ImageCropDialog from "@/components/ImageCropDialog"
+
 export default function Register() {
   const [open, setOpen] = useState(false)
   const [selectedCountry, setSelectedCountry] = useState("")
@@ -41,6 +44,9 @@ export default function Register() {
     password: "",
     avatar: null as File | null
   })
+  const [originalImage, setOriginalImage] = useState<string | null>(null)
+  const [showCropDialog, setShowCropDialog] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState({
     hasLowerCase: false,
@@ -68,8 +74,14 @@ export default function Register() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, files } = e.target
-    if (id === "profile_picture" && files) {
-      setFormData(prev => ({ ...prev, avatar: files[0] }))
+    if (id === "profile_picture" && files && files[0]) {
+      const file = files[0]
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setOriginalImage(reader.result as string)
+        setShowCropDialog(true)
+      }
+      reader.readAsDataURL(file)
     } else {
       setFormData(prev => ({ 
         ...prev, 
@@ -146,6 +158,15 @@ export default function Register() {
       delete (window as any).onRecaptchaSuccess
     }
   }, [])
+
+  const handleCropComplete = (croppedImage: File) => {
+    setFormData(prev => ({ ...prev, avatar: croppedImage }))
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(croppedImage)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -324,9 +345,11 @@ export default function Register() {
             </CardDescription>
           </div>
           <CardAction>
-            <Button variant="ghost" className="hover:bg-accent/50 transition-all">
-              Already have an account? <span className="ml-1 font-semibold text-primary">Sign In</span>
-            </Button>
+            <Link href="/auth/login">
+              <Button variant="ghost" className="hover:bg-accent/50 transition-all">
+                Already have an account? <span className="ml-1 font-semibold text-primary">Sign In</span>
+              </Button>
+            </Link>
           </CardAction>
         </CardHeader>
         <CardContent className="pb-6">
@@ -551,21 +574,53 @@ export default function Register() {
                 <Upload className="w-4 h-4 text-primary" />
                 Profile Picture
               </Label>
-              <div className="relative">
-                <Input
-                  id="profile_picture"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleInputChange}
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer cursor-pointer transition-all"
-                  required
-                />
-              </div>
-              {formData.avatar && (
-                <p className="text-xs text-green-600 flex items-center gap-1 animate-in slide-in-from-top-1">
-                  <Check className="w-3 h-3" />
-                  {formData.avatar.name}
-                </p>
+              
+              {imagePreview ? (
+                <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/30">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-primary">
+                    <Image
+                      src={imagePreview}
+                      alt="Profile preview"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium flex items-center gap-1 text-green-600">
+                      <Check className="w-4 h-4" />
+                      Image cropped and ready
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{formData.avatar?.name}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, avatar: null }))
+                      setImagePreview(null)
+                      setOriginalImage(null)
+                      const input = document.getElementById('profile_picture') as HTMLInputElement
+                      if (input) input.value = ''
+                    }}
+                  >
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    id="profile_picture"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleInputChange}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer cursor-pointer transition-all"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You'll be able to crop and adjust your image after selection
+                  </p>
+                </div>
               )}
             </div>
             
@@ -721,6 +776,22 @@ export default function Register() {
           </form>
         </DialogContent>
       </Dialog>
+      
+      {/* Image Crop Dialog */}
+      {originalImage && (
+        <ImageCropDialog
+          open={showCropDialog}
+          onClose={() => {
+            setShowCropDialog(false)
+            setOriginalImage(null)
+            const input = document.getElementById('profile_picture') as HTMLInputElement
+            if (input) input.value = ''
+          }}
+          imageSrc={originalImage}
+          onCropComplete={handleCropComplete}
+          aspectRatio={1}
+        />
+      )}
     </div>
   )
 }

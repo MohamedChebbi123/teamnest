@@ -1,4 +1,5 @@
-from services.auth_service import register_user_service, verify_email_service
+from schemas.Logininput import Logininput
+from services.auth_service import register_user_service, verify_email_service,login_user_service
 from fastapi import APIRouter, Form, File, Depends, UploadFile
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -60,3 +61,7 @@ async def verify_email(
             "is_verified": verified_user.is_verified
         }
     }
+    
+@router.post("/login")
+async def login_user_router(validator: Logininput, db: Session = Depends(connect_databse)):
+    return await login_user_service(validator, db)
