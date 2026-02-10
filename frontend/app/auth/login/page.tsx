@@ -89,24 +89,18 @@ export default function Login() {
       return
     }
     
-    if (!recaptchaToken) {
-      toast.error("Validation Error", {
-        description: "Please complete the reCAPTCHA verification"
-      })
-      return
-    }
-    
     setIsLoading(true)
 
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append("email", formData.email)
-      formDataToSend.append("password", formData.password)
-      formDataToSend.append("captcha_token", recaptchaToken)
-
       const response = await fetch("http://localhost:8000/login", {
         method: "POST",
-        body: formDataToSend,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
       })
 
       const data = await response.json()
@@ -118,15 +112,15 @@ export default function Login() {
       }
 
       toast.success("Login successful!", {
-        description: "Welcome back! Redirecting to dashboard...",
+        description: "Welcome back! Redirecting to your profile...",
       })
       
-      if (rememberMe && data.access_token) {
+      if (data.access_token) {
         localStorage.setItem("access_token", data.access_token)
       }
       
       setTimeout(() => {
-        window.location.href = "/dashboard"
+        window.location.href = "/auth/profile"
       }, 1000)
       
       console.log("User logged in:", data)

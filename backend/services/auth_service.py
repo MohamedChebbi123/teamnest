@@ -16,11 +16,8 @@ async def register_user_service(
     first_name: str,
     last_name: str,
     email: str,
-    phone_number: str,
-    country: str,
     password: str,
     captcha_token: str,
-    image,
     db: Session
 ):
     
@@ -38,10 +35,6 @@ async def register_user_service(
     if not re.match(email_regex, email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
     
-    phone_digits = re.sub(r'\D', '', phone_number)  
-    if len(phone_digits) < 10:
-        raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
-    
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
     
@@ -57,11 +50,6 @@ async def register_user_service(
     if db.query(Users).filter(Users.email == email).first():
         raise HTTPException(status_code=400, detail="Email is already used")
 
-    if db.query(Users).filter(Users.phone_number == phone_number).first():
-        raise HTTPException(status_code=400, detail="Phone number is already used")
-
-    avatar_url = upload_user_profile_image(image)
-
     verification_code = str(random.randint(100000, 999999))
     verification_expiry = datetime.utcnow() + timedelta(minutes=10)
 
@@ -69,10 +57,7 @@ async def register_user_service(
         first_name=first_name,
         last_name=last_name,
         email=email,
-        phone_number=phone_number,
-        country=country,
         password_hashed=hash_password(password),
-        avatar_url=avatar_url,
         user_tag=str(random.randint(1, 100000)),
         verification_code=verification_code,
         verification_code_expiry=verification_expiry
@@ -119,6 +104,38 @@ async def verify_email_service(
     
     return user
 
+
+async def resend_verification_service(
+    email: str,
+    db: Session
+):
+    user = db.query(Users).filter(Users.email == email).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.is_verified:
+        raise HTTPException(status_code=400, detail="Email is already verified")
+    
+    # Generate new verification code
+    verification_code = str(random.randint(100000, 999999))
+    verification_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    user.verification_code = verification_code
+    user.verification_code_expiry = verification_expiry
+    
+    db.commit()
+    db.refresh(user)
+    
+    try:
+        await simple_send(email, verification_code)
+    except Exception as e:
+        print(f"Failed to send verification email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send verification email")
+    
+    return {"message": "Verification code sent successfully"}
+
+
 async def login_user_service(validator:Logininput,db: Session):
     
     found_user=db.query(Users).filter(Users.email==validator.email).first()
@@ -129,13 +146,116 @@ async def login_user_service(validator:Logininput,db: Session):
     if not verify_password(validator.password,found_user.password_hashed):
         raise HTTPException(status_code=401,detail="wrong password")
     
-    refresh_token=create_refresh_token({"sub": str(found_user.user_id)})
+    #refresh_token=create_refresh_token({"sub": str(found_user.user_id)}) dont remove comment 
     access_token=create_access_token({"sub": str(found_user.user_id)})
-    print(refresh_token)
+    #print(refresh_token)
     print(access_token)
     
     return{
         "message":"user logged in successfully",
-        "refresh token":refresh_token,
-        "access token":access_token
+        #"refresh token":refresh_token,
+        "access_token":access_token
+    }
+
+
+async def view_profile_service(authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    from utils.jwt_handler import verify_token
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "user_id": user.user_id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "country": user.country,
+        "avatar_url": user.avatar_url,
+        "user_tag": user.user_tag,
+        "joined_at": user.joined_at.isoformat() if user.joined_at else None,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "is_verified": user.is_verified,
+        "profile_completed": user.profile_completed
+    }
+
+
+async def complete_profile_service(
+    authorization: str,
+    phone_number: str,
+    country: str,
+    image,
+    db: Session
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    from utils.jwt_handler import verify_token
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.profile_completed:
+        raise HTTPException(status_code=400, detail="Profile is already completed")
+    
+    # Validate phone number
+    phone_digits = re.sub(r'\D', '', phone_number)  
+    if len(phone_digits) < 10:
+        raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
+    
+    # Check if phone number is already used
+    existing_phone = db.query(Users).filter(
+        Users.phone_number == phone_number,
+        Users.user_id != user_id
+    ).first()
+    if existing_phone:
+        raise HTTPException(status_code=400, detail="Phone number is already used")
+    
+    # Upload avatar
+    avatar_url = upload_user_profile_image(image)
+    
+    # Update user
+    user.phone_number = phone_number
+    user.country = country
+    user.avatar_url = avatar_url
+    user.profile_completed = True
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Profile completed successfully",
+        "user": {
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "country": user.country,
+            "avatar_url": user.avatar_url,
+            "profile_completed": user.profile_completed
+        }
     }
