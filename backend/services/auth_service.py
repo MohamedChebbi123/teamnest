@@ -11,6 +11,8 @@ import random
 from schemas.Logininput import Logininput
 from utils.hasher import verify_password
 from utils.jwt_handler import create_access_token,create_refresh_token
+from utils.jwt_handler import verify_token
+
 
 async def register_user_service(
     first_name: str,
@@ -50,8 +52,7 @@ async def register_user_service(
     if db.query(Users).filter(Users.email == email).first():
         raise HTTPException(status_code=400, detail="Email is already used")
 
-    verification_code = str(random.randint(100000, 999999))
-    verification_expiry = datetime.utcnow() + timedelta(minutes=10)
+
 
     new_user = Users(
         first_name=first_name,
@@ -59,18 +60,11 @@ async def register_user_service(
         email=email,
         password_hashed=hash_password(password),
         user_tag=str(random.randint(1, 100000)),
-        verification_code=verification_code,
-        verification_code_expiry=verification_expiry
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
-    try:
-        await simple_send(email, verification_code)
-    except Exception as e:
-        print(f"Failed to send verification email: {str(e)}")
 
     return new_user
 
@@ -164,7 +158,6 @@ async def view_profile_service(authorization: str, db: Session):
     
     token = authorization.split(" ")[1]
     
-    from utils.jwt_handler import verify_token
     payload = verify_token(token, "access")
     
     if not payload or "sub" not in payload:
