@@ -198,7 +198,6 @@ async def complete_profile_service(
     
     token = authorization.split(" ")[1]
     
-    from utils.jwt_handler import verify_token
     payload = verify_token(token, "access")
     
     if not payload or "sub" not in payload:
@@ -252,3 +251,127 @@ async def complete_profile_service(
             "profile_completed": user.profile_completed
         }
     }
+    
+    
+async def edit_avatar_username(db: Session, authorization: str, image=None, lastname: str = None, firstname: str = None):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate and update first name if provided
+    if firstname is not None:
+        if len(firstname.strip()) < 5:
+            raise HTTPException(status_code=400, detail="First name must be at least 5 characters long")
+        user.first_name = firstname
+    
+    # Validate and update last name if provided
+    if lastname is not None:
+        if len(lastname.strip()) < 5:
+            raise HTTPException(status_code=400, detail="Last name must be at least 5 characters long")
+        user.last_name = lastname
+    
+    # Upload new avatar if provided
+    if image:
+        avatar_url = upload_user_profile_image(image)
+        user.avatar_url = avatar_url
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "avatar_url": user.avatar_url
+        }
+    }
+
+
+async def edit_email_country_phone(db: Session, authorization: str, email: str = None, country: str = None, phone_number: str = None):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate and update email if provided
+    if email is not None:
+        email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_regex, email):
+            raise HTTPException(status_code=400, detail="Please enter a valid email address")
+        
+        # Check if email is already used by another user
+        existing_email = db.query(Users).filter(
+            Users.email == email,
+            Users.user_id != user_id
+        ).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email is already used")
+        
+        user.email = email
+    
+    # Update country if provided
+    if country is not None:
+        user.country = country
+    
+    # Validate and update phone number if provided
+    if phone_number is not None:
+        phone_digits = re.sub(r'\D', '', phone_number)
+        if len(phone_digits) < 10:
+            raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
+        
+        # Check if phone number is already used by another user
+        existing_phone = db.query(Users).filter(
+            Users.phone_number == phone_number,
+            Users.user_id != user_id
+        ).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Phone number is already used")
+        
+        user.phone_number = phone_number
+    
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "country": user.country,
+            "avatar_url": user.avatar_url
+        }
+    }
+    

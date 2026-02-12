@@ -1,5 +1,5 @@
 from schemas.Logininput import Logininput
-from services.auth_service import register_user_service, verify_email_service, resend_verification_service, login_user_service, view_profile_service, complete_profile_service
+from services.auth_service import register_user_service, verify_email_service, resend_verification_service, login_user_service, view_profile_service, complete_profile_service, edit_avatar_username, edit_email_country_phone
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -85,3 +85,25 @@ async def complete_profile(
     db: Session = Depends(connect_databse)
 ):
     return await complete_profile_service(authorization, phone_number, country, avatar, db)
+
+
+@router.put("/update-profile")
+async def update_profile(
+    authorization: str = Header(None),
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    avatar: UploadFile = File(None),
+    db: Session = Depends(connect_databse)
+):
+    return await edit_avatar_username(db, authorization, avatar, last_name, first_name)
+
+
+@router.put("/update-contact-info")
+async def update_contact_info(
+    authorization: str = Header(None),
+    email: str = Form(None),
+    country: str = Form(None),
+    phone_number: str = Form(None),
+    db: Session = Depends(connect_databse)
+):
+    return await edit_email_country_phone(db, authorization, email, country, phone_number)
