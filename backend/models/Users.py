@@ -21,4 +21,6 @@ class Users(Base):
     verification_code=Column(String(6),nullable=True)
     verification_code_expiry=Column(DateTime,nullable=True)
     profile_completed=Column(Boolean,default=False)
+    reset_code=Column(String(6),nullable=True)
+    reset_code_expiry=Column(DateTime,nullable=True)
     

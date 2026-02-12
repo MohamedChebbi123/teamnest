@@ -1,5 +1,17 @@
 from schemas.Logininput import Logininput
-from services.auth_service import register_user_service, verify_email_service, resend_verification_service, login_user_service, view_profile_service, complete_profile_service, edit_avatar_username, edit_email_country_phone
+from services.auth_service import (
+    register_user_service, 
+    verify_email_service, 
+    resend_verification_service, 
+    login_user_service, 
+    view_profile_service, 
+    complete_profile_service, 
+    edit_avatar_username, 
+    edit_email_country_phone,
+    send_password_reset_code_service,
+    verify_reset_code_service,
+    reset_password_service
+)
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -107,3 +119,30 @@ async def update_contact_info(
     db: Session = Depends(connect_databse)
 ):
     return await edit_email_country_phone(db, authorization, email, country, phone_number)
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    email: str = Form(...),
+    db: Session = Depends(connect_databse)
+):
+    return await send_password_reset_code_service(email, db)
+
+
+@router.post("/verify-reset-code")
+async def verify_reset_code(
+    email: str = Form(...),
+    reset_code: str = Form(...),
+    db: Session = Depends(connect_databse)
+):
+    return await verify_reset_code_service(email, reset_code, db)
+
+
+@router.post("/reset-password")
+async def reset_password(
+    email: str = Form(...),
+    reset_code: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(connect_databse)
+):
+    return await reset_password_service(email, reset_code, new_password, db)
