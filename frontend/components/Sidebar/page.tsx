@@ -47,7 +47,7 @@ interface NavItem {
 }
 
 const navigationItems: NavItem[] = [
-  { name: 'Home', href: '/', icon: Home },
+  { name: 'Home', href: '/welcome', icon: Home },
   { name: 'Organization', href: '/organization', icon: Building2 },
 ];
 
@@ -110,14 +110,6 @@ export default function Sidebar({ className, onUserFetched }: SidebarProps) {
   const getFullName = () => {
     return `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
   };
-
-  if (loading || !user) {
-    return (
-      <div className="fixed top-0 left-0 z-40 h-screen w-64 bg-background border-r flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -196,60 +188,75 @@ export default function Sidebar({ className, onUserFetched }: SidebarProps) {
 
         {/* User Section */}
         <div className="mt-auto p-4 border-t">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className={cn(
-                  'w-full',
-                  isOpen ? 'justify-start' : 'justify-center px-2'
-                )}
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar_url} alt={getFullName()} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {getInitials(user.first_name || 'U', user.last_name || '')}
-                  </AvatarFallback>
-                </Avatar>
-                {isOpen && (
-                  <div className="flex flex-col items-start ml-3 flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{getFullName()}</p>
-                    <p className="text-xs text-muted-foreground truncate">
+          {loading || !user ? (
+            <div className={cn(
+              'w-full flex items-center',
+              isOpen ? 'justify-start' : 'justify-center'
+            )}>
+              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+              {isOpen && (
+                <div className="flex flex-col ml-3 flex-1 space-y-2">
+                  <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+                  <div className="h-2 w-32 bg-muted rounded animate-pulse" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    'w-full',
+                    isOpen ? 'justify-start' : 'justify-center px-2'
+                  )}
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatar_url} alt={getFullName()} />
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {getInitials(user.first_name || 'U', user.last_name || '')}
+                    </AvatarFallback>
+                  </Avatar>
+                  {isOpen && (
+                    <div className="flex flex-col items-start ml-3 flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{getFullName()}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{getFullName()}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
                   </div>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{getFullName()}</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/auth/profile">
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings/edit_profile">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/auth/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/edit_profile">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </aside>
 

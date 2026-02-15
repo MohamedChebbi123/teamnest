@@ -111,7 +111,6 @@ async def resend_verification_service(
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
     
-    # Generate new verification code
     verification_code = str(random.randint(100000, 999999))
     verification_expiry = datetime.utcnow() + timedelta(minutes=10)
     
@@ -213,12 +212,10 @@ async def complete_profile_service(
     if user.profile_completed:
         raise HTTPException(status_code=400, detail="Profile is already completed")
     
-    # Validate phone number
     phone_digits = re.sub(r'\D', '', phone_number)  
     if len(phone_digits) < 10:
         raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
     
-    # Check if phone number is already used
     existing_phone = db.query(Users).filter(
         Users.phone_number == phone_number,
         Users.user_id != user_id
@@ -226,10 +223,8 @@ async def complete_profile_service(
     if existing_phone:
         raise HTTPException(status_code=400, detail="Phone number is already used")
     
-    # Upload avatar
     avatar_url = upload_user_profile_image(image)
     
-    # Update user
     user.phone_number = phone_number
     user.country = country
     user.avatar_url = avatar_url
@@ -272,19 +267,16 @@ async def edit_avatar_username(db: Session, authorization: str, image=None, last
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Validate and update first name if provided
     if firstname is not None:
         if len(firstname.strip()) < 5:
             raise HTTPException(status_code=400, detail="First name must be at least 5 characters long")
         user.first_name = firstname
     
-    # Validate and update last name if provided
     if lastname is not None:
         if len(lastname.strip()) < 5:
             raise HTTPException(status_code=400, detail="Last name must be at least 5 characters long")
         user.last_name = lastname
     
-    # Upload new avatar if provided
     if image:
         avatar_url = upload_user_profile_image(image)
         user.avatar_url = avatar_url
@@ -323,13 +315,11 @@ async def edit_email_country_phone(db: Session, authorization: str, email: str =
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Validate and update email if provided
     if email is not None:
         email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         if not re.match(email_regex, email):
             raise HTTPException(status_code=400, detail="Please enter a valid email address")
         
-        # Check if email is already used by another user
         existing_email = db.query(Users).filter(
             Users.email == email,
             Users.user_id != user_id
@@ -339,17 +329,14 @@ async def edit_email_country_phone(db: Session, authorization: str, email: str =
         
         user.email = email
     
-    # Update country if provided
     if country is not None:
         user.country = country
     
-    # Validate and update phone number if provided
     if phone_number is not None:
         phone_digits = re.sub(r'\D', '', phone_number)
         if len(phone_digits) < 10:
             raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
         
-        # Check if phone number is already used by another user
         existing_phone = db.query(Users).filter(
             Users.phone_number == phone_number,
             Users.user_id != user_id
@@ -377,24 +364,21 @@ async def edit_email_country_phone(db: Session, authorization: str, email: str =
     
 
 async def send_password_reset_code_service(email: str, db: Session):
-    """Send password reset code to user's email"""
+    
     user = db.query(Users).filter(Users.email == email).first()
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found with this email")
     
-    # Generate 6-digit reset code
     reset_code = str(random.randint(100000, 999999))
     reset_code_expiry = datetime.utcnow() + timedelta(minutes=10)
     
-    # Save reset code to database
     user.reset_code = reset_code
     user.reset_code_expiry = reset_code_expiry
     
     db.commit()
     db.refresh(user)
     
-    # Send email with reset code
     try:
         await send_password_reset_code(email, reset_code)
     except Exception as e:
@@ -405,7 +389,7 @@ async def send_password_reset_code_service(email: str, db: Session):
 
 
 async def verify_reset_code_service(email: str, reset_code: str, db: Session):
-    """Verify the password reset code"""
+    
     user = db.query(Users).filter(Users.email == email).first()
     
     if not user:
@@ -424,7 +408,7 @@ async def verify_reset_code_service(email: str, reset_code: str, db: Session):
 
 
 async def reset_password_service(email: str, reset_code: str, new_password: str, db: Session):
-    """Reset user password after code verification"""
+    
     user = db.query(Users).filter(Users.email == email).first()
     
     if not user:
@@ -439,7 +423,6 @@ async def reset_password_service(email: str, reset_code: str, new_password: str,
     if user.reset_code_expiry < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one")
     
-    # Validate new password
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
     
@@ -452,7 +435,6 @@ async def reset_password_service(email: str, reset_code: str, new_password: str,
     if not re.search(r'[0-9]', new_password):
         raise HTTPException(status_code=400, detail="Password must contain at least one number")
     
-    # Update password and clear reset code
     user.password_hashed = hash_password(new_password)
     user.reset_code = None
     user.reset_code_expiry = None

@@ -11,11 +11,17 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
-import { Building2, FileText, CreditCard, Image as ImageIcon, Loader2, Upload, Check } from "lucide-react"
+import { Building2, FileText, CreditCard, Image as ImageIcon, Loader2, Upload, Check, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { toast } from "sonner"
 import Image from "next/image"
 import ImageCropDialog from "@/components/ImageCropDialog"
+import Sidebar from "@/components/Sidebar/page"
 
 export default function CreateOrganization() {
   const [formData, setFormData] = useState({
@@ -31,8 +37,38 @@ export default function CreateOrganization() {
   const [tempImageSrc, setTempImageSrc] = useState<string>("")
 
   const plans = [
-    { value: "free", label: "Free", description: "Perfect for small teams" },
-    { value: "pro", label: "Pro", description: "Advanced features for growing teams" }
+    { 
+      value: "free", 
+      label: "Free", 
+      description: "Perfect for small teams",
+      details: {
+        price: "$0/month",
+        features: [
+          "Up to 5 team members",
+          "Basic task management",
+          "5GB storage",
+          "Email support",
+          "Basic analytics"
+        ]
+      }
+    },
+    { 
+      value: "pro", 
+      label: "Pro", 
+      description: "Advanced features for growing teams",
+      details: {
+        price: "$29/month",
+        features: [
+          "Unlimited team members",
+          "Advanced task management",
+          "100GB storage",
+          "Priority 24/7 support",
+          "Advanced analytics & reporting",
+          "Custom integrations",
+          "API access"
+        ]
+      }
+    }
   ]
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -159,25 +195,27 @@ export default function CreateOrganization() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4">
-      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-0 items-stretch">
-        {/* Image Side */}
-        <div className="hidden lg:flex items-center justify-center">
-          <div className="relative w-full h-full rounded-l-2xl overflow-hidden shadow-2xl">
-            <Image
-              src="/registerimage.jpeg"
-              fill
-              alt="Organization illustration"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-end p-8">
-              <div className="text-white space-y-2">
-                <h2 className="text-3xl font-bold">Create Your Organization</h2>
-                <p className="text-lg text-white/90">Build and manage your team efficiently</p>
+    <>
+      <Sidebar />
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4">
+        <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-0 items-stretch">
+          {/* Image Side */}
+          <div className="hidden lg:flex items-center justify-center">
+            <div className="relative w-full h-full rounded-l-2xl overflow-hidden shadow-2xl">
+              <Image
+                src="/registerimage.jpeg"
+                fill
+                alt="Organization illustration"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-end p-8">
+                <div className="text-white space-y-2">
+                  <h2 className="text-3xl font-bold">Create Your Organization</h2>
+                  <p className="text-lg text-white/90">Build and manage your team efficiently</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
         {/* Form Side */}
         <Card className="w-full shadow-2xl border-muted/40 backdrop-blur rounded-l-none">
@@ -253,13 +291,13 @@ export default function CreateOrganization() {
                   {plans.map((plan) => (
                     <div
                       key={plan.value}
-                      onClick={() => setFormData(prev => ({ ...prev, organizationPlan: plan.value }))}
                       className={cn(
                         "relative flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all hover:bg-accent/50",
                         formData.organizationPlan === plan.value
                           ? "border-primary bg-primary/5 ring-2 ring-primary/20"
                           : "border-muted"
                       )}
+                      onClick={() => setFormData(prev => ({ ...prev, organizationPlan: plan.value }))}
                     >
                       <div className={cn(
                         "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
@@ -275,6 +313,36 @@ export default function CreateOrganization() {
                         <p className="font-medium">{plan.label}</p>
                         <p className="text-sm text-muted-foreground">{plan.description}</p>
                       </div>
+                      <Popover>
+                        <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="p-1 hover:bg-accent rounded-full transition-colors"
+                            aria-label={`More info about ${plan.label} plan`}
+                          >
+                            <Info className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="end">
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <h4 className="font-semibold text-lg">{plan.label} Plan</h4>
+                              <p className="text-2xl font-bold text-primary">{plan.details.price}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium text-muted-foreground">Features included:</p>
+                              <ul className="space-y-1.5">
+                                {plan.details.features.map((feature, index) => (
+                                  <li key={index} className="flex items-start gap-2 text-sm">
+                                    <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                    <span>{feature}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   ))}
                 </div>
@@ -347,5 +415,6 @@ export default function CreateOrganization() {
         />
       )}
     </div>
+    </>
   )
 }
