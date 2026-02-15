@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Loader2, Mail, Phone, Globe, Calendar, Tag, ShieldCheck, AlertCircle, Edit } from "lucide-react"
 import { toast } from "sonner"
 import Image from "next/image"
-import NavBar from "@/components/NavBar/page"
+import Sidebar from "@/components/Sidebar/page"
+
 interface UserProfile {
   user_id: number
   first_name: string
@@ -25,8 +26,15 @@ interface UserProfile {
   profile_completed: boolean
 }
 
+interface OrganizationData {
+  organization_id: number
+  organization_name: string
+  organaization_picture: string
+}
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
@@ -118,14 +126,8 @@ export default function ProfilePage() {
 
   return (
     <>
-    <NavBar 
-      user={{
-        name: `${profile.first_name} ${profile.last_name}`,
-        email: profile.email,
-        image: profile.avatar_url || undefined,
-        emailVerified: profile.is_verified,
-        portfolioCompleted: profile.profile_completed
-      }}
+    <Sidebar 
+      onOrganizationFetched={(org) => setOrganization(org)}
     />
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">

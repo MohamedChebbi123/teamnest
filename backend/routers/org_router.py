@@ -1,4 +1,4 @@
-from services.org_service import create_organization_service
+from services.org_service import create_organization_service,fetch_organization_service
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -18,3 +18,7 @@ async def create_organization(
     return create_organization_service(organization_name,organization_description,organization_plan,image,authorization,db)
 
 
+@router.get("/get_org_for_admin_org")
+async def get_org_for_admin(authorization: str = Header(None),db: Session = Depends(connect_databse)):
+    
+    return fetch_organization_service(authorization,db)

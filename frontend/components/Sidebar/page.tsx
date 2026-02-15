@@ -13,6 +13,9 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Plus,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,26 +38,25 @@ interface UserData {
   profile_completed?: boolean;
 }
 
+interface OrganizationData {
+  organization_id: number;
+  organization_name: string;
+  organaization_picture: string;
+  organaization_tag?: string;
+}
+
 interface SidebarProps {
   className?: string;
   onUserFetched?: (user: UserData | null) => void;
+  onOrganizationFetched?: (org: OrganizationData | null) => void;
 }
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ElementType;
-}
-
-const navigationItems: NavItem[] = [
-  { name: 'Home', href: '/welcome', icon: Home },
-  { name: 'Organization', href: '/organization', icon: Building2 },
-];
-
-export default function Sidebar({ className, onUserFetched }: SidebarProps) {
+export default function Sidebar({ className, onUserFetched, onOrganizationFetched }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isOrgsExpanded, setIsOrgsExpanded] = useState(true);
   const [user, setUser] = useState<UserData | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
@@ -93,8 +95,39 @@ export default function Sidebar({ className, onUserFetched }: SidebarProps) {
       }
     };
 
+    const fetchOrganizations = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
+        const response = await fetch("http://localhost:8000/get_org_for_admin_org", {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setOrganizations(data);
+          // Notify parent of first organization
+          if (data && data.length > 0) {
+            onOrganizationFetched?.(data[0]);
+          }
+        } else if (response.status === 404) {
+          // No organization found for this admin
+          setOrganizations([]);
+          onOrganizationFetched?.(null);
+        }
+      } catch (error) {
+        console.error('Error fetching organizations:', error);
+        setOrganizations([]);
+        onOrganizationFetched?.(null);
+      }
+    };
+
     fetchUserProfile();
-  }, [router]);
+    fetchOrganizations();
+  }, [router, onUserFetched, onOrganizationFetched]);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
@@ -162,28 +195,79 @@ export default function Sidebar({ className, onUserFetched }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
+          {/* Home Button */}
+          <Button
+            asChild
+            variant={pathname === '/welcome' ? 'secondary' : 'ghost'}
+            className={cn(
+              'w-full justify-start',
+              !isOpen && 'justify-center px-2',
+              pathname === '/welcome' && 'bg-primary/10 text-primary hover:bg-primary/20'
+            )}
+          >
+            <Link href="/welcome" title={!isOpen ? 'Home' : ''}>
+              <Home className="h-5 w-5" />
+              {isOpen && <span className="ml-3">Home</span>}
+            </Link>
+          </Button>
 
-            return (
+          {/* Organizations Section */}
+          {organizations.length > 0 && (
+            <div className="pt-4">
               <Button
-                key={item.name}
+                variant="ghost"
+                onClick={() => setIsOrgsExpanded(!isOrgsExpanded)}
+                className={cn(
+                  'w-full justify-between px-2 mb-2 hover:bg-muted',
+                  !isOpen && 'justify-center'
+                )}
+              >
+                {isOpen && (
+                  <>
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      ORGANIZATIONS
+                    </span>
+                    {isOrgsExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </>
+                )}
+                {!isOpen && <Building2 className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
+          )}
+          
+          {/* Organization List */}
+          {isOrgsExpanded && organizations.length > 0 ? (
+            organizations.map((org: OrganizationData) => (
+              <Button
+                key={org.organization_id}
                 asChild
-                variant={isActive ? 'secondary' : 'ghost'}
+                variant={pathname === `/organization/${org.organization_id}` ? 'secondary' : 'ghost'}
                 className={cn(
                   'w-full justify-start',
                   !isOpen && 'justify-center px-2',
-                  isActive && 'bg-primary/10 text-primary hover:bg-primary/20'
+                  pathname === `/organization/${org.organization_id}` && 'bg-primary/10 text-primary hover:bg-primary/20'
                 )}
               >
-                <Link href={item.href} title={!isOpen ? item.name : ''}>
-                  <Icon className="h-5 w-5" />
-                  {isOpen && <span className="ml-3">{item.name}</span>}
+                <Link href={`/organization/${org.organization_id}`} title={!isOpen ? org.organization_name : ''}>
+                  <Building2 className="h-5 w-5" />
+                  {isOpen && (
+                    <div className="flex flex-col items-start ml-3 flex-1 min-w-0">
+                      <span className="text-sm truncate">{org.organization_name}</span>
+                      {org.organaization_tag && (
+                        <span className="text-xs text-muted-foreground">#{org.organaization_tag}</span>
+                      )}
+                    </div>
+                  )}
                 </Link>
               </Button>
-            );
-          })}
+            ))
+          ) : null}
+
+          
         </nav>
 
         {/* User Section */}

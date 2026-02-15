@@ -66,3 +66,37 @@ def create_organization_service(
     
     return new_organization
 
+
+def fetch_organization_service(authorization: str,db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    
+    # Fetch all organizations where user is the owner
+    found_orgs = db.query(Organization).filter(Organization.owner_id == user_id).all()
+    
+    # Return list of organizations
+    return [
+        {
+            "organization_id": org.organization_id,
+            "organization_name": org.organization_name,
+            "organaization_picture": org.organaization_picture,
+            "organaization_tag": org.organaization_tag
+        }
+        for org in found_orgs
+    ]
