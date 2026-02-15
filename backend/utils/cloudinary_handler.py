@@ -22,3 +22,13 @@ def upload_user_profile_image(file: UploadFile) -> str:
         return result.get("secure_url")  
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Failed to upload file")
+
+def upload_organization_picture(file: UploadFile) -> str:
+    if not (file.filename.lower().endswith(".png") or  file.filename.lower().endswith(".jpg") or file.filename.lower().endswith(".jpeg")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Image extension must be png, jpeg, or jpg" )
+
+    try:
+        result = cloudinary.uploader.upload(file.file)
+        return result.get("secure_url")  
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Failed to upload file")
