@@ -2,7 +2,7 @@ from database.connection import Base, engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, org_router
-from models import Users,Organization
+from models import Users,Organization,Organization_members
 
 
 app = FastAPI()

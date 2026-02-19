@@ -253,7 +253,12 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                 )}
               >
                 <Link href={`/organization/${org.organization_id}`} title={!isOpen ? org.organization_name : ''}>
-                  <Building2 className="h-5 w-5" />
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={org.organaization_picture} alt={org.organization_name} />
+                    <AvatarFallback className="bg-muted">
+                      <Building2 className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
                   {isOpen && (
                     <div className="flex flex-col items-start ml-3 flex-1 min-w-0">
                       <span className="text-sm truncate">{org.organization_name}</span>
