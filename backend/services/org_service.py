@@ -97,7 +97,7 @@ def fetch_organization_service(authorization: str,db: Session):
         raise HTTPException(status_code=404, detail="User not found")
     
     
-    found_orgs = db.query(Organization).filter(Organization.owner_id == user_id).all()
+    orgs_enrolled_in = db.query(Organization).join(Organization_members, Organization.organization_id == Organization_members.org_id).filter(Organization_members.memmber_id == user_id).all()
     
     return [
         {
@@ -110,7 +110,7 @@ def fetch_organization_service(authorization: str,db: Session):
             "owner_id": org.owner_id,
             "created_at": org.created_at.isoformat() if org.created_at else None
         }
-        for org in found_orgs
+        for org in orgs_enrolled_in
     ]
 
 def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization: str,db: Session):
