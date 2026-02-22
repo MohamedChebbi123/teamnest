@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import{ useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -10,12 +10,8 @@ import {
   X,
   Building2,
   User,
-  ChevronLeft,
-  ChevronRight,
   LogOut,
   Plus,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -52,16 +48,13 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ className, onUserFetched, onOrganizationFetched }: SidebarProps) {
-  const [isOpen, setIsOpen] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isOrgsExpanded, setIsOrgsExpanded] = useState(true);
   const [user, setUser] = useState<UserData | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
 
-  const toggleSidebar = () => setIsOpen(!isOpen);
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
 
   useEffect(() => {
@@ -168,152 +161,111 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       <aside
         className={cn(
           'fixed top-0 left-0 z-40 h-screen transition-all duration-300 ease-in-out',
-          'bg-background border-r flex flex-col',
-          isOpen ? 'w-64' : 'w-20',
+          'bg-background border-r flex flex-col w-20',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           className
         )}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          {isOpen && (
-            <h2 className="text-xl font-bold tracking-tight">TeamNest</h2>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="hidden lg:flex"
-          >
-            {isOpen ? (
-              <ChevronLeft className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
+        <div className="flex items-center justify-center p-4 border-b">
+          <Link href="/welcome">
+            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-lg">TN</span>
+            </div>
+          </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {/* Home Button */}
           <Button
             asChild
             variant={pathname === '/welcome' ? 'secondary' : 'ghost'}
             className={cn(
-              'w-full justify-start',
-              !isOpen && 'justify-center px-2',
+              'w-full justify-center px-2 h-12',
               pathname === '/welcome' && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
           >
-            <Link href="/welcome" title={!isOpen ? 'Home' : ''}>
+            <Link href="/welcome" title="Home">
               <Home className="h-5 w-5" />
-              {isOpen && <span className="ml-3">Home</span>}
             </Link>
           </Button>
 
-          {/* Organizations Section */}
+          {/* Divider */}
           {organizations.length > 0 && (
-            <div className="pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => setIsOrgsExpanded(!isOrgsExpanded)}
-                className={cn(
-                  'w-full justify-between px-2 mb-2 hover:bg-muted',
-                  !isOpen && 'justify-center'
-                )}
-              >
-                {isOpen && (
-                  <>
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      ORGANIZATIONS
-                    </span>
-                    {isOrgsExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <div className="py-2">
+              <div className="h-px bg-border" />
+            </div>
+          )}
+
+          {/* Organizations Section - Only Images */}
+          {organizations.length > 0 && (
+            <div className="space-y-2">
+              {organizations.map((org: OrganizationData) => (
+                <Link
+                  key={org.organization_id}
+                  href={`/organization/${org.organization_id}`}
+                  title={org.organization_name}
+                >
+                  <div
+                    className={cn(
+                      'flex items-center justify-center p-1 rounded-lg hover:bg-muted transition-colors cursor-pointer group relative',
+                      pathname === `/organization/${org.organization_id}` && 'bg-primary/10 ring-2 ring-primary/50'
                     )}
-                  </>
-                )}
-                {!isOpen && <Building2 className="h-4 w-4 text-muted-foreground" />}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={org.organaization_picture} alt={org.organization_name} />
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        <Building2 className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    {/* Tooltip on hover */}
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg border">
+                      {org.organization_name}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              
+              {/* Add Organization Button */}
+              <Button
+                asChild
+                variant="ghost"
+                className="w-full justify-center px-2 h-12 border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+              >
+                <Link href="/organization/create_organizattion" title="Create Organization">
+                  <Plus className="h-5 w-5" />
+                </Link>
               </Button>
             </div>
           )}
-          
-          {/* Organization List */}
-          {isOrgsExpanded && organizations.length > 0 ? (
-            organizations.map((org: OrganizationData) => (
-              <Button
-                key={org.organization_id}
-                asChild
-                variant={pathname === `/organization/${org.organization_id}` ? 'secondary' : 'ghost'}
-                className={cn(
-                  'w-full justify-start',
-                  !isOpen && 'justify-center px-2',
-                  pathname === `/organization/${org.organization_id}` && 'bg-primary/10 text-primary hover:bg-primary/20'
-                )}
-              >
-                <Link href={`/organization/${org.organization_id}`} title={!isOpen ? org.organization_name : ''}>
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={org.organaization_picture} alt={org.organization_name} />
-                    <AvatarFallback className="bg-muted">
-                      <Building2 className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                  {isOpen && (
-                    <div className="flex flex-col items-start ml-3 flex-1 min-w-0">
-                      <span className="text-sm truncate">{org.organization_name}</span>
-                      {org.organaization_tag && (
-                        <span className="text-xs text-muted-foreground">#{org.organaization_tag}</span>
-                      )}
-                    </div>
-                  )}
-                </Link>
-              </Button>
-            ))
-          ) : null}
-
-          
         </nav>
 
         {/* User Section */}
         <div className="mt-auto p-4 border-t">
           {loading || !user ? (
-            <div className={cn(
-              'w-full flex items-center',
-              isOpen ? 'justify-start' : 'justify-center'
-            )}>
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-              {isOpen && (
-                <div className="flex flex-col ml-3 flex-1 space-y-2">
-                  <div className="h-3 w-24 bg-muted rounded animate-pulse" />
-                  <div className="h-2 w-32 bg-muted rounded animate-pulse" />
-                </div>
-              )}
+            <div className="flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
             </div>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className={cn(
-                    'w-full',
-                    isOpen ? 'justify-start' : 'justify-center px-2'
-                  )}
+                  className="w-full justify-center px-2 h-12 relative group"
                 >
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-10 w-10">
                     <AvatarImage src={user.avatar_url} alt={getFullName()} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {getInitials(user.first_name || 'U', user.last_name || '')}
                     </AvatarFallback>
                   </Avatar>
-                  {isOpen && (
-                    <div className="flex flex-col items-start ml-3 flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{getFullName()}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {user.email}
-                      </p>
-                    </div>
-                  )}
+                  
+                  {/* Tooltip */}
+                  <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg border">
+                    {getFullName()}
+                  </div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -350,12 +302,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       </aside>
 
       {/* Spacer for content */}
-      <div
-        className={cn(
-          'hidden lg:block transition-all duration-300',
-          isOpen ? 'w-64' : 'w-20'
-        )}
-      />
+      <div className="hidden lg:block w-20" />
     </>
   );
 }

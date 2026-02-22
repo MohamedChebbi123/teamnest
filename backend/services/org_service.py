@@ -127,12 +127,12 @@ def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization:
     
     user_id = int(payload["sub"])
     
-    # Check if organization exists
+    
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is a member and has permission
+   
     found_user_at_org = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
         Organization_members.org_id == org_id
@@ -190,16 +190,14 @@ def update_organization_service(
     
     user_id = int(payload["sub"])
     
-    # Check if organization exists
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is the owner
+  
     if organization.owner_id != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can edit this organization")
-    
-    # Validate organization name if it's being changed
+
     if organization_name and organization_name != organization.organization_name:
         name_pattern = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,19}$"
         if not re.match(name_pattern, organization_name):
@@ -208,7 +206,6 @@ def update_organization_service(
                 detail="Organization name must be 3-20 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores"
             )
         
-        # Check if new name already exists
         existing_org = db.query(Organization).filter(
             Organization.organization_name == organization_name,
             Organization.organization_id != org_id
@@ -219,14 +216,12 @@ def update_organization_service(
         
         organization.organization_name = organization_name
     
-    # Update fields
     if organization_description is not None:
         organization.organization_description = organization_description
     
     if organization_plan:
         organization.organization_plan = organization_plan
     
-    # Update image if provided
     if image:
         organization.organaization_picture = upload_organization_picture(image)
     
@@ -261,20 +256,60 @@ def delete_organization_service(
     
     user_id = int(payload["sub"])
     
-    # Check if organization exists
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is the owner
     if organization.owner_id != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can delete this organization")
     
-    # Delete all organization members first (cascade)
     db.query(Organization_members).filter(Organization_members.org_id == org_id).delete()
     
-    # Delete the organization
     db.delete(organization)
     db.commit()
     
     return {"msg": "Organization deleted successfully"}
+
+def fetch_org_members(org_id: int,authorization: str,db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    
+    organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+   
+    found_user_at_org = db.query(Organization_members).filter(
+        Organization_members.memmber_id == user_id,
+        Organization_members.org_id == org_id
+    ).first()
+    
+    if not found_user_at_org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    org_members = db.query(Organization_members).join(
+        Users, Organization_members.memmber_id == Users.user_id
+    ).filter(Organization_members.org_id == org_id).all()
+    
+    return [
+        {
+            "user_id": member.memmber_id,
+            "first_name": member.user.first_name,
+            "last_name": member.user.last_name,
+            "email": member.user.email,
+            "profile_picture": member.user.avatar_url,
+            "role_user": member.role_user,
+            "joined_at": member.joined_at.isoformat() if member.joined_at else None
+        }
+        for member in org_members
+    ]

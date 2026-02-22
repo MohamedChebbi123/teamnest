@@ -1,4 +1,4 @@
-from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service
+from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -54,3 +54,12 @@ async def delete_organization(
     db: Session = Depends(connect_databse)
 ):
     return delete_organization_service(org_id, authorization, db)
+
+
+@router.get("/organization/{org_id}/members")
+async def get_organization_members(
+    org_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_org_members(org_id, authorization, db)

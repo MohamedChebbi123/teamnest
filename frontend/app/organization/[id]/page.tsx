@@ -11,8 +11,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, MoreVertical } from "lucide-react"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import MembersSidebar from "@/components/MembersSidebar/page"
+import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 
 interface OrganizationDetails {
   organization_id: number
@@ -121,6 +123,19 @@ export default function OrganizationPage() {
       fetchOrganizationDetails()
     }
   }, [organizationId, router])
+
+  // Listen for add member dialog event from navbar
+  useEffect(() => {
+    const handleOpenAddMemberDialog = () => {
+      setAddMemberDialogOpen(true)
+    }
+
+    window.addEventListener('openAddMemberDialog', handleOpenAddMemberDialog)
+    
+    return () => {
+      window.removeEventListener('openAddMemberDialog', handleOpenAddMemberDialog)
+    }
+  }, [])
 
   const handleAddMember = async () => {
     if (!userTag.trim()) {
@@ -334,7 +349,9 @@ export default function OrganizationPage() {
   return (
     <>
       <Sidebar />
-      <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-muted/20 p-8">
+      <OrganizationNavBar organizationId={organizationId as string} />
+      {/* Content area - offset by main sidebar (80px) + org sidebar (288px) = 368px on left, members sidebar (320px) on right */}
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-8" style={{ marginLeft: '368px', marginRight: '320px' }}>
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Organization Header */}
           <Card>
@@ -663,6 +680,7 @@ export default function OrganizationPage() {
           </div>
         </div>
       </div>
+      <MembersSidebar organizationId={organizationId as string} />
     </>
   )
 }
