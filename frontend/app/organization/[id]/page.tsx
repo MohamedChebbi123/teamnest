@@ -27,6 +27,7 @@ interface OrganizationDetails {
   created_at?: string
 }
 
+
 export default function OrganizationPage() {
   const params = useParams()
   const router = useRouter()
@@ -350,7 +351,7 @@ export default function OrganizationPage() {
     <>
       <Sidebar />
       <OrganizationNavBar organizationId={organizationId as string} />
-      {/* Content area - offset by main sidebar (80px) + org sidebar (288px) = 368px on left, members sidebar (320px) on right */}
+    
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-8" style={{ marginLeft: '368px', marginRight: '320px' }}>
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Organization Header */}
