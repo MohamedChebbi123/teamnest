@@ -6,6 +6,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import { Label } from "@/components/ui/label"
 import { 
   Hash, 
   Loader2, 
@@ -16,6 +32,9 @@ import {
   Smile,
   Paperclip,
   AtSign,
+  MoreVertical,
+  Edit,
+  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import Sidebar from "@/components/Sidebar/page"
@@ -46,6 +65,20 @@ export default function ChannelPage() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState("")
   const [showInfo, setShowInfo] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  
+  // Edit channel states
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editChannelData, setEditChannelData] = useState({
+    channel_name: "",
+    type: "text",
+    description: ""
+  })
+  const [isEditingChannel, setIsEditingChannel] = useState(false)
+  
+  // Delete channel states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isDeletingChannel, setIsDeletingChannel] = useState(false)
 
   useEffect(() => {
     const fetchChannelData = async () => {
@@ -54,6 +87,18 @@ export default function ChannelPage() {
         if (!token) {
           router.push('/auth/login')
           return
+        }
+
+        // Get current user info
+        const userResponse = await fetch("http://localhost:8000/profile", {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          setCurrentUserId(userData.user_id)
         }
 
         const response = await fetch(`http://localhost:8000/channel/${channelId}`, {
@@ -65,6 +110,12 @@ export default function ChannelPage() {
         if (response.ok) {
           const data = await response.json()
           setChannel(data)
+          // Initialize edit form with current values
+          setEditChannelData({
+            channel_name: data.channel_name,
+            type: data.type,
+            description: data.description || ""
+          })
         } else {
           const errorData = await response.json()
           toast.error("Error", {
@@ -96,6 +147,120 @@ export default function ChannelPage() {
       description: "Message functionality will be implemented soon"
     })
     setMessage("")
+  }
+
+  const handleEditChannel = () => {
+    setEditDialogOpen(true)
+  }
+
+  const handleUpdateChannel = async () => {
+    if (!editChannelData.channel_name.trim()) {
+      toast.error("Error", {
+        description: "Channel name is required"
+      })
+      return
+    }
+
+    setIsEditingChannel(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/channel/${channelId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(editChannelData)
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Channel updated successfully"
+        })
+        // Update the channel data
+        setChannel(data.channel)
+        setEditDialogOpen(false)
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to update channel"
+        })
+      }
+    } catch (error) {
+      console.error('Error updating channel:', error)
+      toast.error("Error", {
+        description: "An error occurred while updating the channel"
+      })
+    } finally {
+      setIsEditingChannel(false)
+    }
+  }
+
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteChannel = async () => {
+    setIsDeletingChannel(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/channel/${channelId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Channel deleted successfully"
+        })
+        // Redirect to organization page
+        router.push(`/organization/${channel?.organization.organization_id}`)
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to delete channel"
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting channel:', error)
+      toast.error("Error", {
+        description: "An error occurred while deleting the channel"
+      })
+    } finally {
+      setIsDeletingChannel(false)
+    }
+  }
+
+  const canEditDeleteChannel = () => {
+    if (!channel) return false
+    // If channel type is "general", only owner can edit/delete
+    if (channel.type === "general") {
+      // Need to check if current user is the owner - we'll need to fetch org details
+      // For now, we'll rely on the backend to return proper error
+      return true // Show the options, backend will validate
+    }
+    // For other channel types, any member can edit/delete
+    return true
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -151,6 +316,36 @@ export default function ChannelPage() {
             </div>
             
             <div className="flex items-center gap-2">
+              {canEditDeleteChannel() && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={handleEditChannel}
+                      className="cursor-pointer"
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Channel
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleDeleteClick}
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Channel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <Button
                 variant={showInfo ? "secondary" : "ghost"}
                 size="icon"
@@ -195,7 +390,7 @@ export default function ChannelPage() {
                   <div className="flex items-center justify-center py-8">
                     <div className="bg-muted/50 rounded-full px-4 py-2">
                       <p className="text-sm text-muted-foreground">
-                        No messages yet. Start the conversation! 💬
+                        No messages yet. Start the conversation! 
                       </p>
                     </div>
                   </div>
@@ -368,6 +563,117 @@ export default function ChannelPage() {
           </div>
         </aside>
       )}
+
+      {/* Edit Channel Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Channel</DialogTitle>
+            <DialogDescription>
+              Update channel details. {channel?.type === "general" && "Only organization owners can edit general channels."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit_channel_name">Channel Name</Label>
+              <Input
+                id="edit_channel_name"
+                placeholder="e.g., general, announcements"
+                value={editChannelData.channel_name}
+                onChange={(e) => setEditChannelData({ ...editChannelData, channel_name: e.target.value })}
+                maxLength={50}
+              />
+              <p className="text-xs text-muted-foreground">
+                3-50 characters. Letters, numbers, spaces, hyphens, underscores.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_type">Channel Type</Label>
+              <select
+                id="edit_type"
+                value={editChannelData.type}
+                onChange={(e) => setEditChannelData({ ...editChannelData, type: e.target.value })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="text">Text</option>
+                <option value="general">General</option>
+                <option value="announcement">Announcement</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_description">Description (Optional)</Label>
+              <Input
+                id="edit_description"
+                placeholder="What is this channel about?"
+                value={editChannelData.description}
+                onChange={(e) => setEditChannelData({ ...editChannelData, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setEditDialogOpen(false)}
+              disabled={isEditingChannel}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleUpdateChannel}
+              disabled={isEditingChannel}
+            >
+              {isEditingChannel ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update Channel"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Channel Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Channel</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <span className="font-semibold">#{channel?.channel_name}</span>? This action cannot be undone.
+              {channel?.type === "general" && " Only organization owners can delete general channels."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeletingChannel}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="destructive"
+              onClick={handleDeleteChannel}
+              disabled={isDeletingChannel}
+            >
+              {isDeletingChannel ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Channel"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

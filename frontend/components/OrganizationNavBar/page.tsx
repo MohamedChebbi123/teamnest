@@ -14,6 +14,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { 
@@ -27,6 +34,9 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
+  Edit,
+  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -81,6 +91,21 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     type: "text",
     description: ""
   })
+  
+  // Edit channel states
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
+  const [editChannelData, setEditChannelData] = useState({
+    channel_name: "",
+    type: "text",
+    description: ""
+  })
+  const [isEditingChannel, setIsEditingChannel] = useState(false)
+  
+  // Delete channel states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingChannel, setDeletingChannel] = useState<Channel | null>(null)
+  const [isDeletingChannel, setIsDeletingChannel] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -251,6 +276,138 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     } finally {
       setIsCreatingChannel(false)
     }
+  }
+
+  const handleEditChannel = (channel: Channel) => {
+    setEditingChannel(channel)
+    setEditChannelData({
+      channel_name: channel.channel_name,
+      type: channel.type,
+      description: channel.description || ""
+    })
+    setEditDialogOpen(true)
+  }
+
+  const handleUpdateChannel = async () => {
+    if (!editChannelData.channel_name.trim()) {
+      toast.error("Error", {
+        description: "Channel name is required"
+      })
+      return
+    }
+
+    if (!editingChannel) return
+
+    setIsEditingChannel(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/channel/${editingChannel.channel_id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(editChannelData)
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Channel updated successfully"
+        })
+        // Update the channel in the list
+        setChannels(channels.map(ch => 
+          ch.channel_id === editingChannel.channel_id ? data.channel : ch
+        ))
+        setEditDialogOpen(false)
+        setEditingChannel(null)
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to update channel"
+        })
+      }
+    } catch (error) {
+      console.error('Error updating channel:', error)
+      toast.error("Error", {
+        description: "An error occurred while updating the channel"
+      })
+    } finally {
+      setIsEditingChannel(false)
+    }
+  }
+
+  const handleDeleteClick = (channel: Channel) => {
+    setDeletingChannel(channel)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteChannel = async () => {
+    if (!deletingChannel) return
+
+    setIsDeletingChannel(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/channel/${deletingChannel.channel_id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Channel deleted successfully"
+        })
+        // Remove the channel from the list
+        setChannels(channels.filter(ch => ch.channel_id !== deletingChannel.channel_id))
+        setDeleteDialogOpen(false)
+        setDeletingChannel(null)
+        
+        // If user is currently viewing this channel, redirect to org page
+        if (pathname === `/channels/${deletingChannel.channel_id}`) {
+          router.push(`/organization/${organizationId}`)
+        }
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to delete channel"
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting channel:', error)
+      toast.error("Error", {
+        description: "An error occurred while deleting the channel"
+      })
+    } finally {
+      setIsDeletingChannel(false)
+    }
+  }
+
+  const canEditDeleteChannel = (channel: Channel) => {
+    // If channel type is "general", only owner can edit/delete
+    if (channel.type === "general") {
+      return organization?.owner_id === currentUserId
+    }
+    // For other channel types, any member can edit/delete
+    return true
   }
 
 
@@ -472,24 +629,173 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
               )
             ) : (
               channels.map((channel) => (
-                <Button
+                <div
                   key={channel.channel_id}
-                  variant="ghost"
-                  title={isCollapsed ? channel.channel_name : undefined}
                   className={cn(
-                    "w-full h-8",
-                    isCollapsed ? "justify-center px-0" : "justify-start gap-2 px-2"
+                    "flex items-center",
+                    isCollapsed ? "justify-center" : "gap-1"
                   )}
-                  onClick={() => router.push(`/channels/${channel.channel_id}`)}
                 >
-                  <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                  {!isCollapsed && <span className="text-sm truncate">{channel.channel_name}</span>}
-                </Button>
+                  <Button
+                    variant="ghost"
+                    title={isCollapsed ? channel.channel_name : undefined}
+                    className={cn(
+                      "h-8",
+                      isCollapsed ? "w-full justify-center px-0" : "flex-1 justify-start gap-2 px-2"
+                    )}
+                    onClick={() => router.push(`/channels/${channel.channel_id}`)}
+                  >
+                    <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                    {!isCollapsed && <span className="text-sm truncate">{channel.channel_name}</span>}
+                  </Button>
+                  {!isCollapsed && canEditDeleteChannel(channel) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleEditChannel(channel)}
+                          className="cursor-pointer"
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Channel
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(channel)}
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Channel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               ))
             )}
           </div>
         </div>
       </nav>
+
+      {/* Edit Channel Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Channel</DialogTitle>
+            <DialogDescription>
+              Update channel details. {editingChannel?.type === "general" && "Only organization owners can edit general channels."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit_channel_name">Channel Name</Label>
+              <Input
+                id="edit_channel_name"
+                placeholder="e.g., general, announcements"
+                value={editChannelData.channel_name}
+                onChange={(e) => setEditChannelData({ ...editChannelData, channel_name: e.target.value })}
+                maxLength={50}
+              />
+              <p className="text-xs text-muted-foreground">
+                3-50 characters. Letters, numbers, spaces, hyphens, underscores.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_type">Channel Type</Label>
+              <select
+                id="edit_type"
+                value={editChannelData.type}
+                onChange={(e) => setEditChannelData({ ...editChannelData, type: e.target.value })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="text">Text</option>
+                <option value="general">General</option>
+                <option value="announcement">Announcement</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_description">Description (Optional)</Label>
+              <Input
+                id="edit_description"
+                placeholder="What is this channel about?"
+                value={editChannelData.description}
+                onChange={(e) => setEditChannelData({ ...editChannelData, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setEditDialogOpen(false)}
+              disabled={isEditingChannel}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleUpdateChannel}
+              disabled={isEditingChannel}
+            >
+              {isEditingChannel ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update Channel"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Channel Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Channel</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <span className="font-semibold">#{deletingChannel?.channel_name}</span>? This action cannot be undone.
+              {deletingChannel?.type === "general" && " Only organization owners can delete general channels."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeletingChannel}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="destructive"
+              onClick={handleDeleteChannel}
+              disabled={isDeletingChannel}
+            >
+              {isDeletingChannel ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Channel"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }
