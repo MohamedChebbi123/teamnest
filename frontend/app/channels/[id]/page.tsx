@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -82,6 +82,13 @@ export default function ChannelPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
 
+  // WebSocket states
+  const [isConnected, setIsConnected] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const isConnectingRef = useRef(false) // Prevent multiple simultaneous connections
+
   // Edit message states
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
   const [editMessageContent, setEditMessageContent] = useState("")
@@ -149,6 +156,116 @@ export default function ChannelPage() {
     }
   }, [channelId, router])
 
+  // WebSocket connection management
+  useEffect(() => {
+    if (!channel || !channelId) return
+
+    const connectWebSocket = () => {
+      // Prevent multiple simultaneous connections
+      if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
+        return
+      }
+
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      isConnectingRef.current = true
+
+      // Close existing connection if any
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+
+      try {
+        // Note: Backend has endpoint /mesages/{channel_id} (typo in backend)
+        const wsUrl = `ws://localhost:8000/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
+        const ws = new WebSocket(wsUrl)
+
+        ws.onopen = () => {
+          setIsConnected(true)
+          isConnectingRef.current = false
+          toast.success("Connected", {
+            description: "Real-time messaging enabled"
+          })
+        }
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+
+            // Handle different message types
+            if (data.type === 'new_message') {
+              // Add new message to the list (check for duplicates)
+              setMessages(prev => {
+                // Avoid duplicates by checking if message already exists
+                const exists = prev.some(msg => msg.message_id === data.message.message_id)
+                if (exists) {
+                  return prev
+                }
+                return [...prev, data.message]
+              })
+            } else if (data.type === 'message_edited') {
+              // Update edited message
+              setMessages(prev => prev.map(msg =>
+                msg.message_id === data.message.message_id ? data.message : msg
+              ))
+            } else if (data.type === 'message_deleted') {
+              // Remove deleted message
+              setMessages(prev => prev.filter(msg => msg.message_id !== data.message_id))
+            } else if (data.message) {
+              // Fallback: treat as new message (check for duplicates)
+              setMessages(prev => {
+                const exists = prev.some(msg => msg.message_id === data.message.message_id)
+                if (exists) return prev
+                return [...prev, data.message]
+              })
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error)
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error)
+          isConnectingRef.current = false
+          toast.error("Connection Error", {
+            description: "Failed to establish real-time connection"
+          })
+        }
+
+        ws.onclose = () => {
+          setIsConnected(false)
+          isConnectingRef.current = false
+          
+          // Attempt to reconnect after 3 seconds
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket()
+          }, 3000)
+        }
+
+        wsRef.current = ws
+      } catch (error) {
+        console.error('Error creating WebSocket connection:', error)
+        isConnectingRef.current = false
+      }
+    }
+
+    connectWebSocket()
+
+    // Cleanup on unmount
+    return () => {
+      isConnectingRef.current = false
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+    }
+  }, [channel, channelId])
+
   const fetchMessages = async (orgId: number, token?: string) => {
     setLoadingMessages(true)
     try {
@@ -185,8 +302,37 @@ export default function ChannelPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!message.trim() || !channel) return
+    if (!message.trim() || !channel || isSendingMessage) return
 
+    setIsSendingMessage(true)
+
+    // Send via WebSocket if connected
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        const messageData = {
+          type: 'send_message',
+          channel_id: channel.channel_id,
+          org_id: channel.org_id,
+          message_content: message.trim()
+        }
+        
+        wsRef.current.send(JSON.stringify(messageData))
+        setMessage("")
+        
+        // Don't show toast for WebSocket sends to avoid UI clutter
+        // The message will appear immediately via broadcast
+      } catch (error) {
+        console.error('Error sending message via WebSocket:', error)
+        toast.error("Error", {
+          description: "Failed to send message"
+        })
+      } finally {
+        setIsSendingMessage(false)
+      }
+      return
+    }
+
+    // Fallback to REST API if WebSocket is not connected
     try {
       const token = localStorage.getItem('access_token')
       if (!token) {
@@ -226,6 +372,8 @@ export default function ChannelPage() {
       toast.error("Error", {
         description: "An error occurred while sending the message"
       })
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -402,6 +550,14 @@ export default function ChannelPage() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* WebSocket Connection Status */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50">
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {isConnected ? 'Live' : 'Offline'}
+                </span>
+              </div>
+              
               <Button
                 variant={showInfo ? "secondary" : "ghost"}
                 size="icon"
@@ -633,11 +789,11 @@ export default function ChannelPage() {
                     <Button 
                       type="submit" 
                       size="lg"
-                      disabled={!message.trim()}
+                      disabled={!message.trim() || isSendingMessage}
                       className="h-[44px] px-6 shadow-sm flex-shrink-0"
                     >
                       <Send className="h-4 w-4 mr-2" />
-                      Send
+                      {isSendingMessage ? 'Sending...' : 'Send'}
                     </Button>
                   </div>
                 </form>
