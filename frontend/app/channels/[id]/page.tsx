@@ -156,12 +156,11 @@ export default function ChannelPage() {
     }
   }, [channelId, router])
 
-  // WebSocket connection management
   useEffect(() => {
     if (!channel || !channelId) return
 
     const connectWebSocket = () => {
-      // Prevent multiple simultaneous connections
+      
       if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
         return
       }

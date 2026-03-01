@@ -123,9 +123,11 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           },
         })
         
+        let userId: number | null = null
         if (userResponse.ok) {
           const userData = await userResponse.json()
-          setCurrentUserId(userData.user_id)
+          userId = userData.user_id
+          setCurrentUserId(userId)
         }
 
         // Fetch all user organizations
@@ -158,9 +160,11 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         if (membersResponse.ok) {
           const membersData = await membersResponse.json()
           setMembers(membersData)
-          const currentUserMember = membersData.find((member: Member) => member.user_id === currentUserId)
-          if (currentUserMember) {
-            setUserRole(currentUserMember.role_user)
+          if (userId !== null) {
+            const currentUserMember = membersData.find((member: Member) => member.user_id === userId)
+            if (currentUserMember) {
+              setUserRole(currentUserMember.role_user)
+            }
           }
         }
 
@@ -189,7 +193,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     if (organizationId) {
       fetchData()
     }
-  }, [organizationId, router, currentUserId])
+  }, [organizationId, router])
 
   const navigationTabs = [
     { 
@@ -564,8 +568,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                       onChange={(e) => setNewChannel({ ...newChannel, type: e.target.value })}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                      <option value="text">Text</option>
-                      <option value="general">General</option>
+                      <option value="text">team</option>
+                      <option value="general">org</option>
                       <option value="announcement">Announcement</option>
                     </select>
                   </div>

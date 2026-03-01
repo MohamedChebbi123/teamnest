@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime,Integer,String
+from sqlalchemy.orm import relationship
 from database.connection import Base
 
 
@@ -24,3 +25,7 @@ class Users(Base):
     reset_code=Column(String(6),nullable=True)
     reset_code_expiry=Column(DateTime,nullable=True)
     
+    # Relationships
+    owned_organizations = relationship("Organization", back_populates="owner")
+    team_associations = relationship("Team_association", back_populates="user")
+    teams = relationship("Teams", secondary="team_association", back_populates="users", viewonly=True)

@@ -1,8 +1,10 @@
 from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members
+from services.team_service import create_team
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.Add_members_org import Add_members_org
+from schemas.team_creation import team_creation
 
 router = APIRouter()
 
@@ -63,3 +65,13 @@ async def get_organization_members(
     db: Session = Depends(connect_databse)
 ):
     return fetch_org_members(org_id, authorization, db)
+
+
+@router.post("/organization/{org_id}/create_team")
+async def create_team_endpoint(
+    org_id: int,
+    data: team_creation,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return create_team(data, authorization, db)

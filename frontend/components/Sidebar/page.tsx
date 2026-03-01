@@ -12,9 +12,13 @@ import {
   User,
   LogOut,
   Plus,
+  Bell,
+  Mail,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -52,6 +56,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const [user, setUser] = useState<UserData | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showNotifications, setShowNotifications] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -120,7 +125,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
     fetchUserProfile();
     fetchOrganizations();
-  }, [router, onUserFetched, onOrganizationFetched]);
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
@@ -136,6 +141,29 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const getFullName = () => {
     return `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
   };
+
+  // Notifications
+  const notifications = [
+    {
+      id: 1,
+      title: "Verify your email",
+      description: "Please verify your email address to access all features",
+      action: () => router.push('/auth/verify-email'),
+      show: user && !user.is_verified,
+      icon: Mail
+    },
+    {
+      id: 2,
+      title: "Complete your profile",
+      description: "Finalize your profile to get started",
+      action: () => router.push('/auth/complete-profile'),
+      show: user && !user.profile_completed,
+      icon: FileText
+    }
+  ];
+
+  const activeNotifications = notifications.filter(n => n.show);
+  const unreadCount = activeNotifications.length;
 
   return (
     <>
@@ -190,6 +218,55 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               <Home className="h-5 w-5" />
             </Link>
           </Button>
+
+          {/* Notifications Button */}
+          <DropdownMenu open={showNotifications} onOpenChange={setShowNotifications}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-center px-2 h-12 relative"
+                title="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                  >
+                    {unreadCount}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="right" className="w-80 ml-2">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {activeNotifications.length > 0 ? (
+                activeNotifications.map((notification) => {
+                  const Icon = notification.icon;
+                  return (
+                    <DropdownMenuItem 
+                      key={notification.id}
+                      onClick={notification.action}
+                      className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <Icon className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">{notification.title}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground ml-6">
+                        {notification.description}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })
+              ) : (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No new notifications
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Divider */}
           {organizations.length > 0 && (

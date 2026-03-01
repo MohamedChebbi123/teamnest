@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban } from "lucide-react"
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -52,6 +53,13 @@ export default function OrganizationPage() {
   // Delete organization states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  
+  // Create team states
+  const [createTeamDialogOpen, setCreateTeamDialogOpen] = useState(false)
+  const [teamName, setTeamName] = useState("")
+  const [teamSize, setTeamSize] = useState("")
+  const [teamDescription, setTeamDescription] = useState("")
+  const [creatingTeam, setCreatingTeam] = useState(false)
 
   useEffect(() => {
     const fetchOrganizationDetails = async () => {
@@ -305,6 +313,76 @@ export default function OrganizationPage() {
       })
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleCreateTeam = async () => {
+    if (!teamName.trim()) {
+      toast.error("Team name required", {
+        description: "Please enter a team name"
+      })
+      return
+    }
+
+    if (!teamSize || parseInt(teamSize) < 1) {
+      toast.error("Invalid team size", {
+        description: "Please enter a valid team size (minimum 1)"
+      })
+      return
+    }
+
+    setCreatingTeam(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error("Authentication required")
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(`http://localhost:8000/organization/${organizationId}/create_team`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          team_name: teamName,
+          team_size: parseInt(teamSize),
+          description: teamDescription,
+          org_id: parseInt(organizationId as string)
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success("Team created successfully", {
+          description: `${teamName} has been created`
+        })
+        setCreateTeamDialogOpen(false)
+        setTeamName("")
+        setTeamSize("")
+        setTeamDescription("")
+      } else if (response.status === 403) {
+        const data = await response.json()
+        toast.error("Permission denied", {
+          description: data.detail || "Only organization owner or admin can create teams"
+        })
+      } else if (response.status === 400) {
+        const data = await response.json()
+        toast.error("Team name already exists", {
+          description: data.detail || "This team name is already taken in this organization"
+        })
+      } else {
+        throw new Error("Failed to create team")
+      }
+    } catch (error) {
+      console.error('Error creating team:', error)
+      toast.error("Error", {
+        description: "Failed to create team"
+      })
+    } finally {
+      setCreatingTeam(false)
     }
   }
 
@@ -670,7 +748,12 @@ export default function OrganizationPage() {
                   <UserPlus className="h-4 w-4 mr-2" />
                   Invite Team Members
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateTeamDialogOpen(true)}
+                >
+                  <FolderKanban className="h-4 w-4 mr-2" />
                   Create a Team
                 </Button>
                 <Button variant="outline" className="w-full justify-start">
@@ -682,6 +765,77 @@ export default function OrganizationPage() {
         </div>
       </div>
       <MembersSidebar organizationId={organizationId as string} />
+      
+      {/* Create Team Dialog */}
+      <Dialog open={createTeamDialogOpen} onOpenChange={setCreateTeamDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Team</DialogTitle>
+            <DialogDescription>
+              Create a team within {organization?.organization_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamName">Team Name *</Label>
+              <Input
+                id="teamName"
+                placeholder="Enter team name"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="teamSize">Team Size *</Label>
+              <Input
+                id="teamSize"
+                type="number"
+                min="1"
+                placeholder="Enter maximum team size"
+                value={teamSize}
+                onChange={(e) => setTeamSize(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="teamDescription">Description</Label>
+              <Textarea
+                id="teamDescription"
+                placeholder="Enter team description (optional)"
+                value={teamDescription}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTeamDescription(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateTeamDialogOpen(false)
+                setTeamName("")
+                setTeamSize("")
+                setTeamDescription("")
+              }}
+              disabled={creatingTeam}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTeam} disabled={creatingTeam}>
+              {creatingTeam ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  Create Team
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
