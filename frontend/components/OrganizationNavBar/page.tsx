@@ -568,9 +568,9 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                       onChange={(e) => setNewChannel({ ...newChannel, type: e.target.value })}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                      <option value="text">team</option>
-                      <option value="general">org</option>
-                      <option value="announcement">Announcement</option>
+                      <option value="announcement">announcement</option>
+                      <option value="orgbased">orgbased</option>
+                      <option value="teambased">teambased</option>
                     </select>
                   </div>
                   <div className="grid gap-2">

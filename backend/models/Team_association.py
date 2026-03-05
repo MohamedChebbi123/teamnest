@@ -8,7 +8,6 @@ class Team_association(Base):
     team_id=Column(Integer,ForeignKey("teams.team_id"),primary_key=True,nullable=False)
     user_id=Column(Integer,ForeignKey("users.user_id"),primary_key=True,nullable=False)
     
-    # Relationships
     team = relationship("Teams", back_populates="team_members")
     user = relationship("Users", back_populates="team_associations")
     

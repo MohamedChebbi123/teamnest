@@ -30,7 +30,7 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
             detail="Channel name must be 3-50 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores"
         )
     
-    valid_types = ["text", "general", "announcement"]
+    valid_types = ["announcement", "orgbased", "teambased"]
     if data.type not in valid_types:
         raise HTTPException(
             status_code=400,

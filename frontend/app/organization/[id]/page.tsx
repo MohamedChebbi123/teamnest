@@ -28,6 +28,15 @@ interface OrganizationDetails {
   created_at?: string
 }
 
+interface Team {
+  team_id: number
+  team_name: string
+  team_size: number
+  description?: string
+  org_id: number
+  created_at: string
+}
+
 
 export default function OrganizationPage() {
   const params = useParams()
@@ -60,6 +69,21 @@ export default function OrganizationPage() {
   const [teamSize, setTeamSize] = useState("")
   const [teamDescription, setTeamDescription] = useState("")
   const [creatingTeam, setCreatingTeam] = useState(false)
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
+  
+  // Edit team states
+  const [editTeamDialogOpen, setEditTeamDialogOpen] = useState(false)
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+  const [editTeamName, setEditTeamName] = useState("")
+  const [editTeamSize, setEditTeamSize] = useState("")
+  const [editTeamDescription, setEditTeamDescription] = useState("")
+  const [isEditingTeam, setIsEditingTeam] = useState(false)
+  
+  // Delete team states
+  const [deleteTeamDialogOpen, setDeleteTeamDialogOpen] = useState(false)
+  const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
+  const [isDeletingTeam, setIsDeletingTeam] = useState(false)
 
   useEffect(() => {
     const fetchOrganizationDetails = async () => {
@@ -132,6 +156,36 @@ export default function OrganizationPage() {
       fetchOrganizationDetails()
     }
   }, [organizationId, router])
+
+  // Fetch teams
+  useEffect(() => {
+    const fetchTeams = async () => {
+      if (!organizationId) return
+      
+      setLoadingTeams(true)
+      try {
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+
+        const response = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setTeams(data)
+        }
+      } catch (error) {
+        console.error('Error fetching teams:', error)
+      } finally {
+        setLoadingTeams(false)
+      }
+    }
+
+    fetchTeams()
+  }, [organizationId])
 
   // Listen for add member dialog event from navbar
   useEffect(() => {
@@ -363,6 +417,17 @@ export default function OrganizationPage() {
         setTeamName("")
         setTeamSize("")
         setTeamDescription("")
+        
+        // Refresh teams list
+        const teamsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json()
+          setTeams(teamsData)
+        }
       } else if (response.status === 403) {
         const data = await response.json()
         toast.error("Permission denied", {
@@ -383,6 +448,144 @@ export default function OrganizationPage() {
       })
     } finally {
       setCreatingTeam(false)
+    }
+  }
+
+  const handleEditTeam = async () => {
+    if (!editingTeam) return
+
+    if (!editTeamName.trim()) {
+      toast.error("Team name required", {
+        description: "Please enter a team name"
+      })
+      return
+    }
+
+    if (!editTeamSize || parseInt(editTeamSize) < 1) {
+      toast.error("Invalid team size", {
+        description: "Please enter a valid team size (minimum 1)"
+      })
+      return
+    }
+
+    setIsEditingTeam(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error("Authentication required")
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(`http://localhost:8000/team/${editingTeam.team_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          team_name: editTeamName,
+          team_size: parseInt(editTeamSize),
+          description: editTeamDescription,
+          org_id: parseInt(organizationId as string)
+        })
+      })
+
+      if (response.ok) {
+        toast.success("Team updated successfully", {
+          description: `${editTeamName} has been updated`
+        })
+        setEditTeamDialogOpen(false)
+        setEditingTeam(null)
+        
+        // Refresh teams list
+        const teamsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json()
+          setTeams(teamsData)
+        }
+      } else if (response.status === 403) {
+        const data = await response.json()
+        toast.error("Permission denied", {
+          description: data.detail || "Only organization owner or admin can edit teams"
+        })
+      } else if (response.status === 400) {
+        const data = await response.json()
+        toast.error("Team name already exists", {
+          description: data.detail || "This team name is already taken in this organization"
+        })
+      } else {
+        throw new Error("Failed to update team")
+      }
+    } catch (error) {
+      console.error('Error updating team:', error)
+      toast.error("Error", {
+        description: "Failed to update team"
+      })
+    } finally {
+      setIsEditingTeam(false)
+    }
+  }
+
+  const handleDeleteTeam = async () => {
+    if (!deletingTeam) return
+
+    setIsDeletingTeam(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error("Authentication required")
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(`http://localhost:8000/team/${deletingTeam.team_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
+
+      if (response.ok) {
+        toast.success("Team deleted successfully", {
+          description: `${deletingTeam.team_name} has been deleted`
+        })
+        setDeleteTeamDialogOpen(false)
+        setDeletingTeam(null)
+        
+        // Refresh teams list
+        const teamsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json()
+          setTeams(teamsData)
+        }
+      } else if (response.status === 403) {
+        const data = await response.json()
+        toast.error("Permission denied", {
+          description: data.detail || "Only organization owner or admin can delete teams"
+        })
+      } else if (response.status === 404) {
+        toast.error("Team not found", {
+          description: "This team may have already been deleted"
+        })
+      } else {
+        throw new Error("Failed to delete team")
+      }
+    } catch (error) {
+      console.error('Error deleting team:', error)
+      toast.error("Error", {
+        description: "Failed to delete team"
+      })
+    } finally {
+      setIsDeletingTeam(false)
     }
   }
 
@@ -701,8 +904,10 @@ export default function OrganizationPage() {
                 <Building2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">No teams yet</p>
+                <div className="text-2xl font-bold">{loadingTeams ? '...' : teams.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  {teams.length === 0 ? 'No teams yet' : teams.length === 1 ? '1 team' : `${teams.length} teams`}
+                </p>
               </CardContent>
             </Card>
 
@@ -724,13 +929,69 @@ export default function OrganizationPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest updates in your organization</CardDescription>
+                <CardTitle>Teams</CardTitle>
+                <CardDescription>Teams in your organization</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  No recent activity
-                </div>
+                {loadingTeams ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : teams.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No teams yet. Create your first team!
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {teams.map((team) => (
+                      <div
+                        key={team.team_id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                      >
+                        <div 
+                          className="flex-1 cursor-pointer"
+                          onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                        >
+                          <h4 className="font-medium hover:text-primary transition-colors">{team.team_name}</h4>
+                          {team.description && (
+                            <p className="text-sm text-muted-foreground">{team.description}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Max size: {team.team_size} members
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{team.team_size}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingTeam(team)
+                              setEditTeamName(team.team_name)
+                              setEditTeamSize(team.team_size.toString())
+                              setEditTeamDescription(team.description || "")
+                              setEditTeamDialogOpen(true)
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeletingTeam(team)
+                              setDeleteTeamDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -831,6 +1092,110 @@ export default function OrganizationPage() {
                   <FolderKanban className="h-4 w-4 mr-2" />
                   Create Team
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Team Dialog */}
+      <Dialog open={editTeamDialogOpen} onOpenChange={setEditTeamDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Team</DialogTitle>
+            <DialogDescription>
+              Update team details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editTeamName">Team Name *</Label>
+              <Input
+                id="editTeamName"
+                placeholder="Enter team name"
+                value={editTeamName}
+                onChange={(e) => setEditTeamName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editTeamSize">Team Size *</Label>
+              <Input
+                id="editTeamSize"
+                type="number"
+                min="1"
+                placeholder="Enter maximum team size"
+                value={editTeamSize}
+                onChange={(e) => setEditTeamSize(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editTeamDescription">Description</Label>
+              <Textarea
+                id="editTeamDescription"
+                placeholder="Enter team description (optional)"
+                value={editTeamDescription}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditTeamDescription(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditTeamDialogOpen(false)
+                setEditingTeam(null)
+              }}
+              disabled={isEditingTeam}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditTeam} disabled={isEditingTeam}>
+              {isEditingTeam ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Team Dialog */}
+      <Dialog open={deleteTeamDialogOpen} onOpenChange={setDeleteTeamDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Team</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {deletingTeam?.team_name}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTeamDialogOpen(false)
+                setDeletingTeam(null)
+              }}
+              disabled={isDeletingTeam}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTeam}
+              disabled={isDeletingTeam}
+            >
+              {isDeletingTeam ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Team"
               )}
             </Button>
           </DialogFooter>

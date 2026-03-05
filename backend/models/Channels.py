@@ -10,7 +10,7 @@ class Channels(Base):
     type=Column(String,nullable=False)
     description=Column(Text,nullable=True)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
-    team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=False)
+    team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=True)
     org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)
     
     # Relationships

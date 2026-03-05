@@ -1,0 +1,55 @@
+from schemas.Add_members_team import Add_members_team
+from services.team_service import create_team, fetch_teams_service, delete_team_service, update_team_service,add_memebers_to_teams
+from fastapi import APIRouter, Depends, Header
+from sqlalchemy.orm import Session
+from database.connection import connect_databse
+from schemas.team_creation import team_creation
+
+router = APIRouter()
+
+
+@router.post("/organization/{org_id}/create_team")
+async def create_team_endpoint(
+    org_id: int,
+    data: team_creation,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return create_team(data, authorization, db)
+
+
+@router.get("/organization/{org_id}/teams")
+async def get_teams(
+    org_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_teams_service(org_id, authorization, db)
+
+
+@router.put("/team/{team_id}")
+async def update_team(
+    team_id: int,
+    data: team_creation,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return update_team_service(team_id, data, authorization, db)
+
+
+@router.delete("/team/{team_id}")
+async def delete_team(
+    team_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return delete_team_service(team_id, authorization, db)
+
+@router.post("/team/{team_id}")
+async def add_members_to_team(
+    team_id: int, 
+    data: Add_members_team, 
+    authorization: str = Header(None), 
+    db: Session = Depends(connect_databse)
+):
+    return add_memebers_to_teams(team_id, data, authorization, db)
