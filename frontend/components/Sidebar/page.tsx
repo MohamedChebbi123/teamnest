@@ -57,10 +57,45 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [isResizing, setIsResizing] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
+  const minWidth = 80;
+  const maxWidth = 400;
+
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = e.clientX;
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -187,13 +222,20 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
       {/* Sidebar */}
       <aside
+        style={{ width: `${sidebarWidth}px` }}
         className={cn(
-          'fixed top-0 left-0 z-40 h-screen transition-all duration-300 ease-in-out',
-          'bg-background border-r flex flex-col w-20',
+          'fixed top-0 left-0 z-40 h-screen',
+          'bg-background border-r flex flex-col',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          isResizing ? 'select-none' : '',
           className
         )}
       >
+        {/* Resize Handle */}
+        <div
+          onMouseDown={startResizing}
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+        />
         {/* Sidebar Header */}
         <div className="flex items-center justify-center p-4 border-b">
           <Link href="/welcome">
@@ -210,12 +252,14 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
             asChild
             variant={pathname === '/welcome' ? 'secondary' : 'ghost'}
             className={cn(
-              'w-full justify-center px-2 h-12',
+              'w-full h-12 transition-all',
+              sidebarWidth > 150 ? 'justify-start gap-3 px-4' : 'justify-center px-2',
               pathname === '/welcome' && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
           >
             <Link href="/welcome" title="Home">
-              <Home className="h-5 w-5" />
+              <Home className="h-5 w-5 flex-shrink-0" />
+              {sidebarWidth > 150 && <span className="text-sm">Home</span>}
             </Link>
           </Button>
 
@@ -224,14 +268,21 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-center px-2 h-12 relative"
+                className={cn(
+                  'w-full h-12 relative transition-all',
+                  sidebarWidth > 150 ? 'justify-start gap-3 px-4' : 'justify-center px-2'
+                )}
                 title="Notifications"
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-5 w-5 flex-shrink-0" />
+                {sidebarWidth > 150 && <span className="text-sm">Notifications</span>}
                 {unreadCount > 0 && (
                   <Badge 
                     variant="destructive" 
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                    className={cn(
+                      "h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs",
+                      sidebarWidth > 150 ? "ml-auto" : "absolute -top-1 -right-1"
+                    )}
                   >
                     {unreadCount}
                   </Badge>
@@ -286,21 +337,23 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                 >
                   <div
                     className={cn(
-                      'flex items-center justify-center p-1 rounded-lg hover:bg-muted transition-colors cursor-pointer group relative',
+                      'flex items-center rounded-lg hover:bg-muted transition-all cursor-pointer group overflow-hidden',
+                      sidebarWidth > 150 ? 'gap-3 p-2' : 'justify-center p-1',
                       pathname === `/organization/${org.organization_id}` && 'bg-primary/10 ring-2 ring-primary/50'
                     )}
                   >
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
                       <AvatarImage src={org.organaization_picture} alt={org.organization_name} />
                       <AvatarFallback className="bg-primary/10 text-primary">
                         <Building2 className="h-5 w-5" />
                       </AvatarFallback>
                     </Avatar>
                     
-                    {/* Tooltip on hover */}
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg border">
-                      {org.organization_name}
-                    </div>
+                    {sidebarWidth > 150 && (
+                      <span className="text-sm font-medium truncate">
+                        {org.organization_name}
+                      </span>
+                    )}
                   </div>
                 </Link>
               ))}
@@ -309,10 +362,14 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               <Button
                 asChild
                 variant="ghost"
-                className="w-full justify-center px-2 h-12 border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+                className={cn(
+                  'w-full h-12 border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5 transition-all',
+                  sidebarWidth > 150 ? 'justify-start gap-3 px-4' : 'justify-center px-2'
+                )}
               >
                 <Link href="/organization/create_organizattion" title="Create Organization">
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-5 w-5 flex-shrink-0" />
+                  {sidebarWidth > 150 && <span className="text-sm">Create Organization</span>}
                 </Link>
               </Button>
             </div>
@@ -330,19 +387,28 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="w-full justify-center px-2 h-12 relative group"
+                  className={cn(
+                    'w-full h-12 transition-all overflow-hidden',
+                    sidebarWidth > 150 ? 'justify-start gap-3 px-3' : 'justify-center px-2'
+                  )}
                 >
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 flex-shrink-0">
                     <AvatarImage src={user.avatar_url} alt={getFullName()} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {getInitials(user.first_name || 'U', user.last_name || '')}
                     </AvatarFallback>
                   </Avatar>
                   
-                  {/* Tooltip */}
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg border">
-                    {getFullName()}
-                  </div>
+                  {sidebarWidth > 150 && (
+                    <div className="flex flex-col items-start min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate w-full">
+                        {getFullName()}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate w-full">
+                        {user.email}
+                      </p>
+                    </div>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -379,7 +445,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       </aside>
 
       {/* Spacer for content */}
-      <div className="hidden lg:block w-20" />
+      <div className="hidden lg:block" style={{ width: `${sidebarWidth}px` }} />
     </>
   );
 }

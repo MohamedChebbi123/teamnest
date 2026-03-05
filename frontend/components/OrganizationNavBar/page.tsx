@@ -85,12 +85,46 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [channels, setChannels] = useState<Channel[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [navbarWidth, setNavbarWidth] = useState(240)
+  const [isResizing, setIsResizing] = useState(false)
   const [newChannel, setNewChannel] = useState({
     channel_name: "",
     type: "text",
     description: ""
   })
+  
+  const minWidth = 64;
+  const maxWidth = 400;
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = e.clientX - 80; // Subtract main sidebar width
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setNavbarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
   
   // Edit channel states
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -417,13 +451,20 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
   if (loading) {
     return (
-      <aside className={cn(
-        "fixed left-20 top-0 h-screen bg-background border-r flex items-center justify-center z-30 transition-all duration-300",
-        isCollapsed ? "w-16" : "w-72"
-      )}>
+      <aside 
+        style={{ width: `${navbarWidth}px` }}
+        className={cn(
+          "fixed left-20 top-0 h-screen bg-background border-r flex items-center justify-center z-30",
+          isResizing ? 'select-none' : ''
+        )}
+      >
+        <div
+          onMouseDown={startResizing}
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+        />
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          {!isCollapsed && <p className="text-sm text-muted-foreground">Loading...</p>}
+          {navbarWidth > 100 && <p className="text-sm text-muted-foreground">Loading...</p>}
         </div>
       </aside>
     )
@@ -434,25 +475,34 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   return (
-    <aside className={cn(
-      "fixed left-20 top-0 h-screen bg-background border-r flex flex-col z-30 shadow-sm transition-all duration-300",
-      isCollapsed ? "w-16" : "w-72"
-    )}>
+    <aside 
+      style={{ width: `${navbarWidth}px` }}
+      className={cn(
+        "fixed left-20 top-0 h-screen bg-background border-r flex flex-col z-30 shadow-sm",
+        isResizing ? 'select-none' : ''
+      )}
+    >
+      {/* Resize Handle */}
+      <div
+        onMouseDown={startResizing}
+        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+      />
+
       {/* Toggle Button */}
       <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={() => setNavbarWidth(navbarWidth > 100 ? 64 : 240)}
         className="absolute -right-3 top-6 bg-background border border-border rounded-full p-1 hover:bg-muted transition-colors shadow-md z-50"
       >
-        {isCollapsed ? (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-        ) : (
+        {navbarWidth > 100 ? (
           <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
         )}
       </button>
 
       {/* Organization Header */}
-      <div className={cn("border-b", isCollapsed ? "p-2" : "p-4 space-y-3")}>
-        {isCollapsed ? (
+      <div className={cn("border-b", navbarWidth > 100 ? "p-4 space-y-3" : "p-2")}>
+        {navbarWidth <= 100 ? (
           <div className="flex justify-center">
             <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
               <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
@@ -496,7 +546,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       </div>
 
       {/* Navigation */}
-      <nav className={cn("flex-1 overflow-y-auto space-y-1", isCollapsed ? "p-2" : "p-3")}>
+      <nav className={cn("flex-1 overflow-y-auto space-y-1", navbarWidth > 100 ? "p-3" : "p-2")}>
         <div className="space-y-1">
           {navigationTabs
             .filter(canAccessTab)
@@ -508,15 +558,15 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                   key={tab.name}
                   variant={active ? "secondary" : "ghost"}
                   onClick={() => router.push(tab.path)}
-                  title={isCollapsed ? tab.name : undefined}
+                  title={navbarWidth <= 100 ? tab.name : undefined}
                   className={cn(
                     "w-full h-9",
-                    isCollapsed ? "justify-center px-0" : "justify-start gap-3",
+                    navbarWidth > 100 ? "justify-start gap-3" : "justify-center px-0",
                     active && "bg-primary/10 text-primary hover:bg-primary/15"
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {!isCollapsed && <span className="text-sm">{tab.name}</span>}
+                  {navbarWidth > 100 && <span className="text-sm">{tab.name}</span>}
                 </Button>
               )
             })}
@@ -524,7 +574,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
         {/* Channels Section */}
         <div className="pt-4 mt-4 border-t">
-          {!isCollapsed && (
+          {navbarWidth > 100 && (
             <div className="flex items-center justify-between mb-2 px-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Channels
@@ -612,7 +662,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             </div>
           )}
           
-          {isCollapsed ? (
+          {navbarWidth <= 100 ? (
             <Button 
               variant="ghost" 
               size="icon"
@@ -626,7 +676,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           
           <div className="space-y-0.5">
             {channels.length === 0 ? (
-              !isCollapsed && (
+              navbarWidth > 100 && (
                 <p className="text-xs text-muted-foreground px-2 py-2">
                   No channels yet. Click + to create one.
                 </p>
@@ -637,22 +687,22 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                   key={channel.channel_id}
                   className={cn(
                     "flex items-center",
-                    isCollapsed ? "justify-center" : "gap-1"
+                    navbarWidth <= 100 ? "justify-center" : "gap-1"
                   )}
                 >
                   <Button
                     variant="ghost"
-                    title={isCollapsed ? channel.channel_name : undefined}
+                    title={navbarWidth <= 100 ? channel.channel_name : undefined}
                     className={cn(
                       "h-8",
-                      isCollapsed ? "w-full justify-center px-0" : "flex-1 justify-start gap-2 px-2"
+                      navbarWidth <= 100 ? "w-full justify-center px-0" : "flex-1 justify-start gap-2 px-2"
                     )}
                     onClick={() => router.push(`/channels/${channel.channel_id}`)}
                   >
                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                    {!isCollapsed && <span className="text-sm truncate">{channel.channel_name}</span>}
+                    {navbarWidth > 100 && <span className="text-sm truncate">{channel.channel_name}</span>}
                   </Button>
-                  {!isCollapsed && canEditDeleteChannel(channel) && (
+                  {navbarWidth > 100 && canEditDeleteChannel(channel) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

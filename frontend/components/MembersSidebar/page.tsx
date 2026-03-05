@@ -25,8 +25,43 @@ interface MembersSidebarProps {
 export default function MembersSidebar({ organizationId }: MembersSidebarProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(320)
+  const [isResizing, setIsResizing] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+
+  const minWidth = 250;
+  const maxWidth = 500;
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -89,10 +124,18 @@ export default function MembersSidebar({ organizationId }: MembersSidebarProps) 
     <>
       {/* Sidebar - Always visible but collapsible */}
       <div
+        style={{ width: isOpen ? `${sidebarWidth}px` : '0px' }}
         className={`fixed top-0 right-0 h-full bg-background border-l border-border shadow-lg transition-all duration-300 ease-in-out z-40 ${
-          isOpen ? 'w-80' : 'w-0'
+          isResizing ? 'select-none' : ''
         }`}
       >
+        {/* Resize Handle */}
+        {isOpen && (
+          <div
+            onMouseDown={startResizing}
+            className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+          />
+        )}
         {/* Toggle Arrow Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
