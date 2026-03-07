@@ -1,5 +1,6 @@
 from schemas.Add_members_team import Add_members_team
-from services.team_service import create_team, fetch_teams_service, delete_team_service, update_team_service,add_memebers_to_teams, fetch_team_members
+from schemas.Update_team_member_role import Update_team_member_role
+from services.team_service import create_team, fetch_teams_service, delete_team_service, update_team_service,add_memebers_to_teams, fetch_team_members, remove_team_member, update_team_member_role
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -61,3 +62,22 @@ async def get_team_members(
     db: Session = Depends(connect_databse)
 ):
     return fetch_team_members(team_id, authorization, db)
+
+@router.delete("/team/{team_id}/member/{member_user_id}")
+async def kick_team_member(
+    team_id: int,
+    member_user_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return remove_team_member(team_id, member_user_id, authorization, db)
+
+@router.put("/team/{team_id}/member/{member_user_id}/role")
+async def update_member_role(
+    team_id: int,
+    member_user_id: int,
+    data: Update_team_member_role,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return update_team_member_role(team_id, member_user_id, data, authorization, db)

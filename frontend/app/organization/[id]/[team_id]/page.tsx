@@ -24,6 +24,8 @@ import {
   UserPlus,
   Check,
   X,
+  UserX,
+  Shield,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -107,6 +109,17 @@ export default function TeamPage() {
   const [memberDetailsDialogOpen, setMemberDetailsDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
 
+  // Edit member role dialog
+  const [editRoleDialogOpen, setEditRoleDialogOpen] = useState(false)
+  const [editRole, setEditRole] = useState<string>("MEMBER")
+  const [editCanCreateChannels, setEditCanCreateChannels] = useState(false)
+  const [editCanSendMessages, setEditCanSendMessages] = useState(true)
+  const [editCanDeleteMessages, setEditCanDeleteMessages] = useState(false)
+  const [editCanManageRoles, setEditCanManageRoles] = useState(false)
+  const [editCanKickMembers, setEditCanKickMembers] = useState(false)
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false)
+  const [currentUserPermissions, setCurrentUserPermissions] = useState<TeamMember['permissions'] | null>(null)
+
   const fetchTeamMembers = async () => {
     try {
       const token = localStorage.getItem('access_token')
@@ -124,6 +137,14 @@ export default function TeamPage() {
       if (response.ok) {
         const membersData = await response.json()
         setTeamMembers(membersData)
+        
+        // Set current user's permissions
+        if (currentUserId) {
+          const currentUser = membersData.find((m: TeamMember) => m.user_id === currentUserId)
+          if (currentUser) {
+            setCurrentUserPermissions(currentUser.permissions)
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching team members:', error)
@@ -352,6 +373,113 @@ export default function TeamPage() {
       })
     } finally {
       setIsAddingMember(false)
+    }
+  }
+
+  const handleKickMember = async (memberUserId: number) => {
+    if (!confirm(`Are you sure you want to remove this member from the team?`)) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/team/${teamId}/member/${memberUserId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Member removed from team successfully"
+        })
+        setMemberDetailsDialogOpen(false)
+        await fetchTeamMembers()
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to remove member"
+        })
+      }
+    } catch (error) {
+      console.error('Error removing member:', error)
+      toast.error("Error", {
+        description: "An error occurred while removing member"
+      })
+    }
+  }
+
+  const handleOpenEditRole = (member: TeamMember) => {
+    setEditRole(member.role)
+    setEditCanCreateChannels(member.permissions.can_create_channels)
+    setEditCanSendMessages(member.permissions.can_send_messages)
+    setEditCanDeleteMessages(member.permissions.can_delete_messages)
+    setEditCanManageRoles(member.permissions.can_manage_roles)
+    setEditCanKickMembers(member.permissions.can_kick_members)
+    setEditRoleDialogOpen(true)
+  }
+
+  const handleUpdateRole = async () => {
+    if (!selectedMember) return
+
+    setIsUpdatingRole(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/team/${teamId}/member/${selectedMember.user_id}/role`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            role: editRole,
+            can_create_channels: editCanCreateChannels,
+            can_send_messages: editCanSendMessages,
+            can_delete_messages: editCanDeleteMessages,
+            can_manage_roles: editCanManageRoles,
+            can_kick_members: editCanKickMembers
+          })
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Member role updated successfully"
+        })
+        setEditRoleDialogOpen(false)
+        setMemberDetailsDialogOpen(false)
+        await fetchTeamMembers()
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to update member role"
+        })
+      }
+    } catch (error) {
+      console.error('Error updating member role:', error)
+      toast.error("Error", {
+        description: "An error occurred while updating member role"
+      })
+    } finally {
+      setIsUpdatingRole(false)
     }
   }
 
@@ -818,11 +946,163 @@ export default function TeamPage() {
               </div>
             )}
             <DialogFooter>
+              <div className="flex justify-between w-full">
+                <div className="flex gap-2">
+                  {/* Show kick button if user has can_kick_members permission or is OWNER/ADMIN */}
+                  {selectedMember && selectedMember.user_id !== currentUserId && 
+                   (userRole === "OWNER" || userRole === "ADMIN" || currentUserPermissions?.can_kick_members) && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleKickMember(selectedMember.user_id)}
+                    >
+                      <UserX className="h-4 w-4 mr-2" />
+                      Remove Member
+                    </Button>
+                  )}
+                  {/* Show edit role button if user has can_manage_roles permission or is OWNER/ADMIN */}
+                  {selectedMember && 
+                   (userRole === "OWNER" || userRole === "ADMIN" || currentUserPermissions?.can_manage_roles) && (
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        handleOpenEditRole(selectedMember)
+                      }}
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Manage Role
+                    </Button>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setMemberDetailsDialogOpen(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Member Role Dialog */}
+        <Dialog open={editRoleDialogOpen} onOpenChange={setEditRoleDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Member Role & Permissions</DialogTitle>
+              <DialogDescription>
+                Update the role and permissions for {selectedMember?.first_name} {selectedMember?.last_name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-6 py-4">
+              {/* Role Input */}
+              <div className="grid gap-2">
+                <Label htmlFor="edit_member_role">Role *</Label>
+                <Input
+                  id="edit_member_role"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  placeholder="Enter role (e.g., MEMBER, ADMIN, MODERATOR)"
+                />
+              </div>
+
+              {/* Permissions */}
+              <div className="grid gap-4">
+                <Label className="text-base font-semibold">Permissions</Label>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_create_channels"
+                    checked={editCanCreateChannels}
+                    onCheckedChange={(checked) => setEditCanCreateChannels(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_create_channels" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can create channels
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_send_messages"
+                    checked={editCanSendMessages}
+                    onCheckedChange={(checked) => setEditCanSendMessages(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_send_messages" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can send messages
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_delete_messages"
+                    checked={editCanDeleteMessages}
+                    onCheckedChange={(checked) => setEditCanDeleteMessages(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_delete_messages" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can delete messages
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_manage_roles"
+                    checked={editCanManageRoles}
+                    onCheckedChange={(checked) => setEditCanManageRoles(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_manage_roles" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can manage roles
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_kick_members"
+                    checked={editCanKickMembers}
+                    onCheckedChange={(checked) => setEditCanKickMembers(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_kick_members" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can kick members
+                  </label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setMemberDetailsDialogOpen(false)}
+                onClick={() => setEditRoleDialogOpen(false)}
+                disabled={isUpdatingRole}
               >
-                Close
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateRole}
+                disabled={isUpdatingRole}
+              >
+                {isUpdatingRole ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Update Role
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

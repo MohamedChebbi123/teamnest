@@ -9,6 +9,7 @@ from models.Team_roles import Team_roles
 from utils.jwt_handler import verify_token
 from schemas.team_creation import team_creation
 from schemas.Add_members_team import Add_members_team
+from schemas.Update_team_member_role import Update_team_member_role
 
 def create_team(data:team_creation,authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -418,3 +419,159 @@ def fetch_team_members(team_id: int, authorization: str, db: Session):
     ]
     
     return members_list
+
+
+def remove_team_member(team_id: int, member_user_id: int, authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if organization exists
+    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if the requesting user has permission to kick members
+    is_owner = found_organization.owner_id == user_id
+    
+    # Check if user has can_kick_members permission in the team
+    user_team_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == user_id
+    ).first()
+    
+    has_kick_permission = user_team_role and user_team_role.can_kick_members
+    
+    if not is_owner and not has_kick_permission:
+        raise HTTPException(
+            status_code=403, 
+            detail="You don't have permission to kick members from this team"
+        )
+    
+    # Check if member to be removed exists in the team
+    member_association = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == member_user_id
+    ).first()
+    
+    if not member_association:
+        raise HTTPException(status_code=404, detail="User is not a member of this team")
+    
+    # Prevent kicking yourself
+    if user_id == member_user_id:
+        raise HTTPException(status_code=400, detail="You cannot remove yourself from the team")
+    
+    # Remove from team_roles
+    team_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == member_user_id
+    ).first()
+    
+    if team_role:
+        db.delete(team_role)
+    
+    # Remove from team_association
+    db.delete(member_association)
+    db.commit()
+    
+    return {
+        "message": "Member removed successfully",
+        "team_id": team_id,
+        "user_id": member_user_id
+    }
+
+
+def update_team_member_role(team_id: int, member_user_id: int, data: Update_team_member_role, authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if organization exists
+    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if the requesting user has permission to manage roles
+    is_owner = found_organization.owner_id == user_id
+    
+    # Check if user has can_manage_roles permission in the team
+    user_team_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == user_id
+    ).first()
+    
+    has_manage_permission = user_team_role and user_team_role.can_manage_roles
+    
+    if not is_owner and not has_manage_permission:
+        raise HTTPException(
+            status_code=403, 
+            detail="You don't have permission to manage roles in this team"
+        )
+    
+    # Check if member to be updated exists in the team
+    member_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == member_user_id
+    ).first()
+    
+    if not member_role:
+        raise HTTPException(status_code=404, detail="User is not a member of this team")
+    
+    # Update the role and permissions
+    member_role.role = data.role
+    member_role.can_create_channels = data.can_create_channels
+    member_role.can_send_messages = data.can_send_messages
+    member_role.can_delete_messages = data.can_delete_messages
+    member_role.can_manage_roles = data.can_manage_roles
+    member_role.can_kick_members = data.can_kick_members
+    
+    db.commit()
+    db.refresh(member_role)
+    
+    return {
+        "message": "Member role updated successfully",
+        "team_id": team_id,
+        "user_id": member_user_id,
+        "role": member_role.role,
+        "permissions": {
+            "can_create_channels": member_role.can_create_channels,
+            "can_send_messages": member_role.can_send_messages,
+            "can_delete_messages": member_role.can_delete_messages,
+            "can_manage_roles": member_role.can_manage_roles,
+            "can_kick_members": member_role.can_kick_members
+        }
+    }
+
+
