@@ -1,5 +1,5 @@
 from schemas.Add_members_team import Add_members_team
-from services.team_service import create_team, fetch_teams_service, delete_team_service, update_team_service,add_memebers_to_teams
+from services.team_service import create_team, fetch_teams_service, delete_team_service, update_team_service,add_memebers_to_teams, fetch_team_members
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -53,3 +53,11 @@ async def add_members_to_team(
     db: Session = Depends(connect_databse)
 ):
     return add_memebers_to_teams(team_id, data, authorization, db)
+
+@router.get("/team/{team_id}/members")
+async def get_team_members(
+    team_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_team_members(team_id, authorization, db)

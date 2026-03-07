@@ -341,3 +341,80 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
             "can_kick_members": new_role.can_kick_members
         }
     }
+    
+    
+def fetch_team_members(team_id: int, authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if user is a member of the organization
+
+    
+    is_org_member = db.query(Organization_members).filter(
+        Organization_members.org_id == team.org_id,
+        Organization_members.memmber_id == user_id
+    ).first()
+    
+    if  not is_org_member:
+        raise HTTPException(status_code=403, detail="You must be a member of the organization to view team members")
+    
+    # Query team members with user info and permissions using joins
+    team_members = db.query(
+        Users.user_id,
+        Users.first_name,
+        Users.last_name,
+        Users.email,
+        Users.avatar_url,
+        Users.joined_at,
+        Team_roles.role,
+        Team_roles.can_create_channels,
+        Team_roles.can_send_messages,
+        Team_roles.can_delete_messages,
+        Team_roles.can_manage_roles,
+        Team_roles.can_kick_members
+    ).join(
+        Team_association, Users.user_id == Team_association.user_id
+    ).join(
+        Team_roles, 
+        (Team_roles.user_id == Users.user_id) & 
+        (Team_roles.team_id == Team_association.team_id)
+    ).filter(Team_association.team_id == team_id).all()
+    
+    # Format the response
+    members_list = [
+        {
+            "user_id": member.user_id,
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "email": member.email,
+            "profile_picture": member.avatar_url,
+            "role": member.role,
+            "permissions": {
+                "can_create_channels": member.can_create_channels,
+                "can_send_messages": member.can_send_messages,
+                "can_delete_messages": member.can_delete_messages,
+                "can_manage_roles": member.can_manage_roles,
+                "can_kick_members": member.can_kick_members
+            },
+            "joined_at": member.joined_at.isoformat() if member.joined_at else None
+        }
+        for member in team_members
+    ]
+    
+    return members_list

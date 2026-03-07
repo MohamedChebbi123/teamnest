@@ -22,6 +22,8 @@ import {
   ArrowLeft,
   Edit,
   UserPlus,
+  Check,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -34,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 interface TeamDetails {
   team_id: number
   team_name: string
@@ -48,7 +51,25 @@ interface OrganizationMember {
   first_name: string
   last_name: string
   email: string
+  profile_picture: string | null
   role_user: string
+}
+
+interface TeamMember {
+  user_id: number
+  first_name: string
+  last_name: string
+  email: string
+  profile_picture: string | null
+  role: string
+  permissions: {
+    can_create_channels: boolean
+    can_send_messages: boolean
+    can_delete_messages: boolean
+    can_manage_roles: boolean
+    can_kick_members: boolean
+  }
+  joined_at: string | null
 }
 
 export default function TeamPage() {
@@ -62,6 +83,7 @@ export default function TeamPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [userRole, setUserRole] = useState<string>("MEMBER")
   const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
 
   // Edit team dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -80,6 +102,33 @@ export default function TeamPage() {
   const [canManageRoles, setCanManageRoles] = useState(false)
   const [canKickMembers, setCanKickMembers] = useState(false)
   const [isAddingMember, setIsAddingMember] = useState(false)
+
+  // Member details dialog
+  const [memberDetailsDialogOpen, setMemberDetailsDialogOpen] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
+
+  const fetchTeamMembers = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(
+        `http://localhost:8000/team/${teamId}/members`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (response.ok) {
+        const membersData = await response.json()
+        setTeamMembers(membersData)
+      }
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+    }
+  }
 
   useEffect(() => {
     const fetchTeamData = async () => {
@@ -156,6 +205,9 @@ export default function TeamPage() {
             }
           }
         }
+
+        // Fetch team members
+        await fetchTeamMembers()
 
       } catch (error) {
         console.error('Error fetching team data:', error)
@@ -286,6 +338,8 @@ export default function TeamPage() {
         setCanDeleteMessages(false)
         setCanManageRoles(false)
         setCanKickMembers(false)
+        // Refresh team members list
+        await fetchTeamMembers()
       } else {
         toast.error("Error", {
           description: data.detail || "Failed to add member to team"
@@ -407,16 +461,43 @@ export default function TeamPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground mb-4">No team members yet</p>
-                {(userRole === "OWNER" || userRole === "ADMIN") && (
-                  <Button onClick={() => setAddMemberDialogOpen(true)}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add First Member
-                  </Button>
-                )}
-              </div>
+              {teamMembers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground mb-4">No team members yet</p>
+                  {(userRole === "OWNER" || userRole === "ADMIN") && (
+                    <Button onClick={() => setAddMemberDialogOpen(true)}>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add First Member
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {teamMembers.map((member) => (
+                    <div
+                      key={member.user_id}
+                      onClick={() => {
+                        setSelectedMember(member)
+                        setMemberDetailsDialogOpen(true)
+                      }}
+                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={member.profile_picture || undefined} alt={`${member.first_name} ${member.last_name}`} />
+                        <AvatarFallback>
+                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-medium">{member.first_name} {member.last_name}</p>
+                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                      </div>
+                      <Badge variant="secondary">{member.role}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -518,7 +599,15 @@ export default function TeamPage() {
                   <SelectContent>
                     {organizationMembers.map((member) => (
                       <SelectItem key={member.user_id} value={member.user_id.toString()}>
-                        {member.first_name} {member.last_name} ({member.email}) - {member.role_user}
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={member.profile_picture || undefined} alt={`${member.first_name} ${member.last_name}`} />
+                            <AvatarFallback className="text-xs">
+                              {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{member.first_name} {member.last_name} ({member.email}) - {member.role_user}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -634,6 +723,106 @@ export default function TeamPage() {
                     Add Member
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Member Details Dialog */}
+        <Dialog open={memberDetailsDialogOpen} onOpenChange={setMemberDetailsDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Team Member Details</DialogTitle>
+              <DialogDescription>
+                View member information and permissions
+              </DialogDescription>
+            </DialogHeader>
+            {selectedMember && (
+              <div className="space-y-6">
+                {/* Member Info */}
+                <div className="flex items-center gap-4 p-4 border rounded-lg">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={selectedMember.profile_picture || undefined} alt={`${selectedMember.first_name} ${selectedMember.last_name}`} />
+                    <AvatarFallback className="text-lg">
+                      {selectedMember.first_name.charAt(0)}{selectedMember.last_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold">{selectedMember.first_name} {selectedMember.last_name}</h3>
+                    <p className="text-muted-foreground">{selectedMember.email}</p>
+                    <div className="mt-2">
+                      <Badge variant="secondary" className="text-sm">{selectedMember.role}</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Permissions */}
+                <div>
+                  <h4 className="font-semibold mb-3">Permissions</h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <span className="text-sm">Can create channels</span>
+                      {selectedMember.permissions.can_create_channels ? (
+                        <Check className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <X className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <span className="text-sm">Can send messages</span>
+                      {selectedMember.permissions.can_send_messages ? (
+                        <Check className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <X className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <span className="text-sm">Can delete messages</span>
+                      {selectedMember.permissions.can_delete_messages ? (
+                        <Check className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <X className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <span className="text-sm">Can manage roles</span>
+                      {selectedMember.permissions.can_manage_roles ? (
+                        <Check className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <X className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <span className="text-sm">Can kick members</span>
+                      {selectedMember.permissions.can_kick_members ? (
+                        <Check className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <X className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Info */}
+                {selectedMember.joined_at && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      Joined: {new Date(selectedMember.joined_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setMemberDetailsDialogOpen(false)}
+              >
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
