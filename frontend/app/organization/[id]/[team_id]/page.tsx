@@ -29,6 +29,7 @@ import {
   Shield,
   Check,
   X,
+  UserMinus,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -110,6 +111,23 @@ export default function TeamPage() {
   const [canKickMembers, setCanKickMembers] = useState(false)
   const [isAddingMember, setIsAddingMember] = useState(false)
 
+  // Edit permissions dialog
+  const [editPermissionsOpen, setEditPermissionsOpen] = useState(false)
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
+  const [editRole, setEditRole] = useState<string>("")
+  const [editCanCreateChannels, setEditCanCreateChannels] = useState(false)
+  const [editCanSendMessages, setEditCanSendMessages] = useState(false)
+  const [editCanDeleteMessages, setEditCanDeleteMessages] = useState(false)
+  const [editCanManageRoles, setEditCanManageRoles] = useState(false)
+  const [editCanKickMembers, setEditCanKickMembers] = useState(false)
+  const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false)
+
+  // Current user's permissions
+  const [currentUserPermissions, setCurrentUserPermissions] = useState<{
+    can_manage_roles: boolean
+    can_kick_members: boolean
+  }>({ can_manage_roles: false, can_kick_members: false })
+
   const fetchTeamMembers = async () => {
     try {
       const token = localStorage.getItem('access_token')
@@ -127,6 +145,17 @@ export default function TeamPage() {
       if (response.ok) {
         const data = await response.json()
         setTeamMembers(data.members || [])
+        
+        // Set current user's permissions
+        if (currentUserId !== null) {
+          const currentUserMember = data.members.find((m: TeamMember) => m.user_id === currentUserId)
+          if (currentUserMember && currentUserMember.permissions) {
+            setCurrentUserPermissions({
+              can_manage_roles: currentUserMember.permissions.can_manage_roles,
+              can_kick_members: currentUserMember.permissions.can_kick_members
+            })
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching team members:', error)
@@ -361,6 +390,116 @@ export default function TeamPage() {
   const handleMemberClick = (member: TeamMember) => {
     setSelectedMember(member)
     setMemberDetailsOpen(true)
+  }
+
+  const handleEditPermissions = (member: TeamMember) => {
+    setEditingMember(member)
+    setEditRole(member.role)
+    if (member.permissions) {
+      setEditCanCreateChannels(member.permissions.can_create_channels)
+      setEditCanSendMessages(member.permissions.can_send_messages)
+      setEditCanDeleteMessages(member.permissions.can_delete_messages)
+      setEditCanManageRoles(member.permissions.can_manage_roles)
+      setEditCanKickMembers(member.permissions.can_kick_members)
+    }
+    setEditPermissionsOpen(true)
+    setMemberDetailsOpen(false)
+  }
+
+  const handleUpdatePermissions = async () => {
+    if (!editingMember) return
+
+    setIsUpdatingPermissions(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/team/${teamId}/member/${editingMember.user_id}/permissions`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            role: editRole,
+            can_create_channels: editCanCreateChannels,
+            can_send_messages: editCanSendMessages,
+            can_delete_messages: editCanDeleteMessages,
+            can_manage_roles: editCanManageRoles,
+            can_kick_members: editCanKickMembers
+          })
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Member permissions updated successfully"
+        })
+        setEditPermissionsOpen(false)
+        await fetchTeamMembers()
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to update permissions"
+        })
+      }
+    } catch (error) {
+      console.error('Error updating permissions:', error)
+      toast.error("Error", {
+        description: "An error occurred while updating permissions"
+      })
+    } finally {
+      setIsUpdatingPermissions(false)
+    }
+  }
+
+  const handleKickMember = async (memberId: number, memberName: string) => {
+    if (!confirm(`Are you sure you want to kick ${memberName} from the team?`)) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/team/${teamId}/member/${memberId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Member kicked successfully"
+        })
+        setMemberDetailsOpen(false)
+        await fetchTeamMembers()
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to kick member"
+        })
+      }
+    } catch (error) {
+      console.error('Error kicking member:', error)
+      toast.error("Error", {
+        description: "An error occurred while kicking member"
+      })
+    }
   }
 
   if (loading) {
@@ -836,9 +975,152 @@ export default function TeamPage() {
                 )}
               </div>
             )}
-            <DialogFooter>
-              <Button onClick={() => setMemberDetailsOpen(false)}>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <div className="flex gap-2 flex-1">
+                {(userRole === "OWNER" || userRole === "ADMIN" || currentUserPermissions.can_manage_roles) && selectedMember && selectedMember.user_id !== currentUserId && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleEditPermissions(selectedMember)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Permissions
+                  </Button>
+                )}
+                {(userRole === "OWNER" || userRole === "ADMIN" || currentUserPermissions.can_kick_members) && selectedMember && selectedMember.user_id !== currentUserId && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => handleKickMember(selectedMember.user_id, `${selectedMember.first_name} ${selectedMember.last_name}`)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <UserMinus className="h-4 w-4 mr-2" />
+                    Kick Member
+                  </Button>
+                )}
+              </div>
+              <Button variant="secondary" onClick={() => setMemberDetailsOpen(false)}>
                 Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Permissions Dialog */}
+        <Dialog open={editPermissionsOpen} onOpenChange={setEditPermissionsOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Member Permissions</DialogTitle>
+              <DialogDescription>
+                Update {editingMember?.first_name} {editingMember?.last_name}'s role and permissions
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-6 py-4">
+              {/* Role Input */}
+              <div className="grid gap-2">
+                <Label htmlFor="edit_role">Role *</Label>
+                <Input
+                  id="edit_role"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  placeholder="Enter role (e.g., MEMBER, ADMIN, MODERATOR)"
+                />
+              </div>
+
+              {/* Permissions */}
+              <div className="grid gap-4">
+                <Label className="text-base font-semibold">Permissions</Label>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_create_channels"
+                    checked={editCanCreateChannels}
+                    onCheckedChange={(checked) => setEditCanCreateChannels(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_create_channels" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can create channels
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_send_messages"
+                    checked={editCanSendMessages}
+                    onCheckedChange={(checked) => setEditCanSendMessages(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_send_messages" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can send messages
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_delete_messages"
+                    checked={editCanDeleteMessages}
+                    onCheckedChange={(checked) => setEditCanDeleteMessages(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_delete_messages" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can delete messages
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_manage_roles"
+                    checked={editCanManageRoles}
+                    onCheckedChange={(checked) => setEditCanManageRoles(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_manage_roles" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can manage roles
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_kick_members"
+                    checked={editCanKickMembers}
+                    onCheckedChange={(checked) => setEditCanKickMembers(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_kick_members" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can kick members
+                  </label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditPermissionsOpen(false)}
+                disabled={isUpdatingPermissions}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdatePermissions}
+                disabled={isUpdatingPermissions}
+              >
+                {isUpdatingPermissions ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Permissions"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

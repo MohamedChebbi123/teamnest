@@ -9,6 +9,7 @@ from models.Team_roles import Team_roles
 from utils.jwt_handler import verify_token
 from schemas.team_creation import team_creation
 from schemas.Add_members_team import Add_members_team
+from schemas.Update_team_member_role import Update_team_member_role
 
 def create_team(data:team_creation,authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -419,4 +420,175 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
         "team_name": team.team_name,
         "members": members_list
     }
+
+
+def update_member_permissions_service(team_id: int, member_user_id: int, data: Update_team_member_role, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
     
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if organization exists
+    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if the requesting user has permission to manage roles
+    is_owner = found_organization.owner_id == user_id
+    is_admin = db.query(Organization_members).filter(
+        Organization_members.org_id == team.org_id,
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+    
+    user_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == user_id
+    ).first()
+    
+    has_manage_permission = user_role and user_role.can_manage_roles if user_role else False
+    
+    if not is_owner and not is_admin and not has_manage_permission:
+        raise HTTPException(
+            status_code=403, 
+            detail="You don't have permission to manage roles in this team"
+        )
+    
+    # Check if target member exists in team
+    target_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == member_user_id
+    ).first()
+    
+    if not target_member:
+        raise HTTPException(status_code=404, detail="User is not a member of this team")
+    
+    # Find and update the member's role
+    member_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == member_user_id
+    ).first()
+    
+    if not member_role:
+        raise HTTPException(status_code=404, detail="Member role not found")
+    
+    # Update permissions
+    member_role.role = data.role
+    member_role.can_create_channels = data.can_create_channels
+    member_role.can_send_messages = data.can_send_messages
+    member_role.can_delete_messages = data.can_delete_messages
+    member_role.can_manage_roles = data.can_manage_roles
+    member_role.can_kick_members = data.can_kick_members
+    
+    db.commit()
+    db.refresh(member_role)
+    
+    return {
+        "message": "Member permissions updated successfully",
+        "user_id": member_user_id,
+        "team_id": team_id,
+        "role": member_role.role,
+        "permissions": {
+            "can_create_channels": member_role.can_create_channels,
+            "can_send_messages": member_role.can_send_messages,
+            "can_delete_messages": member_role.can_delete_messages,
+            "can_manage_roles": member_role.can_manage_roles,
+            "can_kick_members": member_role.can_kick_members
+        }
+    }
+
+
+def kick_member_service(team_id: int, member_user_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if organization exists
+    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if the requesting user has permission to kick members
+    is_owner = found_organization.owner_id == user_id
+    
+    
+    user_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == user_id
+    ).first()
+    
+    has_kick_permission = user_role and user_role.can_kick_members if user_role else False
+    
+    if not is_owner  and not has_kick_permission:
+        raise HTTPException(
+            status_code=403, 
+            detail="You don't have permission to kick members from this team"
+        )
+    
+    # Prevent kicking organization owner or admins
+    target_is_owner = found_organization.owner_id == member_user_id
+    
+    
+    if target_is_owner :
+        raise HTTPException(
+            status_code=403, 
+            detail="Cannot kick organization owner"
+        )
+    
+    # Check if target member exists in team
+    target_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == member_user_id
+    ).first()
+    
+    if not target_member:
+        raise HTTPException(status_code=404, detail="User is not a member of this team")
+    
+    # Delete member's role
+    member_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == member_user_id
+    ).first()
+    
+    if member_role:
+        db.delete(member_role)
+    
+    # Delete team association
+    db.delete(target_member)
+    db.commit()
+    
+    return {
+        "message": "Member kicked successfully",
+        "user_id": member_user_id,
+        "team_id": team_id
+    }
+
