@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   Users, 
   Settings,
@@ -22,6 +23,12 @@ import {
   ArrowLeft,
   Edit,
   UserPlus,
+  Mail,
+  Phone,
+  MapPin,
+  Shield,
+  Check,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -51,6 +58,25 @@ interface OrganizationMember {
   role_user: string
 }
 
+interface TeamMember {
+  user_id: number
+  first_name: string
+  last_name: string
+  email: string
+  avatar_url: string | null
+  user_tag: string | null
+  phone_number: string | null
+  country: string | null
+  role: string
+  permissions: {
+    can_create_channels: boolean
+    can_send_messages: boolean
+    can_delete_messages: boolean
+    can_manage_roles: boolean
+    can_kick_members: boolean
+  } | null
+}
+
 export default function TeamPage() {
   const params = useParams()
   const router = useRouter()
@@ -62,6 +88,9 @@ export default function TeamPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [userRole, setUserRole] = useState<string>("MEMBER")
   const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
+  const [memberDetailsOpen, setMemberDetailsOpen] = useState(false)
 
   // Edit team dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -80,6 +109,29 @@ export default function TeamPage() {
   const [canManageRoles, setCanManageRoles] = useState(false)
   const [canKickMembers, setCanKickMembers] = useState(false)
   const [isAddingMember, setIsAddingMember] = useState(false)
+
+  const fetchTeamMembers = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(
+        `http://localhost:8000/team/${teamId}/members`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setTeamMembers(data.members || [])
+      }
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+    }
+  }
 
   useEffect(() => {
     const fetchTeamData = async () => {
@@ -156,6 +208,9 @@ export default function TeamPage() {
             }
           }
         }
+
+        // Fetch team members
+        await fetchTeamMembers()
 
       } catch (error) {
         console.error('Error fetching team data:', error)
@@ -286,6 +341,8 @@ export default function TeamPage() {
         setCanDeleteMessages(false)
         setCanManageRoles(false)
         setCanKickMembers(false)
+        // Refresh team members
+        await fetchTeamMembers()
       } else {
         toast.error("Error", {
           description: data.detail || "Failed to add member to team"
@@ -299,6 +356,11 @@ export default function TeamPage() {
     } finally {
       setIsAddingMember(false)
     }
+  }
+
+  const handleMemberClick = (member: TeamMember) => {
+    setSelectedMember(member)
+    setMemberDetailsOpen(true)
   }
 
   if (loading) {
@@ -403,20 +465,45 @@ export default function TeamPage() {
             <CardHeader>
               <CardTitle>Team Members</CardTitle>
               <CardDescription>
-                View and manage members in this team
+                View and manage members in this team ({teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''})
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground mb-4">No team members yet</p>
-                {(userRole === "OWNER" || userRole === "ADMIN") && (
-                  <Button onClick={() => setAddMemberDialogOpen(true)}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add First Member
-                  </Button>
-                )}
-              </div>
+              {teamMembers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground mb-4">No team members yet</p>
+                  {(userRole === "OWNER" || userRole === "ADMIN") && (
+                    <Button onClick={() => setAddMemberDialogOpen(true)}>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add First Member
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {teamMembers.map((member) => (
+                    <div
+                      key={member.user_id}
+                      onClick={() => handleMemberClick(member)}
+                      className="flex flex-col items-center p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                    >
+                      <Avatar className="h-16 w-16 mb-3">
+                        <AvatarImage src={member.avatar_url || undefined} alt={`${member.first_name} ${member.last_name}`} />
+                        <AvatarFallback className="text-lg">
+                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <h3 className="font-semibold text-center">
+                        {member.first_name} {member.last_name}
+                      </h3>
+                      <Badge variant="secondary" className="mt-2 text-xs">
+                        {member.role}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -634,6 +721,124 @@ export default function TeamPage() {
                     Add Member
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Member Details Dialog */}
+        <Dialog open={memberDetailsOpen} onOpenChange={setMemberDetailsOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Member Details</DialogTitle>
+              <DialogDescription>
+                View member information and permissions
+              </DialogDescription>
+            </DialogHeader>
+            {selectedMember && (
+              <div className="space-y-6 py-4">
+                {/* Member Info */}
+                <div className="flex items-center gap-4 pb-4 border-b">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={selectedMember.avatar_url || undefined} alt={`${selectedMember.first_name} ${selectedMember.last_name}`} />
+                    <AvatarFallback className="text-2xl">
+                      {selectedMember.first_name.charAt(0)}{selectedMember.last_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold">
+                      {selectedMember.first_name} {selectedMember.last_name}
+                    </h3>
+                    {selectedMember.user_tag && (
+                      <p className="text-muted-foreground">@{selectedMember.user_tag}</p>
+                    )}
+                  </div>
+                  <Badge variant="default" className="h-fit">
+                    <Shield className="h-3 w-3 mr-1" />
+                    {selectedMember.role}
+                  </Badge>
+                </div>
+
+                {/* Contact Information */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    Contact Information
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-sm">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span>{selectedMember.email}</span>
+                    </div>
+                    {selectedMember.phone_number && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedMember.phone_number}</span>
+                      </div>
+                    )}
+                    {selectedMember.country && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedMember.country}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Permissions */}
+                {selectedMember.permissions && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                      Permissions
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                        <span className="text-sm font-medium">Create Channels</span>
+                        {selectedMember.permissions.can_create_channels ? (
+                          <Check className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                        <span className="text-sm font-medium">Send Messages</span>
+                        {selectedMember.permissions.can_send_messages ? (
+                          <Check className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                        <span className="text-sm font-medium">Delete Messages</span>
+                        {selectedMember.permissions.can_delete_messages ? (
+                          <Check className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                        <span className="text-sm font-medium">Manage Roles</span>
+                        {selectedMember.permissions.can_manage_roles ? (
+                          <Check className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                        <span className="text-sm font-medium">Kick Members</span>
+                        {selectedMember.permissions.can_kick_members ? (
+                          <Check className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setMemberDetailsOpen(false)}>
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -29,9 +29,25 @@ export default function MembersSidebar({ organizationId }: MembersSidebarProps) 
   const [isResizing, setIsResizing] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
 
   const minWidth = 250;
   const maxWidth = 500;
+
+  // Check if mobile on mount
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      // Close sidebar on mobile by default
+      if (mobile && isOpen) {
+        setIsOpen(false);
+      }
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const startResizing = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -124,13 +140,13 @@ export default function MembersSidebar({ organizationId }: MembersSidebarProps) 
     <>
       {/* Sidebar - Always visible but collapsible */}
       <div
-        style={{ width: isOpen ? `${sidebarWidth}px` : '0px' }}
+        style={{ width: isOpen ? (isMobile ? '280px' : `${sidebarWidth}px`) : '0px' }}
         className={`fixed top-0 right-0 h-full bg-background border-l border-border shadow-lg transition-all duration-300 ease-in-out z-40 ${
           isResizing ? 'select-none' : ''
         }`}
       >
-        {/* Resize Handle */}
-        {isOpen && (
+        {/* Resize Handle - Hidden on mobile */}
+        {isOpen && !isMobile && (
           <div
             onMouseDown={startResizing}
             className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"

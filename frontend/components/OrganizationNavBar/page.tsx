@@ -87,6 +87,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
   const [navbarWidth, setNavbarWidth] = useState(240)
   const [isResizing, setIsResizing] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [newChannel, setNewChannel] = useState({
     channel_name: "",
     type: "text",
@@ -95,6 +97,16 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   
   const minWidth = 64;
   const maxWidth = 400;
+  
+  // Check if mobile on mount
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const startResizing = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -452,15 +464,19 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   if (loading) {
     return (
       <aside 
-        style={{ width: `${navbarWidth}px` }}
+        style={{ 
+          width: isMobile ? '280px' : `${navbarWidth}px`,
+          left: isMobile ? '0' : 'var(--main-sidebar-width, 240px)'
+        }}
         className={cn(
-          "fixed left-20 top-0 h-screen bg-background border-r flex items-center justify-center z-30",
+          "fixed top-0 h-screen bg-background border-r flex items-center justify-center z-30",
+          isMobile ? "-translate-x-full" : "hidden lg:block",
           isResizing ? 'select-none' : ''
         )}
       >
         <div
           onMouseDown={startResizing}
-          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+          className="hidden lg:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
         />
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -475,17 +491,29 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   return (
+    <>
+    {/* Set CSS variable for org navbar width */}
+    <style jsx global>{`
+      :root {
+        --org-navbar-width: ${navbarWidth}px;
+      }
+    `}</style>
+    
     <aside 
-      style={{ width: `${navbarWidth}px` }}
+      style={{ 
+        width: isMobile ? '280px' : `${navbarWidth}px`,
+        left: isMobile ? '0' : 'var(--main-sidebar-width, 240px)'
+      }}
       className={cn(
-        "fixed left-20 top-0 h-screen bg-background border-r flex flex-col z-30 shadow-sm",
+        "fixed top-0 h-screen bg-background border-r flex flex-col z-30 shadow-sm transition-transform duration-300",
+        isMobile ? (isMobileNavOpen ? "translate-x-0" : "-translate-x-full") : "hidden lg:block",
         isResizing ? 'select-none' : ''
       )}
     >
-      {/* Resize Handle */}
+      {/* Resize Handle - Hidden on mobile */}
       <div
         onMouseDown={startResizing}
-        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
+        className="hidden lg:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
       />
 
       {/* Toggle Button */}
@@ -851,5 +879,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         </DialogContent>
       </Dialog>
     </aside>
+    </>
   )
 }
