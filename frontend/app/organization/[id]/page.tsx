@@ -595,7 +595,7 @@ export default function OrganizationPage() {
     return (
       <>
         <Sidebar />
-        <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="min-h-screen w-full flex items-center justify-center p-4">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Loading organization...</p>
@@ -609,7 +609,7 @@ export default function OrganizationPage() {
     return (
       <>
         <Sidebar />
-        <div className="min-h-screen w-full flex items-center justify-center">
+        <div className="min-h-screen w-full flex items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Organization Not Found</CardTitle>
@@ -633,40 +633,40 @@ export default function OrganizationPage() {
       <Sidebar />
       <OrganizationNavBar organizationId={organizationId as string} />
     
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-8" style={{ marginLeft: '368px', marginRight: '320px' }}>
-        <div className="max-w-6xl mx-auto space-y-8">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-6 lg:p-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
+        <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
           {/* Organization Header */}
           <Card>
             <CardHeader>
-              <div className="flex items-start gap-6">
-                <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
+              <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6">
+                <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-lg flex-shrink-0">
                   <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-                    <Building2 className="h-12 w-12" />
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl">
+                    <Building2 className="h-10 w-10 sm:h-12 sm:w-12" />
                   </AvatarFallback>
                 </Avatar>
                 
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 space-y-3 w-full">
                   <div>
-                    <div className="flex items-center gap-3">
-                      <CardTitle className="text-3xl">{organization.organization_name}</CardTitle>
-                      <Badge variant="secondary" className="text-sm">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                      <CardTitle className="text-2xl sm:text-3xl break-words">{organization.organization_name}</CardTitle>
+                      <Badge variant="secondary" className="text-xs sm:text-sm">
                         #{organization.organaization_tag}
                       </Badge>
                       {organization.organization_plan && (
-                        <Badge variant={organization.organization_plan === "pro" ? "default" : "outline"}>
+                        <Badge variant={organization.organization_plan === "pro" ? "default" : "outline"} className="text-xs">
                           {organization.organization_plan.toUpperCase()}
                         </Badge>
                       )}
                     </div>
                     {organization.organization_description && (
-                      <CardDescription className="mt-2 text-base">
+                      <CardDescription className="mt-2 text-sm md:text-base">
                         {organization.organization_description}
                       </CardDescription>
                     )}
                   </div>
                   
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
                     <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
                       <DialogTrigger asChild>
                         <Button variant="default">
@@ -886,7 +886,7 @@ export default function OrganizationPage() {
           </Card>
 
           {/* Organization Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Members</CardTitle>
@@ -1029,7 +1029,7 @@ export default function OrganizationPage() {
       
       {/* Create Team Dialog */}
       <Dialog open={createTeamDialogOpen} onOpenChange={setCreateTeamDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create New Team</DialogTitle>
             <DialogDescription>

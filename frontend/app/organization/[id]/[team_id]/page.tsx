@@ -507,7 +507,7 @@ export default function TeamPage() {
       <div className="min-h-screen flex">
         <OrganizationNavBar organizationId={organizationId} />
         <MembersSidebar organizationId={organizationId} />
-        <main className="flex-1 ml-[680px] p-8">
+        <main className="flex-1 lg:ml-[560px] xl:ml-[680px] p-4 md:p-6 lg:p-8">
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -524,7 +524,7 @@ export default function TeamPage() {
       <div className="min-h-screen flex">
         <OrganizationNavBar organizationId={organizationId} />
         <MembersSidebar organizationId={organizationId} />
-        <main className="flex-1 ml-[680px] p-8">
+        <main className="flex-1 lg:ml-[560px] xl:ml-[680px] p-4 md:p-6 lg:p-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold">Team not found</h1>
             <Button
@@ -545,41 +545,45 @@ export default function TeamPage() {
       <OrganizationNavBar organizationId={organizationId} />
       <MembersSidebar organizationId={organizationId} />
       
-      <main className="flex-1 ml-[680px] p-8">
+      <main className="flex-1 lg:ml-[560px] xl:ml-[680px] p-4 md:p-6 lg:p-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <Button
             variant="ghost"
             onClick={() => router.push(`/organization/${organizationId}`)}
             className="mb-4"
+            size="sm"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Organization
+            <span className="hidden sm:inline">Back to Organization</span>
+            <span className="sm:hidden">Back</span>
           </Button>
 
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold">{team.team_name}</h1>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1 flex-1">
+              <h1 className="text-2xl md:text-3xl font-bold break-words">{team.team_name}</h1>
               {team.description && (
-                <p className="text-muted-foreground">{team.description}</p>
+                <p className="text-muted-foreground text-sm md:text-base">{team.description}</p>
               )}
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="secondary">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <Badge variant="secondary" className="text-xs">
                   <Users className="h-3 w-3 mr-1" />
-                  Max: {team.team_size} members
+                  Max: {team.team_size}
                 </Badge>
-                <Badge variant="outline">
+                <Badge variant="outline" className="text-xs hidden sm:inline-flex">
                   Team ID: {team.team_id}
                 </Badge>
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               {(userRole === "OWNER" || userRole === "ADMIN") && (
                 <>
                   <Button
                     variant="default"
                     onClick={() => setAddMemberDialogOpen(true)}
+                    size="sm"
+                    className="w-full sm:w-auto"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
                     Add Member
@@ -587,6 +591,8 @@ export default function TeamPage() {
                   <Button
                     variant="outline"
                     onClick={() => setEditDialogOpen(true)}
+                    size="sm"
+                    className="w-full sm:w-auto"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Team
@@ -620,7 +626,7 @@ export default function TeamPage() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                   {teamMembers.map((member) => (
                     <div
                       key={member.user_id}
@@ -726,7 +732,7 @@ export default function TeamPage() {
 
         {/* Add Member Dialog */}
         <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add Member to Team</DialogTitle>
               <DialogDescription>
@@ -867,7 +873,7 @@ export default function TeamPage() {
 
         {/* Member Details Dialog */}
         <Dialog open={memberDetailsOpen} onOpenChange={setMemberDetailsOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-[95vw] sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Member Details</DialogTitle>
               <DialogDescription>
@@ -1007,7 +1013,7 @@ export default function TeamPage() {
 
         {/* Edit Permissions Dialog */}
         <Dialog open={editPermissionsOpen} onOpenChange={setEditPermissionsOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Member Permissions</DialogTitle>
               <DialogDescription>
