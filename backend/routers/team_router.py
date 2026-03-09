@@ -8,7 +8,8 @@ from services.team_service import (
     add_memebers_to_teams, 
     fetch_team_members_service,
     update_member_permissions_service,
-    kick_member_service
+    kick_member_service,
+    fetch_user_team_service
 )
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
@@ -90,3 +91,10 @@ async def kick_member(
     db: Session = Depends(connect_databse)
 ):
     return kick_member_service(team_id, member_user_id, authorization, db)
+
+@router.get("/user/teams")
+async def get_user_teams(
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_user_team_service(authorization, db)

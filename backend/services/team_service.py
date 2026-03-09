@@ -340,7 +340,8 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
             "can_send_messages": new_role.can_send_messages,
             "can_delete_messages": new_role.can_delete_messages,
             "can_manage_roles": new_role.can_manage_roles,
-            "can_kick_members": new_role.can_kick_members
+            "can_kick_members": new_role.can_kick_members,
+            "can_make_announcement": new_role.can_make_announcement
         }
     }
 
@@ -411,7 +412,8 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
                     "can_send_messages": role.can_send_messages if role else False,
                     "can_delete_messages": role.can_delete_messages if role else False,
                     "can_manage_roles": role.can_manage_roles if role else False,
-                    "can_kick_members": role.can_kick_members if role else False
+                    "can_kick_members": role.can_kick_members if role else False,
+                    "can_make_announcement": role.can_make_announcement if role else False
                 } if role else None
             }
             members_list.append(member_data)
@@ -509,7 +511,8 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
             "can_send_messages": member_role.can_send_messages,
             "can_delete_messages": member_role.can_delete_messages,
             "can_manage_roles": member_role.can_manage_roles,
-            "can_kick_members": member_role.can_kick_members
+            "can_kick_members": member_role.can_kick_members,
+            "can_make_announcement": member_role.can_make_announcement
         }
     }
 
@@ -594,3 +597,35 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
         "team_id": team_id
     }
 
+
+def fetch_user_team_service(authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    results = db.query(Teams).join(
+        Team_association, Teams.team_id == Team_association.team_id
+    ).filter(
+        Team_association.user_id == user_id
+    ).all()
+    
+    return [
+        {
+            "team_id": team.team_id,
+            "team_name": team.team_name,
+            "description": team.description,
+            "team_size": team.team_size,
+            "org_id": team.org_id,
+            "created_at": team.created_at
+        }
+        for team in results
+    ]

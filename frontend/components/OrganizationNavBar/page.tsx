@@ -73,6 +73,15 @@ interface Channel {
   created_at: string
 }
 
+interface Team {
+  team_id: number
+  team_name: string
+  description?: string
+  team_size: number
+  org_id: number
+  created_at: string
+}
+
 export default function OrganizationNavBar({ organizationId, onClose }: OrganizationNavBarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -83,6 +92,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [members, setMembers] = useState<Member[]>([])
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [channels, setChannels] = useState<Channel[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
   const [navbarWidth, setNavbarWidth] = useState(240)
@@ -224,6 +234,20 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         if (channelsResponse.ok) {
           const channelsData = await channelsResponse.json()
           setChannels(channelsData)
+        }
+
+        // Fetch user teams
+        const teamsResponse = await fetch('http://localhost:8000/user/teams', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json()
+          // Filter teams for current organization
+          const orgTeams = teamsData.filter((team: Team) => team.org_id === parseInt(organizationId as string))
+          setTeams(orgTeams)
         }
 
       } catch (error) {
@@ -762,6 +786,43 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                     </DropdownMenu>
                   )}
                 </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Teams Section */}
+        <div className="pt-4 mt-4 border-t">
+          {navbarWidth > 100 && (
+            <div className="flex items-center justify-between mb-2 px-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                My Teams
+              </h3>
+            </div>
+          )}
+          
+          <div className="space-y-0.5">
+            {teams.length === 0 ? (
+              navbarWidth > 100 && (
+                <p className="text-xs text-muted-foreground px-2 py-2">
+                  No teams enrolled yet.
+                </p>
+              )
+            ) : (
+              teams.map((team) => (
+                <Button
+                  key={team.team_id}
+                  variant="ghost"
+                  title={navbarWidth <= 100 ? team.team_name : undefined}
+                  className={cn(
+                    "h-8 w-full",
+                    navbarWidth <= 100 ? "justify-center px-0" : "justify-start gap-2 px-2"
+                  )}
+                  onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                >
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  {navbarWidth > 100 && <span className="text-sm truncate">{team.team_name}</span>}
+                </Button>
               ))
             )}
           </div>
