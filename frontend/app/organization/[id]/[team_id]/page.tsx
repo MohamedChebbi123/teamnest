@@ -75,6 +75,7 @@ interface TeamMember {
     can_delete_messages: boolean
     can_manage_roles: boolean
     can_kick_members: boolean
+    can_make_announcement: boolean
   } | null
 }
 
@@ -109,6 +110,7 @@ export default function TeamPage() {
   const [canDeleteMessages, setCanDeleteMessages] = useState(false)
   const [canManageRoles, setCanManageRoles] = useState(false)
   const [canKickMembers, setCanKickMembers] = useState(false)
+  const [canMakeAnnouncement, setCanMakeAnnouncement] = useState(false)
   const [isAddingMember, setIsAddingMember] = useState(false)
 
   // Edit permissions dialog
@@ -120,6 +122,7 @@ export default function TeamPage() {
   const [editCanDeleteMessages, setEditCanDeleteMessages] = useState(false)
   const [editCanManageRoles, setEditCanManageRoles] = useState(false)
   const [editCanKickMembers, setEditCanKickMembers] = useState(false)
+  const [editCanMakeAnnouncement, setEditCanMakeAnnouncement] = useState(false)
   const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false)
 
   // Current user's permissions
@@ -350,7 +353,8 @@ export default function TeamPage() {
             can_send_messages: canSendMessages,
             can_delete_messages: canDeleteMessages,
             can_manage_roles: canManageRoles,
-            can_kick_members: canKickMembers
+            can_kick_members: canKickMembers,
+            can_make_announcement: canMakeAnnouncement
           })
         }
       )
@@ -370,6 +374,7 @@ export default function TeamPage() {
         setCanDeleteMessages(false)
         setCanManageRoles(false)
         setCanKickMembers(false)
+        setCanMakeAnnouncement(false)
         // Refresh team members
         await fetchTeamMembers()
       } else {
@@ -401,6 +406,7 @@ export default function TeamPage() {
       setEditCanDeleteMessages(member.permissions.can_delete_messages)
       setEditCanManageRoles(member.permissions.can_manage_roles)
       setEditCanKickMembers(member.permissions.can_kick_members)
+      setEditCanMakeAnnouncement(member.permissions.can_make_announcement)
     }
     setEditPermissionsOpen(true)
     setMemberDetailsOpen(false)
@@ -431,7 +437,8 @@ export default function TeamPage() {
             can_send_messages: editCanSendMessages,
             can_delete_messages: editCanDeleteMessages,
             can_manage_roles: editCanManageRoles,
-            can_kick_members: editCanKickMembers
+            can_kick_members: editCanKickMembers,
+            can_make_announcement: editCanMakeAnnouncement
           })
         }
       )
@@ -802,6 +809,20 @@ export default function TeamPage() {
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
+                    id="can_make_announcement"
+                    checked={canMakeAnnouncement}
+                    onCheckedChange={(checked) => setCanMakeAnnouncement(checked === true)}
+                  />
+                  <label 
+                    htmlFor="can_make_announcement" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can make announcement
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
                     id="can_delete_messages"
                     checked={canDeleteMessages}
                     onCheckedChange={(checked) => setCanDeleteMessages(checked === true)}
@@ -976,6 +997,15 @@ export default function TeamPage() {
                           <X className="h-5 w-5 text-red-600" />
                         )}
                       </div>
+
+                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                        <span className="text-sm font-medium">Make Announcement</span>
+                        {selectedMember.permissions.can_make_announcement ? (
+                          <Check className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1103,6 +1133,20 @@ export default function TeamPage() {
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                   >
                     Can kick members
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit_can_make_announcement"
+                    checked={editCanMakeAnnouncement}
+                    onCheckedChange={(checked) => setEditCanMakeAnnouncement(checked === true)}
+                  />
+                  <label 
+                    htmlFor="edit_can_make_announcement" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Can make announcement
                   </label>
                 </div>
               </div>

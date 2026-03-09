@@ -14,6 +14,7 @@ class Team_roles(Base):
     can_delete_messages=Column(Boolean,default=False)
     can_manage_roles=Column(Boolean,default=False)
     can_kick_members=Column(Boolean,default=False)
+    can_make_announcement=Column(Boolean,default=False)
     created_at = Column(DateTime(timezone=True), default=datetime.now(UTC))
     updated_at = Column(DateTime(timezone=True), default=datetime.now(UTC), onupdate=datetime.now(UTC))
     

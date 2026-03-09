@@ -10,3 +10,4 @@ class Add_members_team(BaseModel):
     can_delete_messages: bool 
     can_manage_roles: bool 
     can_kick_members: bool 
+    can_make_announcement : bool

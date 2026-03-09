@@ -8,3 +8,4 @@ class Update_team_member_role(BaseModel):
     can_delete_messages: bool 
     can_manage_roles: bool 
     can_kick_members: bool 
+    can_make_announcement : bool

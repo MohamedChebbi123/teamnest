@@ -321,7 +321,8 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
         can_send_messages=data.can_send_messages,
         can_delete_messages=data.can_delete_messages,
         can_manage_roles=data.can_manage_roles,
-        can_kick_members=data.can_kick_members
+        can_kick_members=data.can_kick_members,
+        can_make_announcement=data.can_make_announcement
     )
     db.add(new_role)
     
@@ -493,6 +494,7 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
     member_role.can_delete_messages = data.can_delete_messages
     member_role.can_manage_roles = data.can_manage_roles
     member_role.can_kick_members = data.can_kick_members
+    member_role.can_make_announcement=data.can_make_announcement
     
     db.commit()
     db.refresh(member_role)
