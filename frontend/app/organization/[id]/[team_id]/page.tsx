@@ -30,6 +30,8 @@ import {
   Check,
   X,
   UserMinus,
+  Hash,
+  Plus,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -77,6 +79,17 @@ interface TeamMember {
     can_kick_members: boolean
     can_make_announcement: boolean
   } | null
+}
+
+interface Channel {
+  channel_id: number
+  channel_name: string
+  channel_mode: string
+  channel_category: string
+  description: string | null
+  team_id: number
+  org_id: number
+  created_at: string
 }
 
 export default function TeamPage() {
@@ -129,9 +142,19 @@ export default function TeamPage() {
   const [currentUserPermissions, setCurrentUserPermissions] = useState<{
     can_manage_roles: boolean
     can_kick_members: boolean
-  }>({ can_manage_roles: false, can_kick_members: false })
+    can_create_channels: boolean
+  }>({ can_manage_roles: false, can_kick_members: false, can_create_channels: false })
 
-  const fetchTeamMembers = async () => {
+  // Channel creation dialog
+  const [createChannelDialogOpen, setCreateChannelDialogOpen] = useState(false)
+  const [channelName, setChannelName] = useState("")
+  const [channelMode, setChannelMode] = useState<"text" | "voice">("text")
+  const [channelCategory, setChannelCategory] = useState<"teambased" | "orgbased" | "announcement">("teambased")
+  const [channelDescription, setChannelDescription] = useState("")
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false)
+  const [channels, setChannels] = useState<Channel[]>([])
+
+  const fetchTeamMembers = async (userId?: number) => {
     try {
       const token = localStorage.getItem('access_token')
       if (!token) return
@@ -149,19 +172,44 @@ export default function TeamPage() {
         const data = await response.json()
         setTeamMembers(data.members || [])
         
-        // Set current user's permissions
-        if (currentUserId !== null) {
-          const currentUserMember = data.members.find((m: TeamMember) => m.user_id === currentUserId)
+        // Set current user's permissions - use passed userId or state currentUserId
+        const userIdToCheck = userId ?? currentUserId
+        if (userIdToCheck !== null) {
+          const currentUserMember = data.members.find((m: TeamMember) => m.user_id === userIdToCheck)
           if (currentUserMember && currentUserMember.permissions) {
             setCurrentUserPermissions({
               can_manage_roles: currentUserMember.permissions.can_manage_roles,
-              can_kick_members: currentUserMember.permissions.can_kick_members
+              can_kick_members: currentUserMember.permissions.can_kick_members,
+              can_create_channels: currentUserMember.permissions.can_create_channels
             })
           }
         }
       }
     } catch (error) {
       console.error('Error fetching team members:', error)
+    }
+  }
+
+  const fetchTeamChannels = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(
+        `http://localhost:8000/organization/${organizationId}/team/${teamId}/channels`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setChannels(data)
+      }
+    } catch (error) {
+      console.error('Error fetching team channels:', error)
     }
   }
 
@@ -242,7 +290,10 @@ export default function TeamPage() {
         }
 
         // Fetch team members
-        await fetchTeamMembers()
+        await fetchTeamMembers(userId ?? undefined)
+
+        // Fetch team channels
+        await fetchTeamChannels()
 
       } catch (error) {
         console.error('Error fetching team data:', error)
@@ -509,6 +560,68 @@ export default function TeamPage() {
     }
   }
 
+  const handleCreateChannel = async () => {
+    if (!channelName.trim()) {
+      toast.error("Error", {
+        description: "Channel name is required"
+      })
+      return
+    }
+
+    setIsCreatingChannel(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/organization/${organizationId}/team/${teamId}/channels`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            channel_name: channelName,
+            channel_mode: channelMode,
+            channel_category: channelCategory,
+            description: channelDescription || null
+          })
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Success", {
+          description: "Channel created successfully"
+        })
+        setCreateChannelDialogOpen(false)
+        // Reset form
+        setChannelName("")
+        setChannelMode("text")
+        setChannelCategory("teambased")
+        setChannelDescription("")
+        // Refresh channels list
+        await fetchTeamChannels()
+      } else {
+        toast.error("Error", {
+          description: data.detail || "Failed to create channel"
+        })
+      }
+    } catch (error) {
+      console.error('Error creating channel:', error)
+      toast.error("Error", {
+        description: "An error occurred while creating channel"
+      })
+    } finally {
+      setIsCreatingChannel(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex">
@@ -612,6 +725,70 @@ export default function TeamPage() {
 
         {/* Content */}
         <div className="grid grid-cols-1 gap-6">
+          {/* Team Channels */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle>Team Channels</CardTitle>
+                <CardDescription>
+                  Communication channels for this team ({channels.length} channel{channels.length !== 1 ? 's' : ''})
+                </CardDescription>
+              </div>
+              {(userRole === "OWNER" || currentUserPermissions.can_create_channels) && (
+                <Button
+                  onClick={() => setCreateChannelDialogOpen(true)}
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Channel
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {channels.length === 0 ? (
+                <div className="text-center py-8">
+                  <Hash className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground mb-4">No channels yet</p>
+                  {(userRole === "OWNER" || currentUserPermissions.can_create_channels) && (
+                    <Button onClick={() => setCreateChannelDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Channel
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                  {channels.map((channel) => (
+                    <div
+                      key={channel.channel_id}
+                      className="flex flex-col p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Hash className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">{channel.channel_name}</h3>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              {channel.channel_mode}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {channel.channel_category}
+                            </Badge>
+                          </div>
+                          {channel.description && (
+                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                              {channel.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Team Members */}
           <Card>
             <CardHeader>
@@ -1170,6 +1347,89 @@ export default function TeamPage() {
                   </>
                 ) : (
                   "Update Permissions"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Channel Dialog */}
+        <Dialog open={createChannelDialogOpen} onOpenChange={setCreateChannelDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Channel</DialogTitle>
+              <DialogDescription>
+                Create a new channel for team communication
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="channel_name">Channel Name *</Label>
+                <Input
+                  id="channel_name"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  placeholder="e.g., general, announcements"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="channel_mode">Channel Mode *</Label>
+                <Select value={channelMode} onValueChange={(value: "text" | "voice") => setChannelMode(value)}>
+                  <SelectTrigger id="channel_mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="voice">Voice</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="channel_category">Channel Category *</Label>
+                <Select value={channelCategory} onValueChange={(value: "teambased" | "orgbased" | "announcement") => setChannelCategory(value)}>
+                  <SelectTrigger id="channel_category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="teambased">Team Based</SelectItem>
+                    <SelectItem value="orgbased">Organization Based</SelectItem>
+                    <SelectItem value="announcement">Announcement</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="channel_description">Description</Label>
+                <Textarea
+                  id="channel_description"
+                  value={channelDescription}
+                  onChange={(e) => setChannelDescription(e.target.value)}
+                  placeholder="What is this channel for?"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCreateChannelDialogOpen(false)}
+                disabled={isCreatingChannel}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateChannel}
+                disabled={isCreatingChannel}
+              >
+                {isCreatingChannel ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Channel
+                  </>
                 )}
               </Button>
             </DialogFooter>

@@ -31,7 +31,7 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
         )
     
     valid_types = ["announcement", "orgbased", "teambased"]
-    if data.type not in valid_types:
+    if data.channel_mode not in valid_types:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid channel type. Must be one of: {', '.join(valid_types)}"
@@ -61,7 +61,8 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
     
     new_channel = Channels(
         channel_name=data.channel_name,
-        type=data.type,
+        channel_mode=data.channel_mode,
+        channel_category=data.channel_category,
         description=data.description,
         org_id=org_id
     )
@@ -75,7 +76,8 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
         "channel": {
             "channel_id": new_channel.channel_id,
             "channel_name": new_channel.channel_name,
-            "type": new_channel.type,
+            "channel_mode": new_channel.channel_mode,
+            "channel_category": new_channel.channel_category,
             "description": new_channel.description,
             "org_id": new_channel.org_id,
             "created_at": new_channel.created_at
@@ -121,7 +123,8 @@ def fetch_channels_service(org_id:int,authorization: str,db: Session):
         {
             "channel_id": channel.channel_id,
             "channel_name": channel.channel_name,
-            "type": channel.type,
+            "channel_mode": channel.channel_mode,
+            "channel_category": channel.channel_category,
             "description": channel.description,
             "org_id": channel.org_id,
             "created_at": channel.created_at
@@ -172,7 +175,8 @@ def fetch_single_channel_service(channel_id: int, authorization: str, db: Sessio
     return {
         "channel_id": channel.channel_id,
         "channel_name": channel.channel_name,
-        "type": channel.type,
+        "channel_mode": channel.channel_mode,
+        "channel_category": channel.channel_category,
         "description": channel.description,
         "org_id": channel.org_id,
         "created_at": channel.created_at,

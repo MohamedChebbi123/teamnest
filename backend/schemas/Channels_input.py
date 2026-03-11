@@ -1,9 +1,10 @@
 from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Optional
 
 
 class Channels_input(BaseModel):
     channel_name: str
-    type: Literal["announcement", "orgbased", "teambased"]
+    channel_mode: str 
+    channel_category: str
     description: Optional[str] = None
    

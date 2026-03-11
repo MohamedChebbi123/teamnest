@@ -1,5 +1,6 @@
 from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
+from schemas.Channels_input import Channels_input
 from services.team_service import (
     create_team, 
     fetch_teams_service, 
@@ -9,7 +10,9 @@ from services.team_service import (
     fetch_team_members_service,
     update_member_permissions_service,
     kick_member_service,
-    fetch_user_team_service
+    fetch_user_team_service,
+    create_channels_for_teams_service,
+    fetch_channels_for_teams_service
 )
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
@@ -98,3 +101,22 @@ async def get_user_teams(
     db: Session = Depends(connect_databse)
 ):
     return fetch_user_team_service(authorization, db)
+
+@router.post("/organization/{org_id}/team/{team_id}/channels")
+async def create_channel_for_team(
+    org_id: int,
+    team_id: int,
+    data: Channels_input,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return create_channels_for_teams_service(org_id, team_id, data, authorization, db)
+
+@router.get("/organization/{org_id}/team/{team_id}/channels")
+async def get_team_channels(
+    org_id: int,
+    team_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_channels_for_teams_service(org_id, team_id, authorization, db)

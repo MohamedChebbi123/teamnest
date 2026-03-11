@@ -6,10 +6,12 @@ from models.Teams import Teams
 from models.Organization_members import Organization_members
 from models.Team_association import Team_association
 from models.Team_roles import Team_roles
+from models.Channels import Channels
 from utils.jwt_handler import verify_token
 from schemas.team_creation import team_creation
 from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
+from schemas.Channels_input import Channels_input
 
 def create_team(data:team_creation,authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -94,6 +96,7 @@ def fetch_teams_service(org_id:int,authorization: str, db: Session):
         raise HTTPException(status_code=404, detail="Organization not found")
     
     is_owner = found_organization.owner_id == user_id
+    
     is_member = db.query(Organization_members).filter(
         Organization_members.org_id == org_id,
         Organization_members.memmber_id == user_id
@@ -530,19 +533,16 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
     
     user_id = int(payload["sub"])
     
-    # Find the team
-    team = db.query(Teams).filter(Teams.team_id == team_id).first()
-    
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if the requesting user has permission to kick members
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
     is_owner = found_organization.owner_id == user_id
     
     
@@ -559,7 +559,6 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
             detail="You don't have permission to kick members from this team"
         )
     
-    # Prevent kicking organization owner or admins
     target_is_owner = found_organization.owner_id == member_user_id
     
     
@@ -569,7 +568,7 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
             detail="Cannot kick organization owner"
         )
     
-    # Check if target member exists in team
+    
     target_member = db.query(Team_association).filter(
         Team_association.team_id == team_id,
         Team_association.user_id == member_user_id
@@ -578,7 +577,6 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
     if not target_member:
         raise HTTPException(status_code=404, detail="User is not a member of this team")
     
-    # Delete member's role
     member_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
         Team_roles.user_id == member_user_id
@@ -587,7 +585,6 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
     if member_role:
         db.delete(member_role)
     
-    # Delete team association
     db.delete(target_member)
     db.commit()
     
@@ -628,4 +625,156 @@ def fetch_user_team_service(authorization: str, db: Session):
             "created_at": team.created_at
         }
         for team in results
+    ]
+
+
+
+def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_input, authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team first
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Verify team belongs to the organization
+    if team.org_id != org_id:
+        raise HTTPException(status_code=400, detail="Team does not belong to this organization")
+    
+    # Find the organization
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if user is organization owner
+    is_owner = found_organization.owner_id == user_id
+    
+    # Get user's team role
+    user_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == user_id
+    ).first()
+    
+    # Check permissions - only owner or team members with can_create_channels permission
+    has_permission = is_owner or (user_role and user_role.can_create_channels)
+    
+    if not has_permission:
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have permission to create channels in this team"
+        )
+    
+    # Check if channel name already exists in this team
+    existing_channel = db.query(Channels).filter(
+        Channels.team_id == team_id,
+        Channels.channel_name == data.channel_name
+    ).first()
+    
+    if existing_channel:
+        raise HTTPException(status_code=400, detail="Channel name already exists in this team")
+    
+    # Create new channel
+    new_channel = Channels(
+        channel_name=data.channel_name,
+        channel_mode=data.channel_mode,
+        channel_category=data.channel_category,
+        description=data.description,
+        team_id=team_id,
+        org_id=org_id
+    )
+    
+    db.add(new_channel)
+    db.commit()
+    db.refresh(new_channel)
+    
+    return {
+        "message": "Channel created successfully",
+        "channel_id": new_channel.channel_id,
+        "channel_name": new_channel.channel_name,
+        "channel_mode": new_channel.channel_mode,
+        "channel_category": new_channel.channel_category,
+        "description": new_channel.description,
+        "team_id": new_channel.team_id,
+        "org_id": new_channel.org_id,
+        "created_at": new_channel.created_at
+    }
+
+
+def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    # Find the team first
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Verify team belongs to the organization
+    if team.org_id != org_id:
+        raise HTTPException(status_code=400, detail="Team does not belong to this organization")
+    
+    # Find the organization
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    # Check if user has access to the team
+    is_owner = found_organization.owner_id == user_id
+    
+    is_org_member = db.query(Organization_members).filter(
+        Organization_members.org_id == org_id,
+        Organization_members.memmber_id == user_id
+    ).first()
+    
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    
+    if not is_owner and not is_org_member and not is_team_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have access to view channels in this team"
+        )
+    
+    # Fetch all channels for this team
+    channels = db.query(Channels).filter(Channels.team_id == team_id).all()
+    
+    return [
+        {
+            "channel_id": channel.channel_id,
+            "channel_name": channel.channel_name,
+            "channel_mode": channel.channel_mode,
+            "channel_category": channel.channel_category,
+            "description": channel.description,
+            "team_id": channel.team_id,
+            "org_id": channel.org_id,
+            "created_at": channel.created_at
+        }
+        for channel in channels
     ]

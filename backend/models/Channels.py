@@ -7,7 +7,8 @@ class Channels(Base):
     __tablename__="channels"
     channel_id=Column(Integer,primary_key=True)
     channel_name=Column(String,nullable=False)
-    type=Column(String,nullable=False)
+    channel_mode = Column(String, nullable=False)   
+    channel_category = Column(String, nullable=False)  
     description=Column(Text,nullable=True)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=True)
