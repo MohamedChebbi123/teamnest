@@ -1,4 +1,10 @@
-from services.channel_service import create_channel_service, fetch_channels_service, fetch_single_channel_service
+from services.channel_service import (
+    create_channel_service, 
+    fetch_channels_service, 
+    fetch_single_channel_service,
+    update_channel_service,
+    delete_channel_service
+)
 from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, websocket_endpoint as websocket_service
 from fastapi import APIRouter, Depends, Header, Query, WebSocket
 from sqlalchemy.orm import Session
@@ -39,6 +45,27 @@ async def get_channel(
 ):
 
     return fetch_single_channel_service(channel_id, authorization, db)
+
+
+@router.put("/channel/{channel_id}")
+async def update_channel(
+    channel_id: int,
+    data: Channels_input,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+
+    return update_channel_service(channel_id, data, authorization, db)
+
+
+@router.delete("/channel/{channel_id}")
+async def delete_channel(
+    channel_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+
+    return delete_channel_service(channel_id, authorization, db)
 
 
 # @router.post("/channel/send_message")

@@ -68,7 +68,8 @@ interface Member {
 interface Channel {
   channel_id: number
   channel_name: string
-  type: string
+  channel_mode: string
+  channel_category: string
   description?: string
   org_id: number
   team_id?: number | null
@@ -104,7 +105,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [newChannel, setNewChannel] = useState({
     channel_name: "",
-    type: "orgbased",
+    channel_mode: "orgbased",
+    channel_category: "text",
     description: ""
   })
   
@@ -156,7 +158,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
   const [editChannelData, setEditChannelData] = useState({
     channel_name: "",
-    type: "text",
+    channel_mode: "orgbased",
+    channel_category: "text",
     description: ""
   })
   const [isEditingChannel, setIsEditingChannel] = useState(false)
@@ -353,7 +356,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         })
         setChannels([...channels, data.channel])
         setIsDialogOpen(false)
-        setNewChannel({ channel_name: "", type: "orgbased", description: "" })
+        setNewChannel({ channel_name: "", channel_mode: "orgbased", channel_category: "text", description: "" })
       } else {
         toast.error("Error", {
           description: data.detail || "Failed to create channel"
@@ -373,7 +376,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     setEditingChannel(channel)
     setEditChannelData({
       channel_name: channel.channel_name,
-      type: channel.type,
+      channel_mode: channel.channel_mode,
+      channel_category: channel.channel_category,
       description: channel.description || ""
     })
     setEditDialogOpen(true)
@@ -493,12 +497,13 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   const canEditDeleteChannel = (channel: Channel) => {
-    // If channel type is "general", only owner can edit/delete
-    if (channel.type === "general") {
-      return organization?.owner_id === currentUserId
+    // For organization-level channels (no team_id), only admins and owners can edit/delete
+    if (!channel.team_id) {
+      return userRole === "OWNER" || userRole === "ADMIN"
     }
-    // For other organization-level channels, only admins and owners can edit/delete
-    return userRole === "OWNER" || userRole === "ADMIN"
+    // For team-level channels, show edit/delete options
+    // Backend will enforce actual permissions based on team roles
+    return true
   }
 
 
@@ -680,15 +685,29 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                     </p>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="type">Channel Type</Label>
+                    <Label htmlFor="channel_mode">Channel Mode</Label>
                     <select
-                      id="type"
-                      value={newChannel.type}
-                      onChange={(e) => setNewChannel({ ...newChannel, type: e.target.value })}
+                      id="channel_mode"
+                      value={newChannel.channel_mode}
+                      onChange={(e) => setNewChannel({ ...newChannel, channel_mode: e.target.value })}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                      <option value="announcement">announcement</option>
-                      <option value="orgbased">orgbased</option>
+                      <option value="announcement">Announcement</option>
+                      <option value="orgbased">Organization Based</option>
+                      <option value="teambased">Team Based</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="channel_category">Channel Category</Label>
+                    <select
+                      id="channel_category"
+                      value={newChannel.channel_category}
+                      onChange={(e) => setNewChannel({ ...newChannel, channel_category: e.target.value })}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="text">Text</option>
+                      <option value="voice">Voice</option>
+                      <option value="video">Video</option>
                     </select>
                   </div>
                   <div className="grid gap-2">
@@ -936,7 +955,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           <DialogHeader>
             <DialogTitle>Edit Channel</DialogTitle>
             <DialogDescription>
-              Update channel details. {editingChannel?.type === "general" && "Only organization owners can edit general channels."}
+              Update channel details.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -954,16 +973,29 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
               </p>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit_type">Channel Type</Label>
+              <Label htmlFor="edit_channel_mode">Channel Mode</Label>
               <select
-                id="edit_type"
-                value={editChannelData.type}
-                onChange={(e) => setEditChannelData({ ...editChannelData, type: e.target.value })}
+                id="edit_channel_mode"
+                value={editChannelData.channel_mode}
+                onChange={(e) => setEditChannelData({ ...editChannelData, channel_mode: e.target.value })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="announcement">Announcement</option>
+                <option value="orgbased">Organization Based</option>
+                <option value="teambased">Team Based</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_channel_category">Channel Category</Label>
+              <select
+                id="edit_channel_category"
+                value={editChannelData.channel_category}
+                onChange={(e) => setEditChannelData({ ...editChannelData, channel_category: e.target.value })}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="text">Text</option>
-                <option value="general">General</option>
-                <option value="announcement">Announcement</option>
+                <option value="voice">Voice</option>
+                <option value="video">Video</option>
               </select>
             </div>
             <div className="grid gap-2">
@@ -1010,7 +1042,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             <DialogTitle>Delete Channel</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete <span className="font-semibold">#{deletingChannel?.channel_name}</span>? This action cannot be undone.
-              {deletingChannel?.type === "general" && " Only organization owners can delete general channels."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
