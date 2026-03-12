@@ -80,6 +80,7 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
             "channel_category": new_channel.channel_category,
             "description": new_channel.description,
             "org_id": new_channel.org_id,
+            "team_id": new_channel.team_id,
             "created_at": new_channel.created_at
         }
     }
@@ -127,6 +128,7 @@ def fetch_channels_service(org_id:int,authorization: str,db: Session):
             "channel_category": channel.channel_category,
             "description": channel.description,
             "org_id": channel.org_id,
+            "team_id": channel.team_id,
             "created_at": channel.created_at
         }
         for channel in found_channels

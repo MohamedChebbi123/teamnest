@@ -34,6 +34,7 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   MoreVertical,
   Edit,
   Trash2,
@@ -70,6 +71,7 @@ interface Channel {
   type: string
   description?: string
   org_id: number
+  team_id?: number | null
   created_at: string
 }
 
@@ -93,6 +95,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [channels, setChannels] = useState<Channel[]>([])
   const [teams, setTeams] = useState<Team[]>([])
+  const [expandedTeams, setExpandedTeams] = useState<Set<number>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
   const [navbarWidth, setNavbarWidth] = useState(240)
@@ -101,7 +104,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [newChannel, setNewChannel] = useState({
     channel_name: "",
-    type: "text",
+    type: "orgbased",
     description: ""
   })
   
@@ -300,6 +303,20 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     return true
   }
 
+  const toggleTeamExpansion = (teamId: number) => {
+    const newExpanded = new Set(expandedTeams)
+    if (newExpanded.has(teamId)) {
+      newExpanded.delete(teamId)
+    } else {
+      newExpanded.add(teamId)
+    }
+    setExpandedTeams(newExpanded)
+  }
+
+  const getTeamChannels = (teamId: number) => {
+    return channels.filter(channel => channel.team_id === teamId)
+  }
+
   const handleCreateChannel = async () => {
     if (!newChannel.channel_name.trim()) {
       toast.error("Error", {
@@ -336,7 +353,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         })
         setChannels([...channels, data.channel])
         setIsDialogOpen(false)
-        setNewChannel({ channel_name: "", type: "text", description: "" })
+        setNewChannel({ channel_name: "", type: "orgbased", description: "" })
       } else {
         toast.error("Error", {
           description: data.detail || "Failed to create channel"
@@ -480,8 +497,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     if (channel.type === "general") {
       return organization?.owner_id === currentUserId
     }
-    // For other channel types, any member can edit/delete
-    return true
+    // For other organization-level channels, only admins and owners can edit/delete
+    return userRole === "OWNER" || userRole === "ADMIN"
   }
 
 
@@ -672,7 +689,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                     >
                       <option value="announcement">announcement</option>
                       <option value="orgbased">orgbased</option>
-                      <option value="teambased">teambased</option>
                     </select>
                   </div>
                   <div className="grid gap-2">
@@ -727,14 +743,14 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           ) : null}
           
           <div className="space-y-0.5">
-            {channels.length === 0 ? (
+            {channels.filter(channel => !channel.team_id).length === 0 ? (
               navbarWidth > 100 && (
                 <p className="text-xs text-muted-foreground px-2 py-2">
                   No channels yet. Click + to create one.
                 </p>
               )
             ) : (
-              channels.map((channel) => (
+              channels.filter(channel => !channel.team_id).map((channel) => (
                 <div
                   key={channel.channel_id}
                   className={cn(
@@ -809,21 +825,106 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                 </p>
               )
             ) : (
-              teams.map((team) => (
-                <Button
-                  key={team.team_id}
-                  variant="ghost"
-                  title={navbarWidth <= 100 ? team.team_name : undefined}
-                  className={cn(
-                    "h-8 w-full",
-                    navbarWidth <= 100 ? "justify-center px-0" : "justify-start gap-2 px-2"
-                  )}
-                  onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
-                >
-                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                  {navbarWidth > 100 && <span className="text-sm truncate">{team.team_name}</span>}
-                </Button>
-              ))
+              teams.map((team) => {
+                const teamChannels = getTeamChannels(team.team_id)
+                const isExpanded = expandedTeams.has(team.team_id)
+                
+                return (
+                  <div key={team.team_id} className="space-y-0.5">
+                    {/* Team Header */}
+                    <div className="flex items-center">
+                      {navbarWidth > 100 && teamChannels.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-6 flex-shrink-0"
+                          onClick={() => toggleTeamExpansion(team.team_id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        title={navbarWidth <= 100 ? team.team_name : undefined}
+                        className={cn(
+                          "h-8 flex-1",
+                          navbarWidth <= 100 ? "justify-center px-0" : "justify-start gap-2",
+                          navbarWidth > 100 && teamChannels.length === 0 && "px-2"
+                        )}
+                        onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                      >
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                        {navbarWidth > 100 && (
+                          <>
+                            <span className="text-sm truncate">{team.team_name}</span>
+                            {teamChannels.length > 0 && (
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {teamChannels.length}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* Team Channels */}
+                    {navbarWidth > 100 && isExpanded && teamChannels.length > 0 && (
+                      <div className="ml-6 space-y-0.5">
+                        {teamChannels.map((channel) => (
+                          <div
+                            key={channel.channel_id}
+                            className="flex items-center gap-1"
+                          >
+                            <Button
+                              variant="ghost"
+                              className="h-7 flex-1 justify-start gap-2 px-2"
+                              onClick={() => router.push(`/channels/${channel.channel_id}`)}
+                            >
+                              <Hash className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs truncate">{channel.channel_name}</span>
+                            </Button>
+                            {canEditDeleteChannel(channel) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditChannel(channel)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit Channel
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteClick(channel)}
+                                    className="cursor-pointer text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Channel
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
