@@ -92,6 +92,9 @@ export default function Login() {
     setIsLoading(true)
 
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 12000)
+
       const response = await fetch("http://localhost:8000/login", {
         method: "POST",
         headers: {
@@ -101,33 +104,46 @@ export default function Login() {
           email: formData.email,
           password: formData.password,
         }),
+        signal: controller.signal,
       })
 
-      const data = await response.json()
+      clearTimeout(timeout)
+
+      let data: any = null
+      try {
+        data = await response.json()
+      } catch {
+        data = null
+      }
       console.log("Response status:", response.status)
       console.log("Response data:", data)
 
       if (!response.ok) {
-        throw new Error(data.detail || "Login failed")
+        throw new Error(data?.detail || data?.message || "Login failed")
       }
 
       toast.success("Login successful!", {
         description: "Welcome back! Redirecting to your profile...",
       })
       
-      if (data.access_token) {
-        localStorage.setItem("access_token", data.access_token)
+      const token = data.access_token || data.token
+      if (token) {
+        localStorage.setItem("access_token", token)
+      } else {
+        throw new Error("Login succeeded but no access token was returned")
       }
       
       setTimeout(() => {
-        window.location.href = "/auth/profile"
+        window.location.replace("/auth/profile")
       }, 1000)
       
       console.log("User logged in:", data)
     } catch (err) {
       console.error("Login error:", err)
       toast.error("Login failed", {
-        description: err instanceof Error ? err.message : "Invalid email or password. Please try again.",
+        description: err instanceof Error
+          ? (err.name === "AbortError" ? "Request timed out. Check backend server and try again." : err.message)
+          : "Invalid email or password. Please try again.",
       })
     } finally {
       setIsLoading(false)

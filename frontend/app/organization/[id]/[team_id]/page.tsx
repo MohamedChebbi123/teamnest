@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
 import { 
   Users, 
-  Settings,
   Loader2,
   ArrowLeft,
   Edit,
@@ -26,16 +26,18 @@ import {
   Mail,
   Phone,
   MapPin,
-  Shield,
   Check,
   X,
   UserMinus,
   Hash,
   Plus,
+  Mic,
+  Video,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
+import Sidebar from "@/components/Sidebar/page"
 import {
   Select,
   SelectContent,
@@ -624,14 +626,21 @@ export default function TeamPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex">
+      <div className="min-h-screen bg-background">
+        <Sidebar />
         <OrganizationNavBar organizationId={organizationId} />
         <MembersSidebar organizationId={organizationId} />
-        <main className="flex-1 lg:ml-[560px] xl:ml-[680px] p-4 md:p-6 lg:p-8">
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-muted-foreground">Loading team...</p>
+        <main className="p-4 md:p-6 lg:p-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="h-16 w-16 rounded-full border-4 border-muted" />
+                <Loader2 className="h-16 w-16 animate-spin text-primary absolute inset-0" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="font-medium text-foreground">Loading team...</p>
+                <p className="text-sm text-muted-foreground">Fetching team details and members</p>
+              </div>
             </div>
           </div>
         </main>
@@ -641,214 +650,224 @@ export default function TeamPage() {
 
   if (!team) {
     return (
-      <div className="min-h-screen flex">
+      <div className="min-h-screen bg-background">
+        <Sidebar />
         <OrganizationNavBar organizationId={organizationId} />
         <MembersSidebar organizationId={organizationId} />
-        <main className="flex-1 lg:ml-[560px] xl:ml-[680px] p-4 md:p-6 lg:p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">Team not found</h1>
-            <Button
-              onClick={() => router.push(`/organization/${organizationId}`)}
-              className="mt-4"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Organization
-            </Button>
+        <main className="p-4 md:p-6 lg:p-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
+          <div className="flex items-center justify-center h-[60vh]">
+            <Card className="max-w-md w-full text-center">
+              <CardContent className="pt-8 pb-6 space-y-4">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto">
+                  <Users className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-xl font-semibold">Team not found</h2>
+                  <p className="text-sm text-muted-foreground">This team may have been removed or you don&apos;t have access.</p>
+                </div>
+                <Button onClick={() => router.push(`/organization/${organizationId}`)}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Organization
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>
     )
   }
 
+  const getChannelIcon = (mode: string) => {
+    switch (mode) {
+      case "voice": return <Mic className="h-4 w-4" />
+      case "video": return <Video className="h-4 w-4" />
+      default: return <Hash className="h-4 w-4" />
+    }
+  }
+
+  const getRoleBadgeVariant = (role: string): "default" | "secondary" | "outline" | "destructive" => {
+    const upper = role.toUpperCase()
+    if (upper === "OWNER" || upper === "ADMIN") return "default"
+    if (upper === "MODERATOR") return "secondary"
+    return "outline"
+  }
+
+  const getPresenceBadge = (index: number) => {
+    const cycle = [
+      { label: "Online", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+      { label: "Away", className: "bg-slate-100 text-slate-700 border-slate-200" },
+      { label: "Busy", className: "bg-red-100 text-red-700 border-red-200" },
+    ]
+    return cycle[index % cycle.length]
+  }
+
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen bg-background">
+      <Sidebar />
       <OrganizationNavBar organizationId={organizationId} />
       <MembersSidebar organizationId={organizationId} />
       
-      <main className="flex-1 lg:ml-[560px] xl:ml-[680px] p-4 md:p-6 lg:p-8">
-        {/* Header */}
-        <div className="mb-6 md:mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => router.push(`/organization/${organizationId}`)}
-            className="mb-4"
-            size="sm"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Back to Organization</span>
-            <span className="sm:hidden">Back</span>
-          </Button>
-
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="space-y-1 flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold break-words">{team.team_name}</h1>
-              {team.description && (
-                <p className="text-muted-foreground text-sm md:text-base">{team.description}</p>
-              )}
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Badge variant="secondary" className="text-xs">
-                  <Users className="h-3 w-3 mr-1" />
-                  Max: {team.team_size}
-                </Badge>
-                <Badge variant="outline" className="text-xs hidden sm:inline-flex">
-                  Team ID: {team.team_id}
-                </Badge>
-              </div>
+      <main className="px-4 py-5 md:px-8 md:py-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px] overflow-y-auto">
+        <div className="mx-auto max-w-7xl space-y-8">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push(`/organization/${organizationId}`)}
+                className="mb-2 -ml-2"
+              >
+                <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                Back
+              </Button>
+              <h1 className="text-2xl font-semibold tracking-tight">Team Dashboard</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage members and channels for <span className="font-medium text-foreground">{team.team_name}</span>.
+              </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              {(userRole === "OWNER" || userRole === "ADMIN") && (
-                <>
-                  <Button
-                    variant="default"
-                    onClick={() => setAddMemberDialogOpen(true)}
-                    size="sm"
-                    className="w-full sm:w-auto"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Member
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditDialogOpen(true)}
-                    size="sm"
-                    className="w-full sm:w-auto"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Team
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="grid grid-cols-1 gap-6">
-          {/* Team Channels */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle>Team Channels</CardTitle>
-                <CardDescription>
-                  Communication channels for this team ({channels.length} channel{channels.length !== 1 ? 's' : ''})
-                </CardDescription>
-              </div>
+            <div className="flex items-center gap-2">
               {(userRole === "OWNER" || currentUserPermissions.can_create_channels) && (
-                <Button
-                  onClick={() => setCreateChannelDialogOpen(true)}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button variant="outline" onClick={() => setCreateChannelDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
                   Create Channel
                 </Button>
               )}
-            </CardHeader>
-            <CardContent>
-              {channels.length === 0 ? (
-                <div className="text-center py-8">
-                  <Hash className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground mb-4">No channels yet</p>
-                  {(userRole === "OWNER" || currentUserPermissions.can_create_channels) && (
-                    <Button onClick={() => setCreateChannelDialogOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create First Channel
-                    </Button>
-                  )}
+              {(userRole === "OWNER" || userRole === "ADMIN") && (
+                <Button onClick={() => setAddMemberDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add Member
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+            <Card className="xl:col-span-4 py-0">
+              <CardHeader className="border-b py-4">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle>Channels</CardTitle>
+                  <Badge variant="secondary" className="font-medium">
+                    {channels.length} active
+                  </Badge>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                  {channels.map((channel) => (
-                    <div
+              </CardHeader>
+
+              <CardContent className="p-2">
+                {channels.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    No channels yet.
+                  </div>
+                ) : (
+                  channels.slice(0, 8).map((channel, index) => (
+                    <button
                       key={channel.channel_id}
-                      className="flex flex-col p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                      onClick={() => router.push(`/channels/${channel.channel_id}`)}
+                      className="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-muted/70"
                     >
-                      <div className="flex items-start gap-3">
-                        <Hash className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate">{channel.channel_name}</h3>
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            <Badge variant="outline" className="text-xs">
-                              {channel.channel_mode}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {channel.channel_category}
-                            </Badge>
-                          </div>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="text-muted-foreground">{getChannelIcon(channel.channel_mode)}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{channel.channel_name}</p>
                           {channel.description && (
-                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                              {channel.description}
-                            </p>
+                            <p className="truncate text-xs text-muted-foreground">{channel.description}</p>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      {index === 2 ? (
+                        <Badge className="bg-red-100 text-red-700 hover:bg-red-100">HOT</Badge>
+                      ) : (
+                        <Badge variant="outline" className="capitalize text-[10px]">
+                          {channel.channel_category}
+                        </Badge>
+                      )}
+                    </button>
+                  ))
+                )}
+              </CardContent>
 
-          {/* Team Members */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>
-                View and manage members in this team ({teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''})
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {teamMembers.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground mb-4">No team members yet</p>
-                  {(userRole === "OWNER" || userRole === "ADMIN") && (
-                    <Button onClick={() => setAddMemberDialogOpen(true)}>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Add First Member
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                  {teamMembers.map((member) => (
-                    <div
-                      key={member.user_id}
-                      onClick={() => handleMemberClick(member)}
-                      className="flex flex-col items-center p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
-                    >
-                      <Avatar className="h-16 w-16 mb-3">
-                        <AvatarImage src={member.avatar_url || undefined} alt={`${member.first_name} ${member.last_name}`} />
-                        <AvatarFallback className="text-lg">
-                          {member.first_name.charAt(0)}{member.last_name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <h3 className="font-semibold text-center">
-                        {member.first_name} {member.last_name}
-                      </h3>
-                      <Badge variant="secondary" className="mt-2 text-xs">
-                        {member.role}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              <CardFooter className="border-t py-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => channels[0] && router.push(`/channels/${channels[0].channel_id}`)}
+                  disabled={channels.length === 0}
+                >
+                  View All Channels
+                </Button>
+              </CardFooter>
+            </Card>
 
-          {/* Team Statistics or Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Activity</CardTitle>
-              <CardDescription>Recent team activity and statistics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Settings className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-                <p>Team activity tracking coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
+            <Card className="xl:col-span-8 py-0">
+              <CardHeader className="border-b py-4">
+                <CardTitle>Team Members</CardTitle>
+                <CardDescription>
+                  {teamMembers.length}/{team.team_size} seats filled
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="p-0 overflow-x-auto">
+                {teamMembers.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">No members in this team yet.</div>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-muted/50 text-muted-foreground">
+                      <tr>
+                        <th className="px-5 py-3 text-left font-medium">Member</th>
+                        <th className="px-5 py-3 text-left font-medium">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamMembers.slice(0, 8).map((member, index) => {
+                        const presence = getPresenceBadge(index)
+                        return (
+                          <tr
+                            key={member.user_id}
+                            className="border-t hover:bg-muted/40 cursor-pointer"
+                            onClick={() => handleMemberClick(member)}
+                          >
+                            <td className="px-5 py-3">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9">
+                                  <AvatarImage src={member.avatar_url || undefined} alt={`${member.first_name} ${member.last_name}`} />
+                                  <AvatarFallback>
+                                    {member.first_name.charAt(0)}{member.last_name.charAt(0)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium">{member.first_name} {member.last_name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3">
+                              <Badge variant={getRoleBadgeVariant(member.role)}>{member.role}</Badge>
+                            </td>
+                          
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+
+              <CardFooter className="border-t flex items-center justify-between py-3 text-sm text-muted-foreground">
+                <span>
+                  Showing 1-{Math.min(teamMembers.length, 8)} of {teamMembers.length} members
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled>
+                    Prev
+                  </Button>
+                  <Button variant="outline" size="sm" disabled>
+                    Next
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
 
         {/* Edit Team Dialog */}
@@ -916,17 +935,17 @@ export default function TeamPage() {
 
         {/* Add Member Dialog */}
         <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add Member to Team</DialogTitle>
               <DialogDescription>
                 Select an organization member and assign their role and permissions
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 py-4">
+            <div className="grid gap-5 py-2">
               {/* Member Selection */}
               <div className="grid gap-2">
-                <Label htmlFor="select_member">Select Member *</Label>
+                <Label htmlFor="select_member">Select Member</Label>
                 <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                   <SelectTrigger id="select_member">
                     <SelectValue placeholder="Choose a member..." />
@@ -934,7 +953,7 @@ export default function TeamPage() {
                   <SelectContent>
                     {organizationMembers.map((member) => (
                       <SelectItem key={member.user_id} value={member.user_id.toString()}>
-                        {member.first_name} {member.last_name} ({member.email}) - {member.role_user}
+                        {member.first_name} {member.last_name} ({member.email})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -943,101 +962,44 @@ export default function TeamPage() {
 
               {/* Role Input */}
               <div className="grid gap-2">
-                <Label htmlFor="member_role">Role *</Label>
+                <Label htmlFor="member_role">Role</Label>
                 <Input
                   id="member_role"
                   value={memberRole}
                   onChange={(e) => setMemberRole(e.target.value)}
-                  placeholder="Enter role (e.g., MEMBER, ADMIN, MODERATOR)"
+                  placeholder="e.g., MEMBER, ADMIN, MODERATOR"
                 />
               </div>
 
+              <Separator />
+
               {/* Permissions */}
-              <div className="grid gap-4">
-                <Label className="text-base font-semibold">Permissions</Label>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="can_create_channels"
-                    checked={canCreateChannels}
-                    onCheckedChange={(checked) => setCanCreateChannels(checked === true)}
-                  />
-                  <label 
-                    htmlFor="can_create_channels" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can create channels
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="can_send_messages"
-                    checked={canSendMessages}
-                    onCheckedChange={(checked) => setCanSendMessages(checked === true)}
-                  />
-                  <label 
-                    htmlFor="can_send_messages" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can send messages
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="can_make_announcement"
-                    checked={canMakeAnnouncement}
-                    onCheckedChange={(checked) => setCanMakeAnnouncement(checked === true)}
-                  />
-                  <label 
-                    htmlFor="can_make_announcement" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can make announcement
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="can_delete_messages"
-                    checked={canDeleteMessages}
-                    onCheckedChange={(checked) => setCanDeleteMessages(checked === true)}
-                  />
-                  <label 
-                    htmlFor="can_delete_messages" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can delete messages
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="can_manage_roles"
-                    checked={canManageRoles}
-                    onCheckedChange={(checked) => setCanManageRoles(checked === true)}
-                  />
-                  <label 
-                    htmlFor="can_manage_roles" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can manage roles
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="can_kick_members"
-                    checked={canKickMembers}
-                    onCheckedChange={(checked) => setCanKickMembers(checked === true)}
-                  />
-                  <label 
-                    htmlFor="can_kick_members" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can kick members
-                  </label>
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Permissions</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    { id: "can_create_channels", label: "Create Channels", checked: canCreateChannels, onChange: setCanCreateChannels },
+                    { id: "can_send_messages", label: "Send Messages", checked: canSendMessages, onChange: setCanSendMessages },
+                    { id: "can_make_announcement", label: "Announcements", checked: canMakeAnnouncement, onChange: setCanMakeAnnouncement },
+                    { id: "can_delete_messages", label: "Delete Messages", checked: canDeleteMessages, onChange: setCanDeleteMessages },
+                    { id: "can_manage_roles", label: "Manage Roles", checked: canManageRoles, onChange: setCanManageRoles },
+                    { id: "can_kick_members", label: "Kick Members", checked: canKickMembers, onChange: setCanKickMembers },
+                  ].map((perm) => (
+                    <label
+                      key={perm.id}
+                      htmlFor={perm.id}
+                      className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        perm.checked ? "bg-primary/5 border-primary/30" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <Checkbox
+                        id={perm.id}
+                        checked={perm.checked}
+                        onCheckedChange={(checked) => perm.onChange(checked === true)}
+                      />
+                      <span className="text-sm font-medium">{perm.label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1071,130 +1033,98 @@ export default function TeamPage() {
 
         {/* Member Details Dialog */}
         <Dialog open={memberDetailsOpen} onOpenChange={setMemberDetailsOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+          <DialogContent className="max-w-[95vw] sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Member Details</DialogTitle>
-              <DialogDescription>
-                View member information and permissions
-              </DialogDescription>
             </DialogHeader>
             {selectedMember && (
-              <div className="space-y-6 py-4">
+              <div className="space-y-5">
                 {/* Member Info */}
-                <div className="flex items-center gap-4 pb-4 border-b">
-                  <Avatar className="h-20 w-20">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-14 w-14">
                     <AvatarImage src={selectedMember.avatar_url || undefined} alt={`${selectedMember.first_name} ${selectedMember.last_name}`} />
-                    <AvatarFallback className="text-2xl">
+                    <AvatarFallback className="text-lg">
                       {selectedMember.first_name.charAt(0)}{selectedMember.last_name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold truncate">
                       {selectedMember.first_name} {selectedMember.last_name}
                     </h3>
                     {selectedMember.user_tag && (
-                      <p className="text-muted-foreground">@{selectedMember.user_tag}</p>
+                      <p className="text-sm text-muted-foreground">@{selectedMember.user_tag}</p>
                     )}
+                    <Badge variant={getRoleBadgeVariant(selectedMember.role)} className="mt-1">
+                      {selectedMember.role}
+                    </Badge>
                   </div>
-                  <Badge variant="default" className="h-fit">
-                    <Shield className="h-3 w-3 mr-1" />
-                    {selectedMember.role}
-                  </Badge>
                 </div>
 
+                <Separator />
+
                 {/* Contact Information */}
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                    Contact Information
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-sm">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{selectedMember.email}</span>
-                    </div>
-                    {selectedMember.phone_number && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{selectedMember.phone_number}</span>
-                      </div>
-                    )}
-                    {selectedMember.country && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{selectedMember.country}</span>
-                      </div>
-                    )}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">{selectedMember.email}</span>
                   </div>
+                  {selectedMember.phone_number && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span>{selectedMember.phone_number}</span>
+                    </div>
+                  )}
+                  {selectedMember.country && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span>{selectedMember.country}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Permissions */}
                 {selectedMember.permissions && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                      Permissions
-                    </h4>
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                        <span className="text-sm font-medium">Create Channels</span>
-                        {selectedMember.permissions.can_create_channels ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                        <span className="text-sm font-medium">Send Messages</span>
-                        {selectedMember.permissions.can_send_messages ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                        <span className="text-sm font-medium">Delete Messages</span>
-                        {selectedMember.permissions.can_delete_messages ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                        <span className="text-sm font-medium">Manage Roles</span>
-                        {selectedMember.permissions.can_manage_roles ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                        <span className="text-sm font-medium">Kick Members</span>
-                        {selectedMember.permissions.can_kick_members ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-600" />
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                        <span className="text-sm font-medium">Make Announcement</span>
-                        {selectedMember.permissions.can_make_announcement ? (
-                          <Check className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-600" />
-                        )}
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Permissions
+                      </h4>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {[
+                          { label: "Create Channels", value: selectedMember.permissions.can_create_channels },
+                          { label: "Send Messages", value: selectedMember.permissions.can_send_messages },
+                          { label: "Delete Messages", value: selectedMember.permissions.can_delete_messages },
+                          { label: "Manage Roles", value: selectedMember.permissions.can_manage_roles },
+                          { label: "Kick Members", value: selectedMember.permissions.can_kick_members },
+                          { label: "Announcements", value: selectedMember.permissions.can_make_announcement },
+                        ].map((perm) => (
+                          <div
+                            key={perm.label}
+                            className="flex items-center gap-2 text-sm py-1"
+                          >
+                            {perm.value ? (
+                              <Check className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                            )}
+                            <span className={`text-xs ${perm.value ? "text-foreground" : "text-muted-foreground"}`}>{perm.label}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             )}
-            <DialogFooter className="flex-col sm:flex-row gap-2">
+            <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
               <div className="flex gap-2 flex-1">
                 {(userRole === "OWNER" || userRole === "ADMIN" || currentUserPermissions.can_manage_roles) && selectedMember && selectedMember.user_id !== currentUserId && (
                   <Button 
                     variant="outline" 
                     onClick={() => handleEditPermissions(selectedMember)}
                     className="flex-1 sm:flex-none"
+                    size="sm"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Permissions
@@ -1205,13 +1135,14 @@ export default function TeamPage() {
                     variant="destructive" 
                     onClick={() => handleKickMember(selectedMember.user_id, `${selectedMember.first_name} ${selectedMember.last_name}`)}
                     className="flex-1 sm:flex-none"
+                    size="sm"
                   >
                     <UserMinus className="h-4 w-4 mr-2" />
-                    Kick Member
+                    Kick
                   </Button>
                 )}
               </div>
-              <Button variant="secondary" onClick={() => setMemberDetailsOpen(false)}>
+              <Button variant="secondary" onClick={() => setMemberDetailsOpen(false)} size="sm">
                 Close
               </Button>
             </DialogFooter>
@@ -1220,111 +1151,54 @@ export default function TeamPage() {
 
         {/* Edit Permissions Dialog */}
         <Dialog open={editPermissionsOpen} onOpenChange={setEditPermissionsOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Member Permissions</DialogTitle>
+              <DialogTitle>Edit Permissions</DialogTitle>
               <DialogDescription>
-                Update {editingMember?.first_name} {editingMember?.last_name}'s role and permissions
+                Update {editingMember?.first_name} {editingMember?.last_name}&apos;s role and permissions
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 py-4">
+            <div className="grid gap-5 py-2">
               {/* Role Input */}
               <div className="grid gap-2">
-                <Label htmlFor="edit_role">Role *</Label>
+                <Label htmlFor="edit_role">Role</Label>
                 <Input
                   id="edit_role"
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value)}
-                  placeholder="Enter role (e.g., MEMBER, ADMIN, MODERATOR)"
+                  placeholder="e.g., MEMBER, ADMIN, MODERATOR"
                 />
               </div>
 
+              <Separator />
+
               {/* Permissions */}
-              <div className="grid gap-4">
-                <Label className="text-base font-semibold">Permissions</Label>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="edit_can_create_channels"
-                    checked={editCanCreateChannels}
-                    onCheckedChange={(checked) => setEditCanCreateChannels(checked === true)}
-                  />
-                  <label 
-                    htmlFor="edit_can_create_channels" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can create channels
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="edit_can_send_messages"
-                    checked={editCanSendMessages}
-                    onCheckedChange={(checked) => setEditCanSendMessages(checked === true)}
-                  />
-                  <label 
-                    htmlFor="edit_can_send_messages" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can send messages
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="edit_can_delete_messages"
-                    checked={editCanDeleteMessages}
-                    onCheckedChange={(checked) => setEditCanDeleteMessages(checked === true)}
-                  />
-                  <label 
-                    htmlFor="edit_can_delete_messages" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can delete messages
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="edit_can_manage_roles"
-                    checked={editCanManageRoles}
-                    onCheckedChange={(checked) => setEditCanManageRoles(checked === true)}
-                  />
-                  <label 
-                    htmlFor="edit_can_manage_roles" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can manage roles
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="edit_can_kick_members"
-                    checked={editCanKickMembers}
-                    onCheckedChange={(checked) => setEditCanKickMembers(checked === true)}
-                  />
-                  <label 
-                    htmlFor="edit_can_kick_members" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can kick members
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="edit_can_make_announcement"
-                    checked={editCanMakeAnnouncement}
-                    onCheckedChange={(checked) => setEditCanMakeAnnouncement(checked === true)}
-                  />
-                  <label 
-                    htmlFor="edit_can_make_announcement" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Can make announcement
-                  </label>
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Permissions</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    { id: "edit_can_create_channels", label: "Create Channels", checked: editCanCreateChannels, onChange: setEditCanCreateChannels },
+                    { id: "edit_can_send_messages", label: "Send Messages", checked: editCanSendMessages, onChange: setEditCanSendMessages },
+                    { id: "edit_can_make_announcement", label: "Announcements", checked: editCanMakeAnnouncement, onChange: setEditCanMakeAnnouncement },
+                    { id: "edit_can_delete_messages", label: "Delete Messages", checked: editCanDeleteMessages, onChange: setEditCanDeleteMessages },
+                    { id: "edit_can_manage_roles", label: "Manage Roles", checked: editCanManageRoles, onChange: setEditCanManageRoles },
+                    { id: "edit_can_kick_members", label: "Kick Members", checked: editCanKickMembers, onChange: setEditCanKickMembers },
+                  ].map((perm) => (
+                    <label
+                      key={perm.id}
+                      htmlFor={perm.id}
+                      className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        perm.checked ? "bg-primary/5 border-primary/30" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <Checkbox
+                        id={perm.id}
+                        checked={perm.checked}
+                        onCheckedChange={(checked) => perm.onChange(checked === true)}
+                      />
+                      <span className="text-sm font-medium">{perm.label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>

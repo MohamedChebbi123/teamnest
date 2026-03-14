@@ -43,21 +43,28 @@ export default function ProfilePage() {
       const token = localStorage.getItem("access_token")
       
       if (!token) {
+        setIsLoading(false)
         toast.error("Not authenticated", {
           description: "Please log in to view your profile"
         })
-        router.push("/auth/login")
+        router.replace("/auth/login")
         return
       }
 
       try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 10000)
+
         const response = await fetch("http://localhost:8000/profile", {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
-          }
+          },
+          signal: controller.signal,
         })
+
+        clearTimeout(timeout)
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -65,7 +72,7 @@ export default function ProfilePage() {
               description: "Please log in again"
             })
             localStorage.removeItem("access_token")
-            router.push("/auth/login")
+            router.replace("/auth/login")
             return
           }
           throw new Error("Failed to fetch profile")
@@ -76,7 +83,9 @@ export default function ProfilePage() {
       } catch (error) {
         console.error("Error fetching profile:", error)
         toast.error("Error", {
-          description: "Failed to load profile. Please try again."
+          description: error instanceof Error && error.name === "AbortError"
+            ? "Profile request timed out. Please try again."
+            : "Failed to load profile. Please try again."
         })
       } finally {
         setIsLoading(false)
