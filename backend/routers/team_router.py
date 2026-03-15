@@ -13,9 +13,10 @@ from services.team_service import (
     fetch_user_team_service,
     create_channels_for_teams_service,
     fetch_channels_for_teams_service,
-    fetch_members_info
+    fetch_members_info,
+    revoke_permissions_from_team_memebers
 )
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.team_creation import team_creation
@@ -86,6 +87,17 @@ async def update_member_permissions(
     db: Session = Depends(connect_databse)
 ):
     return update_member_permissions_service(team_id, member_user_id, data, authorization, db)
+
+
+@router.put("/team/{team_id}/member/{member_user_id}/revoke-permissions")
+async def revoke_member_permissions(
+    team_id: int,
+    member_user_id: int,
+    permission_name: str | None = Query(None),
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return revoke_permissions_from_team_memebers(team_id, member_user_id, authorization, db, permission_name)
 
 @router.delete("/team/{team_id}/member/{member_user_id}")
 async def kick_member(

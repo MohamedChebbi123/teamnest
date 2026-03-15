@@ -54,6 +54,9 @@ interface MemberDetailsResponse {
   }
 }
 
+type TeamInfo = NonNullable<MemberDetailsResponse["team"]>
+type PermissionKey = keyof TeamInfo["permissions"]
+
 export default function MembersSidebar({ organizationId, teamId }: MembersSidebarProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(true)
@@ -66,6 +69,7 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
   const [memberDetails, setMemberDetails] = useState<MemberDetailsResponse | null>(null)
   const [memberTeamDetails, setMemberTeamDetails] = useState<NonNullable<MemberDetailsResponse["team"]>[]>([])
   const [loadingMemberDetails, setLoadingMemberDetails] = useState(false)
+  const [revokingPermissionKey, setRevokingPermissionKey] = useState<string | null>(null)
 
   const minWidth = 250;
   const maxWidth = 500;
@@ -339,6 +343,74 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
     setSelectedMemberId(null)
     setMemberDetails(null)
     setMemberTeamDetails([])
+    setRevokingPermissionKey(null)
+  }
+
+  const revokePermission = async (team: TeamInfo, permissionKey: PermissionKey) => {
+    if (selectedMemberId === null) return
+
+    const token = localStorage.getItem("access_token")
+    if (!token) {
+      router.push("/auth/login")
+      return
+    }
+
+    const requestKey = `${team.team_id}-${permissionKey}`
+    setRevokingPermissionKey(requestKey)
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/team/${team.team_id}/member/${selectedMemberId}/revoke-permissions?permission_name=${permissionKey}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setMemberTeamDetails((previous) =>
+          previous.map((item) =>
+            item.team_id === team.team_id
+              ? {
+                  ...item,
+                  role: data.role || item.role,
+                  permissions: data.permissions || item.permissions,
+                }
+              : item
+          )
+        )
+        toast.success("Permission removed")
+        return
+      }
+
+      if (response.status === 401) {
+        toast.error("Session expired", {
+          description: "Please log in again"
+        })
+        router.push("/auth/login")
+        return
+      }
+
+      if (response.status === 403) {
+        toast.error("Not allowed", {
+          description: "Only owner or members with manage roles can do this"
+        })
+        return
+      }
+
+      const errorBody = await response.json().catch(() => null)
+      throw new Error(errorBody?.detail || "Failed to revoke permission")
+    } catch (error) {
+      console.error("Error revoking permission:", error)
+      toast.error("Error", {
+        description: error instanceof Error ? error.message : "Failed to revoke permission"
+      })
+    } finally {
+      setRevokingPermissionKey(null)
+    }
   }
 
   return (
@@ -522,9 +594,22 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
                           {Object.entries(team.permissions)
                             .filter(([, value]) => value)
                             .map(([key]) => (
-                              <Badge key={`${team.team_id}-${key}`} className="text-[10px]">
-                                {permissionLabelMap[key]}
-                              </Badge>
+                              <button
+                                key={`${team.team_id}-${key}`}
+                                onClick={() => revokePermission(team, key as PermissionKey)}
+                                disabled={revokingPermissionKey === `${team.team_id}-${key}`}
+                                className="disabled:opacity-60"
+                                title="Remove permission"
+                              >
+                                <Badge className="text-[10px] gap-1 pr-1.5">
+                                  {permissionLabelMap[key]}
+                                  {revokingPermissionKey === `${team.team_id}-${key}` ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <X className="h-3 w-3" />
+                                  )}
+                                </Badge>
+                              </button>
                             ))}
                         </div>
                       </div>

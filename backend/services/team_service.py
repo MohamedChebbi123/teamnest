@@ -779,6 +779,8 @@ def fetch_members_info(org_id: int, team_id: int, user_id: int, authorization: s
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
+    
+    
     target_user_id = user_id
     user_id = int(payload["sub"])
     
@@ -853,6 +855,103 @@ def fetch_members_info(org_id: int, team_id: int, user_id: int, authorization: s
                 "can_kick_members": target_role.can_kick_members if target_role else False,
                 "can_make_announcement": target_role.can_make_announcement if target_role else False
             }
+        }
+    }
+    
+
+def revoke_permissions_from_team_memebers(team_id: int, user_id: int, authorization: str, db: Session, permission_name: str = None):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    requester_user_id = int(payload["sub"])
+    target_user_id = int(user_id)
+
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_owner = found_organization.owner_id == requester_user_id
+
+    requester_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == requester_user_id
+    ).first()
+
+    has_manage_permission = requester_role.can_manage_roles if requester_role else False
+
+    if not is_owner and not has_manage_permission:
+        raise HTTPException(
+            status_code=403,
+            detail="Only organization owner or members with manage roles permission can revoke permissions"
+        )
+
+    target_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == target_user_id
+    ).first()
+
+    if not target_member:
+        raise HTTPException(status_code=404, detail="User is not a member of this team")
+
+    if found_organization.owner_id == target_user_id:
+        raise HTTPException(status_code=403, detail="Cannot revoke permissions from organization owner")
+
+    target_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == target_user_id
+    ).first()
+
+    if not target_role:
+        raise HTTPException(status_code=404, detail="Member role not found")
+
+    permission_fields = {
+        "can_create_channels",
+        "can_send_messages",
+        "can_delete_messages",
+        "can_manage_roles",
+        "can_kick_members",
+        "can_make_announcement",
+    }
+
+    if permission_name:
+        if permission_name not in permission_fields:
+            raise HTTPException(status_code=400, detail="Invalid permission name")
+        setattr(target_role, permission_name, False)
+    else:
+        target_role.role = "MEMBER"
+        target_role.can_create_channels = False
+        target_role.can_send_messages = False
+        target_role.can_delete_messages = False
+        target_role.can_manage_roles = False
+        target_role.can_kick_members = False
+        target_role.can_make_announcement = False
+
+    db.commit()
+    db.refresh(target_role)
+
+    return {
+        "message": "Member permissions revoked successfully",
+        "user_id": target_user_id,
+        "team_id": team_id,
+        "role": target_role.role,
+        "permissions": {
+            "can_create_channels": target_role.can_create_channels,
+            "can_send_messages": target_role.can_send_messages,
+            "can_delete_messages": target_role.can_delete_messages,
+            "can_manage_roles": target_role.can_manage_roles,
+            "can_kick_members": target_role.can_kick_members,
+            "can_make_announcement": target_role.can_make_announcement
         }
     }
     
