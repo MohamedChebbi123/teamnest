@@ -86,6 +86,7 @@ interface Team {
 }
 
 export default function OrganizationNavBar({ organizationId, onClose }: OrganizationNavBarProps) {
+  const MAIN_SIDEBAR_WIDTH = 80
   const router = useRouter()
   const pathname = usePathname()
   const [organization, setOrganization] = useState<OrganizationDetails | null>(null)
@@ -512,7 +513,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       <aside 
         style={{ 
           width: isMobile ? '280px' : `${navbarWidth}px`,
-          left: isMobile ? '0' : 'var(--main-sidebar-width, 240px)'
+          left: isMobile ? '0' : `var(--main-sidebar-width, ${MAIN_SIDEBAR_WIDTH}px)`
         }}
         className={cn(
           "fixed top-0 h-screen bg-background border-r flex items-center justify-center z-30",
@@ -548,7 +549,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     <aside 
       style={{ 
         width: isMobile ? '280px' : `${navbarWidth}px`,
-        left: isMobile ? '0' : 'var(--main-sidebar-width, 240px)'
+        left: isMobile ? '0' : `var(--main-sidebar-width, ${MAIN_SIDEBAR_WIDTH}px)`
       }}
       className={cn(
         "fixed top-0 h-screen bg-muted/35 border-r flex flex-col z-30 shadow-sm backdrop-blur-[1px] transition-transform duration-300",
