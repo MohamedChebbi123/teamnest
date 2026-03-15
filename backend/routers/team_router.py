@@ -12,7 +12,8 @@ from services.team_service import (
     kick_member_service,
     fetch_user_team_service,
     create_channels_for_teams_service,
-    fetch_channels_for_teams_service
+    fetch_channels_for_teams_service,
+    fetch_members_info
 )
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
@@ -120,3 +121,13 @@ async def get_team_channels(
     db: Session = Depends(connect_databse)
 ):
     return fetch_channels_for_teams_service(org_id, team_id, authorization, db)
+
+@router.get("/organization/{org_id}/team/{team_id}/member/{user_id}")
+async def get_member_info(
+    org_id: int,
+    team_id: int,
+    user_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_members_info(org_id, team_id, user_id, authorization, db)

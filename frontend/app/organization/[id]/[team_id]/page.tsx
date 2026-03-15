@@ -629,7 +629,7 @@ export default function TeamPage() {
       <div className="min-h-screen bg-background">
         <Sidebar />
         <OrganizationNavBar organizationId={organizationId} />
-        <MembersSidebar organizationId={organizationId} />
+        <MembersSidebar organizationId={organizationId} teamId={teamId} />
         <main className="p-4 md:p-6 lg:p-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
           <div className="flex items-center justify-center h-[60vh]">
             <div className="flex flex-col items-center gap-4">
@@ -653,7 +653,7 @@ export default function TeamPage() {
       <div className="min-h-screen bg-background">
         <Sidebar />
         <OrganizationNavBar organizationId={organizationId} />
-        <MembersSidebar organizationId={organizationId} />
+        <MembersSidebar organizationId={organizationId} teamId={teamId} />
         <main className="p-4 md:p-6 lg:p-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
           <div className="flex items-center justify-center h-[60vh]">
             <Card className="max-w-md w-full text-center">
@@ -705,7 +705,7 @@ export default function TeamPage() {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <OrganizationNavBar organizationId={organizationId} />
-      <MembersSidebar organizationId={organizationId} />
+      <MembersSidebar organizationId={organizationId} teamId={teamId} />
       
       <main className="px-4 py-5 md:px-8 md:py-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px] overflow-y-auto">
         <div className="mx-auto max-w-7xl space-y-8">

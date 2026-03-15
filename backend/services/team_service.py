@@ -121,7 +121,6 @@ def fetch_teams_service(org_id:int,authorization: str, db: Session):
     
     return teams_list
 
-
 def delete_team_service(team_id: int, authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
@@ -169,7 +168,6 @@ def delete_team_service(team_id: int, authorization: str, db: Session):
         "message": "Team deleted successfully",
         "team_id": team_id
     }
-
 
 def update_team_service(team_id: int, data: team_creation, authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -238,9 +236,6 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
         "created_at": team.created_at
     }
     
-    
-
-
 def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: str, db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -348,7 +343,6 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
         }
     }
 
-
 def fetch_team_members_service(team_id: int, authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
@@ -426,7 +420,6 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
         "team_name": team.team_name,
         "members": members_list
     }
-
 
 def update_member_permissions_service(team_id: int, member_user_id: int, data: Update_team_member_role, authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -519,7 +512,6 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
         }
     }
 
-
 def kick_member_service(team_id: int, member_user_id: int, authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
@@ -594,7 +586,6 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
         "team_id": team_id
     }
 
-
 def fetch_user_team_service(authorization: str, db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -626,8 +617,6 @@ def fetch_user_team_service(authorization: str, db: Session):
         }
         for team in results
     ]
-
-
 
 def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_input, authorization: str, db: Session):
     
@@ -712,7 +701,6 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
         "created_at": new_channel.created_at
     }
 
-
 def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: str, db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -778,3 +766,93 @@ def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: s
         }
         for channel in channels
     ]
+    
+def fetch_members_info(org_id: int, team_id: int, user_id: int, authorization: str, db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    target_user_id = user_id
+    user_id = int(payload["sub"])
+    
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    if team.org_id != org_id:
+        raise HTTPException(status_code=400, detail="Team does not belong to this organization")
+
+    is_owner = found_organization.owner_id == user_id
+    
+    is_org_member = db.query(Organization_members).filter(
+        Organization_members.org_id == org_id,
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    
+    if not is_owner and not is_org_member and not is_team_member:
+        raise HTTPException(status_code=403, detail="you are not allowed")
+
+    target_user = db.query(Users).filter(Users.user_id == target_user_id).first()
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_membership = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == target_user_id
+    ).first()
+
+    if not target_membership:
+        raise HTTPException(status_code=404, detail="User is not a member of this team")
+
+    target_role = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == target_user_id
+    ).first()
+
+    return {
+        "user": {
+            "user_id": target_user.user_id,
+            "first_name": target_user.first_name,
+            "last_name": target_user.last_name,
+            "email": target_user.email,
+            "avatar_url": target_user.avatar_url,
+            "user_tag": target_user.user_tag,
+            "phone_number": target_user.phone_number,
+            "country": target_user.country
+        },
+        "organization_id": org_id,
+        "team": {
+            "team_id": team.team_id,
+            "team_name": team.team_name,
+            "role": target_role.role if target_role else "MEMBER",
+            "permissions": {
+                "can_create_channels": target_role.can_create_channels if target_role else False,
+                "can_send_messages": target_role.can_send_messages if target_role else False,
+                "can_delete_messages": target_role.can_delete_messages if target_role else False,
+                "can_manage_roles": target_role.can_manage_roles if target_role else False,
+                "can_kick_members": target_role.can_kick_members if target_role else False,
+                "can_make_announcement": target_role.can_make_announcement if target_role else False
+            }
+        }
+    }
+    
