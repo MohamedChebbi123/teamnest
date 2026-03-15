@@ -551,7 +551,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         left: isMobile ? '0' : 'var(--main-sidebar-width, 240px)'
       }}
       className={cn(
-        "fixed top-0 h-screen bg-background border-r flex flex-col z-30 shadow-sm transition-transform duration-300",
+        "fixed top-0 h-screen bg-muted/35 border-r flex flex-col z-30 shadow-sm backdrop-blur-[1px] transition-transform duration-300",
         isMobile ? (isMobileNavOpen ? "translate-x-0" : "-translate-x-full") : "hidden lg:block",
         isResizing ? 'select-none' : ''
       )}
@@ -565,7 +565,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       {/* Toggle Button */}
       <button
         onClick={() => setNavbarWidth(navbarWidth > 100 ? 64 : 240)}
-        className="absolute -right-3 top-6 bg-background border border-border rounded-full p-1 hover:bg-muted transition-colors shadow-md z-50"
+        className="absolute -right-3 top-6 bg-muted/60 border border-border rounded-full p-1 hover:bg-accent transition-colors shadow-md z-50"
       >
         {navbarWidth > 100 ? (
           <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />

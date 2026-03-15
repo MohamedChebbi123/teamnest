@@ -141,7 +141,7 @@ export default function MembersSidebar({ organizationId }: MembersSidebarProps) 
       {/* Sidebar - Always visible but collapsible */}
       <div
         style={{ width: isOpen ? (isMobile ? '280px' : `${sidebarWidth}px`) : '0px' }}
-        className={`fixed top-0 right-0 h-full bg-background border-l border-border shadow-lg transition-all duration-300 ease-in-out z-40 ${
+        className={`fixed top-0 right-0 h-full bg-muted/40 border-l border-border shadow-lg backdrop-blur-[1px] transition-all duration-300 ease-in-out z-40 ${
           isResizing ? 'select-none' : ''
         }`}
       >
@@ -155,7 +155,7 @@ export default function MembersSidebar({ organizationId }: MembersSidebarProps) 
         {/* Toggle Arrow Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="absolute -left-8 top-1/2 -translate-y-1/2 bg-background border border-border rounded-l-lg p-2 hover:bg-muted transition-colors shadow-md z-50"
+          className="absolute -left-8 top-1/2 -translate-y-1/2 bg-muted/60 border border-border rounded-l-lg p-2 hover:bg-accent transition-colors shadow-md z-50"
         >
           {isOpen ? (
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -194,7 +194,7 @@ export default function MembersSidebar({ organizationId }: MembersSidebarProps) 
               {members.map((member) => (
                 <div
                   key={member.user_id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm transition-colors hover:bg-accent/40 cursor-pointer"
                 >
                   <Avatar className="h-10 w-10 border-2 border-background">
                     <AvatarImage src={member.profile_picture} alt={`${member.first_name} ${member.last_name}`} />

@@ -12,7 +12,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -633,12 +634,12 @@ export default function OrganizationPage() {
       <Sidebar />
       <OrganizationNavBar organizationId={organizationId as string} />
     
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-6 lg:p-8 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
-        <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/15 p-4 md:p-6 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
+        <div className="max-w-6xl mx-auto space-y-6">
           {/* Organization Header */}
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6">
+          <Card className="rounded-xl border bg-card shadow-sm">
+            <CardHeader className="p-6">
+              <div className="flex flex-col items-start gap-6">
                 <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-lg flex-shrink-0">
                   <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
                   <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl">
@@ -646,7 +647,7 @@ export default function OrganizationPage() {
                   </AvatarFallback>
                 </Avatar>
                 
-                <div className="flex-1 space-y-3 w-full">
+                <div className="w-full space-y-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2 md:gap-3">
                       <CardTitle className="text-2xl sm:text-3xl break-words">{organization.organization_name}</CardTitle>
@@ -660,16 +661,16 @@ export default function OrganizationPage() {
                       )}
                     </div>
                     {organization.organization_description && (
-                      <CardDescription className="mt-2 text-sm md:text-base">
+                      <CardDescription className="mt-2 text-sm text-muted-foreground md:text-base">
                         {organization.organization_description}
                       </CardDescription>
                     )}
                   </div>
                   
-                  <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button variant="default">
+                        <Button variant="default" className="transition-colors hover:bg-primary/90">
                           <UserPlus className="h-4 w-4 mr-2" />
                           Add Member
                         </Button>
@@ -729,13 +730,13 @@ export default function OrganizationPage() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
-                    <Button variant="outline">
+                    <Button variant="outline" className="transition-colors hover:bg-accent/60">
                       <Users className="h-4 w-4 mr-2" />
                       View Members
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline">
+                        <Button variant="outline" className="transition-colors hover:bg-accent/60">
                           <Settings className="h-4 w-4 mr-2" />
                           Settings
                         </Button>
@@ -885,60 +886,64 @@ export default function OrganizationPage() {
             </CardHeader>
           </Card>
 
+          <Separator className="bg-border/70" />
+
           {/* Organization Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+            <Card className="rounded-xl border bg-card shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
+                <CardTitle className="text-sm text-muted-foreground">Total Members</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 pt-0">
                 <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">No members yet</p>
+                <p className="text-sm text-muted-foreground">No members yet</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Teams</CardTitle>
+            <Card className="rounded-xl border bg-card shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
+                <CardTitle className="text-sm text-muted-foreground">Active Teams</CardTitle>
                 <Building2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 pt-0">
                 <div className="text-2xl font-bold">{loadingTeams ? '...' : teams.length}</div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {teams.length === 0 ? 'No teams yet' : teams.length === 1 ? '1 team' : `${teams.length} teams`}
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Plan</CardTitle>
+            <Card className="rounded-xl border bg-card shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
+                <CardTitle className="text-sm text-muted-foreground">Plan</CardTitle>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 pt-0">
                 <div className="text-2xl font-bold capitalize">
                   {organization.organization_plan || "Free"}
                 </div>
-                <p className="text-xs text-muted-foreground">Current subscription</p>
+                <p className="text-sm text-muted-foreground">Current subscription</p>
               </CardContent>
             </Card>
           </div>
 
+          <Separator className="bg-border/70" />
+
           {/* Additional Content Sections */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Teams</CardTitle>
-                <CardDescription>Teams in your organization</CardDescription>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <Card className="rounded-xl border bg-card shadow-sm lg:col-span-8">
+              <CardHeader className="p-6 pb-2">
+                <CardTitle className="text-xl font-semibold">Teams</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">Teams in your organization</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 pt-2">
                 {loadingTeams ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : teams.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                     No teams yet. Create your first team!
                   </div>
                 ) : (
@@ -946,25 +951,25 @@ export default function OrganizationPage() {
                     {teams.map((team) => (
                       <div
                         key={team.team_id}
-                        className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                        onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                        className="group flex cursor-pointer items-center justify-between rounded-xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/30 hover:shadow-md"
                       >
-                        <div 
-                          className="flex-1 cursor-pointer"
-                          onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
-                        >
-                          <h4 className="font-medium hover:text-primary transition-colors">{team.team_name}</h4>
+                        <div className="flex-1">
+                          <h4 className="text-base font-semibold transition-colors group-hover:text-primary">{team.team_name}</h4>
                           {team.description && (
                             <p className="text-sm text-muted-foreground">{team.description}</p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="mt-1 text-sm text-muted-foreground">
                             Max size: {team.team_size} members
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="secondary">{team.team_size}</Badge>
+                          <Badge variant="secondary" className="h-6 px-2 text-xs">{team.team_size}</Badge>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="hover:bg-accent"
                             onClick={(e) => {
                               e.stopPropagation()
                               setEditingTeam(team)
@@ -979,6 +984,7 @@ export default function OrganizationPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="hover:bg-destructive/10"
                             onClick={(e) => {
                               e.stopPropagation()
                               setDeletingTeam(team)
@@ -995,15 +1001,15 @@ export default function OrganizationPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common tasks and settings</CardDescription>
+            <Card className="rounded-xl border bg-card shadow-sm lg:col-span-4">
+              <CardHeader className="p-6 pb-2">
+                <CardTitle className="text-xl font-semibold">Quick Actions</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">Common tasks and settings</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3 p-6 pt-2">
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start"
+                  className="w-full justify-start transition-colors hover:bg-accent/60"
                   onClick={() => setAddMemberDialogOpen(true)}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -1011,13 +1017,13 @@ export default function OrganizationPage() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start"
+                  className="w-full justify-start transition-colors hover:bg-accent/60"
                   onClick={() => setCreateTeamDialogOpen(true)}
                 >
                   <FolderKanban className="h-4 w-4 mr-2" />
                   Create a Team
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start transition-colors hover:bg-accent/60">
                   Organization Settings
                 </Button>
               </CardContent>
