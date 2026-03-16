@@ -86,8 +86,7 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
             "created_at": new_channel.created_at
         }
     }
-    
-    
+     
 def fetch_channels_service(org_id:int,authorization: str,db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -102,13 +101,11 @@ def fetch_channels_service(org_id:int,authorization: str,db: Session):
     
     user_id = int(payload["sub"])
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is owner or member of the organization
     is_owner = found_organization.owner_id == user_id
     is_member = db.query(Organization_members).filter(
         Organization_members.org_id == org_id,
@@ -118,10 +115,8 @@ def fetch_channels_service(org_id:int,authorization: str,db: Session):
     if not is_owner and not is_member:
         raise HTTPException(status_code=403, detail="You must be a member of this organization to view channels")
     
-    # Fetch all channels for the organization
     found_channels = db.query(Channels).filter(Channels.org_id == org_id).all()
     
-    # Format the response
     channels_list = [
         {
             "channel_id": channel.channel_id,
@@ -138,7 +133,6 @@ def fetch_channels_service(org_id:int,authorization: str,db: Session):
     
     return channels_list
 
-
 def fetch_single_channel_service(channel_id: int, authorization: str, db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -153,19 +147,16 @@ def fetch_single_channel_service(channel_id: int, authorization: str, db: Sessio
     
     user_id = int(payload["sub"])
     
-    # Fetch the channel
     channel = db.query(Channels).filter(Channels.channel_id == channel_id).first()
     
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is owner or member of the organization
     is_owner = found_organization.owner_id == user_id
     is_member = db.query(Organization_members).filter(
         Organization_members.org_id == channel.org_id,
@@ -175,7 +166,6 @@ def fetch_single_channel_service(channel_id: int, authorization: str, db: Sessio
     if not is_owner and not is_member:
         raise HTTPException(status_code=403, detail="You must be a member of this organization to view this channel")
     
-    # Return channel details
     return {
         "channel_id": channel.channel_id,
         "channel_name": channel.channel_name,
@@ -192,7 +182,6 @@ def fetch_single_channel_service(channel_id: int, authorization: str, db: Sessio
         }
     }
 
-
 def update_channel_service(channel_id: int, data: Channels_input, authorization: str, db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -207,21 +196,17 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
     
     user_id = int(payload["sub"])
     
-    # Fetch the channel
     channel = db.query(Channels).filter(Channels.channel_id == channel_id).first()
     
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
     
-    # Get organization
     organization = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()
     
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Determine if user has permission based on channel type
     if channel.team_id is None:
-        # Organization-level channel - only OWNER or ADMIN can update
         is_owner = organization.owner_id == user_id
         
         org_member = db.query(Organization_members).filter(
@@ -237,16 +222,13 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
                 detail="Only organization owners and admins can update organization-level channels"
             )
     else:
-        # Team-level channel - check team permissions
         is_owner = organization.owner_id == user_id
         
-        # Get user's team role
         user_role = db.query(Team_roles).filter(
             Team_roles.team_id == channel.team_id,
             Team_roles.user_id == user_id
         ).first()
         
-        # Can update if organization owner OR has can_create_channels permission
         has_permission = is_owner or (user_role and user_role.can_create_channels)
         
         if not has_permission:
@@ -255,7 +237,6 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
                 detail="You don't have permission to update channels in this team"
             )
     
-    # Validate channel name
     channel_name_pattern = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,49}$"
     if not re.match(channel_name_pattern, data.channel_name):
         raise HTTPException(
@@ -263,7 +244,6 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
             detail="Channel name must be 3-50 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores"
         )
     
-    # Check if new name conflicts with existing channel (if name is being changed)
     if data.channel_name != channel.channel_name:
         existing_channel = db.query(Channels).filter(
             Channels.org_id == channel.org_id,
@@ -272,7 +252,6 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
         ).first()
         
         if channel.team_id:
-            # For team channels, check within the same team
             existing_channel = db.query(Channels).filter(
                 Channels.team_id == channel.team_id,
                 Channels.channel_name == data.channel_name,
@@ -282,7 +261,6 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
         if existing_channel:
             raise HTTPException(status_code=400, detail="A channel with this name already exists")
     
-    # Update channel
     channel.channel_name = data.channel_name
     channel.channel_mode = data.channel_mode
     channel.channel_category = data.channel_category
@@ -305,7 +283,6 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
         }
     }
 
-
 def delete_channel_service(channel_id: int, authorization: str, db: Session):
     
     if not authorization or not authorization.startswith("Bearer "):
@@ -320,21 +297,17 @@ def delete_channel_service(channel_id: int, authorization: str, db: Session):
     
     user_id = int(payload["sub"])
     
-    # Fetch the channel
     channel = db.query(Channels).filter(Channels.channel_id == channel_id).first()
     
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
     
-    # Get organization
     organization = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()
     
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Determine if user has permission based on channel type
     if channel.team_id is None:
-        # Organization-level channel - only OWNER or ADMIN can delete
         is_owner = organization.owner_id == user_id
         
         org_member = db.query(Organization_members).filter(
@@ -350,16 +323,13 @@ def delete_channel_service(channel_id: int, authorization: str, db: Session):
                 detail="Only organization owners and admins can delete organization-level channels"
             )
     else:
-        # Team-level channel - check team permissions
         is_owner = organization.owner_id == user_id
         
-        # Get user's team role
         user_role = db.query(Team_roles).filter(
             Team_roles.team_id == channel.team_id,
             Team_roles.user_id == user_id
         ).first()
         
-        # Can delete if organization owner OR has can_create_channels permission
         has_permission = is_owner or (user_role and user_role.can_create_channels)
         
         if not has_permission:
@@ -368,7 +338,6 @@ def delete_channel_service(channel_id: int, authorization: str, db: Session):
                 detail="You don't have permission to delete channels in this team"
             )
     
-    # Delete the channel
     db.delete(channel)
     db.commit()
     

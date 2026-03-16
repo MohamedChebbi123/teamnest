@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
-import Script from "next/script";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -27,10 +26,6 @@ export default function RootLayout({
       >
         {children}
         <Toaster />
-        <Script
-          src="https://www.google.com/recaptcha/api.js"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );

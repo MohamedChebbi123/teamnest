@@ -25,7 +25,6 @@ async def register_new_user(
     last_name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    captcha_token: str = Form(...),
     db: Session = Depends(connect_databse)
 ):
     new_user = await register_user_service(
@@ -33,7 +32,6 @@ async def register_new_user(
         last_name=last_name,
         email=email,
         password=password,
-        captcha_token=captcha_token,
         db=db
     )
     return {

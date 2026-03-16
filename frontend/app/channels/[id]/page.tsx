@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { 
   Hash, 
+  Volume2,
   Loader2, 
   Send,
   Info,
@@ -39,11 +40,13 @@ import { toast } from "sonner"
 import Sidebar from "@/components/Sidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
+import VoiceChannelPanel from "@/components/VoiceChannelPanel"
 
 interface ChannelDetails {
   channel_id: number
   channel_name: string
-  type: string
+  channel_mode: string
+  channel_category: string
   description?: string
   org_id: number
   created_at: string
@@ -521,6 +524,9 @@ export default function ChannelPage() {
     return null
   }
 
+  const isVoiceChannel = (channel.channel_category || "").toLowerCase() === "voice"
+  const ChannelIcon = isVoiceChannel ? Volume2 : Hash
+
   return (
     <>
       <Sidebar />
@@ -534,7 +540,7 @@ export default function ChannelPage() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2.5">
                 <div className="bg-primary/10 p-1.5 rounded-md">
-                  <Hash className="h-5 w-5 text-primary" />
+                  <ChannelIcon className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold">{channel.channel_name}</h1>
@@ -544,7 +550,7 @@ export default function ChannelPage() {
                 </div>
               </div>
               <Badge variant="secondary" className="text-xs font-normal">
-                {channel.type}
+                {channel.channel_category}
               </Badge>
             </div>
             
@@ -572,11 +578,17 @@ export default function ChannelPage() {
         <div className="flex h-[calc(100vh-88px)]">
           {/* Messages Area */}
           <div className="flex-1 flex flex-col">
-            {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto px-4 py-6">
-              <div className="max-w-5xl mx-auto">
-                {/* Channel Welcome Message */}
-                {messages.length === 0 && (
+            {isVoiceChannel ? (
+              <div className="flex-1 overflow-y-auto px-4 py-6">
+                <VoiceChannelPanel channelId={channel.channel_id} orgId={channel.org_id} />
+              </div>
+            ) : (
+              <>
+                {/* Messages Container */}
+                <div className="flex-1 overflow-y-auto px-4 py-6">
+                  <div className="max-w-5xl mx-auto">
+                    {/* Channel Welcome Message */}
+                    {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="relative mb-6">
                       <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
@@ -605,17 +617,17 @@ export default function ChannelPage() {
                       </div>
                     )}
                   </div>
-                )}
+                    )}
 
-                {/* Loading Messages */}
-                {loadingMessages && messages.length === 0 && (
+                    {/* Loading Messages */}
+                    {loadingMessages && messages.length === 0 && (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   </div>
-                )}
+                    )}
 
-                {/* Messages List */}
-                {messages.length > 0 && (
+                    {/* Messages List */}
+                    {messages.length > 0 && (
                   <div className="space-y-6">
                     {messages.map((msg) => {
                       const isOwnMessage = currentUserId === msg.sender.user_id
@@ -732,72 +744,74 @@ export default function ChannelPage() {
                       </div>
                     )})}
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Message Input Area */}
-            <div className="border-t bg-background/50 backdrop-blur px-4 py-4">
-              <div className="max-w-5xl mx-auto">
-                <form onSubmit={handleSendMessage} className="relative">
-                  <div className="flex items-start gap-2">
-                    {/* Main Input Container */}
-                    <div className="flex-1 relative">
-                      <div className="relative flex items-center bg-background rounded-lg border border-input shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                        {/* Input Field */}
-                        <Input
-                          placeholder={`Message #${channel.channel_name}`}
-                          value={message}
-                          onChange={(e) => setMessage(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pr-24 h-[44px] bg-transparent"
-                        />
-                        
-                        {/* Action Buttons */}
-                        <div className="absolute right-2 flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            title="Add emoji"
-                          >
-                            <Smile className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            title="Attach file"
-                          >
-                            <Paperclip className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Helper Text */}
-                      <div className="flex items-center gap-2 mt-2 px-3">
-                        <p className="text-xs text-muted-foreground">
-                          Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Enter</kbd> to send
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Send Button */}
-                    <Button 
-                      type="submit" 
-                      size="lg"
-                      disabled={!message.trim() || isSendingMessage}
-                      className="h-[44px] px-6 shadow-sm flex-shrink-0"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      {isSendingMessage ? 'Sending...' : 'Send'}
-                    </Button>
+                    )}
                   </div>
-                </form>
-              </div>
-            </div>
+                </div>
+
+                {/* Message Input Area */}
+                <div className="border-t bg-background/50 backdrop-blur px-4 py-4">
+                  <div className="max-w-5xl mx-auto">
+                    <form onSubmit={handleSendMessage} className="relative">
+                      <div className="flex items-start gap-2">
+                        {/* Main Input Container */}
+                        <div className="flex-1 relative">
+                          <div className="relative flex items-center bg-background rounded-lg border border-input shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                            {/* Input Field */}
+                            <Input
+                              placeholder={`Message #${channel.channel_name}`}
+                              value={message}
+                              onChange={(e) => setMessage(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pr-24 h-[44px] bg-transparent"
+                            />
+                            
+                            {/* Action Buttons */}
+                            <div className="absolute right-2 flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                title="Add emoji"
+                              >
+                                <Smile className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                title="Attach file"
+                              >
+                                <Paperclip className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {/* Helper Text */}
+                          <div className="flex items-center gap-2 mt-2 px-3">
+                            <p className="text-xs text-muted-foreground">
+                              Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Enter</kbd> to send
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Send Button */}
+                        <Button 
+                          type="submit" 
+                          size="lg"
+                          disabled={!message.trim() || isSendingMessage}
+                          className="h-[44px] px-6 shadow-sm flex-shrink-0"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          {isSendingMessage ? 'Sending...' : 'Send'}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -820,7 +834,7 @@ export default function ChannelPage() {
                   <div>
                     <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1.5">Channel Name</p>
                     <div className="flex items-center gap-2">
-                      <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                      <ChannelIcon className="h-3.5 w-3.5 text-muted-foreground" />
                       <p className="font-medium">{channel.channel_name}</p>
                     </div>
                   </div>
@@ -828,7 +842,7 @@ export default function ChannelPage() {
                   <div className="pt-3 border-t border-border/50">
                     <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1.5">Type</p>
                     <Badge variant="secondary" className="text-xs">
-                      {channel.type}
+                      {channel.channel_category}
                     </Badge>
                   </div>
                   

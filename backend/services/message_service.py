@@ -9,9 +9,10 @@ from models.Channels import Channels
 from models.Users import Users
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
-from utils.Websocket_manager import Websocket_manager
+from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager
 
-manager=Websocket_manager()
+manager=Text_Websocket_manager()
+voice_manager = VoiceWebsocketManager()
 
 
 # def send_messages_channel_service(data:Message_input,authorization: str,db: Session):
@@ -249,3 +250,56 @@ async def websocket_endpoint(
                 
     except WebSocketDisconnect:
         manager.disconnect(channel_id, websocket)
+
+
+async def voice_websocket_endpoint(
+    websocket: WebSocket,
+    channel_id: int,
+    authorization: str,
+    org_id: int,
+    db: Session
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+
+    member = db.query(Organization_members).filter(
+        Organization_members.memmber_id == user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
+    if not member:
+        await websocket.close(code=1008, reason="Not a member of this organization")
+        return
+
+    channel = db.query(Channels).filter(
+        Channels.channel_id == channel_id,
+        Channels.org_id == org_id
+    ).first()
+
+    if not channel:
+        await websocket.close(code=1008, reason="Channel not found")
+        return
+
+    if str(channel.channel_category).lower() != "voice":
+        await websocket.close(code=1008, reason="Channel is not a voice channel")
+        return
+
+    await voice_manager.connect(channel_id, websocket)
+
+    try:
+        while True:
+            message = await websocket.receive_json()
+
+            if isinstance(message, dict):
+                await voice_manager.forward_signal(channel_id, websocket, message)
+    except WebSocketDisconnect:
+        voice_manager.disconnect(channel_id, websocket)

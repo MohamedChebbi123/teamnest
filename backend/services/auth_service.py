@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from utils.hasher import hash_password
 from utils.cloudinary_handler import upload_user_profile_image
-from utils.recaptcha_verifier import verify_recaptcha
 from utils.email_sender import simple_send, send_password_reset_code
 from datetime import datetime, timedelta, UTC
 import re
@@ -19,13 +18,9 @@ async def register_user_service(
     last_name: str,
     email: str,
     password: str,
-    captcha_token: str,
     db: Session
 ):
-    
-    await verify_recaptcha(captcha_token)
-    
-    
+
     if len(first_name.strip()) < 5:
         raise HTTPException(status_code=400, detail="First name must be at least 5 characters long")
     

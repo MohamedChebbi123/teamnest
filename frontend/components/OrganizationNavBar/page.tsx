@@ -31,6 +31,7 @@ import {
   Settings,
   Loader2,
   Hash,
+  Volume2,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -83,6 +84,11 @@ interface Team {
   team_size: number
   org_id: number
   created_at: string
+}
+
+const getChannelIcon = (category: string, className: string) => {
+  const isVoiceChannel = (category || "").toLowerCase() === "voice"
+  return isVoiceChannel ? <Volume2 className={className} /> : <Hash className={className} />
 }
 
 export default function OrganizationNavBar({ organizationId, onClose }: OrganizationNavBarProps) {
@@ -787,7 +793,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                     )}
                     onClick={() => router.push(`/channels/${channel.channel_id}`)}
                   >
-                    <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                    {getChannelIcon(channel.channel_category, "h-3.5 w-3.5 text-muted-foreground")}
                     {navbarWidth > 100 && <span className="text-sm truncate">{channel.channel_name}</span>}
                   </Button>
                   {navbarWidth > 100 && canEditDeleteChannel(channel) && (
@@ -904,7 +910,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                               className="h-7 flex-1 justify-start gap-2 px-2"
                               onClick={() => router.push(`/channels/${channel.channel_id}`)}
                             >
-                              <Hash className="h-3 w-3 text-muted-foreground" />
+                              {getChannelIcon(channel.channel_category, "h-3 w-3 text-muted-foreground")}
                               <span className="text-xs truncate">{channel.channel_name}</span>
                             </Button>
                             {canEditDeleteChannel(channel) && (

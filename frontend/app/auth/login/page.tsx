@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Check, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -27,7 +27,6 @@ export default function Login() {
   const [emailError, setEmailError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [recaptchaToken, setRecaptchaToken] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,40 +42,6 @@ export default function Login() {
       }
     }
   }
-
-  useEffect(() => {
-    (window as any).onRecaptchaSuccess = (token: string) => {
-      setRecaptchaToken(token)
-    }
-
-    const renderRecaptcha = () => {
-      if ((window as any).grecaptcha && (window as any).grecaptcha.render) {
-        try {
-          const container = document.querySelector('.g-recaptcha')
-          if (container && !container.hasChildNodes()) {
-            (window as any).grecaptcha.render(container, {
-              sitekey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
-              callback: 'onRecaptchaSuccess'
-            })
-          }
-        } catch (error) {
-          console.error('reCAPTCHA render error:', error)
-        }
-      }
-    }
-
-    const checkRecaptcha = setInterval(() => {
-      if ((window as any).grecaptcha) {
-        clearInterval(checkRecaptcha)
-        renderRecaptcha()
-      }
-    }, 100)
-
-    return () => {
-      clearInterval(checkRecaptcha)
-      delete (window as any).onRecaptchaSuccess
-    }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -273,15 +238,6 @@ export default function Login() {
                 >
                   Remember me for 30 days
                 </Label>
-              </div>
-              
-              {/* reCAPTCHA v2 Widget */}
-              <div className="flex justify-center pt-2">
-                <div 
-                  className="g-recaptcha" 
-                  data-sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
-                  data-callback="onRecaptchaSuccess"
-                ></div>
               </div>
               
               {/* Submit Buttons */}
