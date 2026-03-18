@@ -16,6 +16,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "country-list": "^2.4.1",
+    "emoji-picker-element": "^1.29.1",
     "flag-icons": "^7.5.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.563.0",

@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Mic, MicOff } from "lucide-react"
 import { toast } from "sonner"
 
+type VoiceParticipant = {
+  user_id: number
+  first_name: string
+  last_name: string
+  avatar_url?: string | null
+  user_tag?: string
+}
+
 type SignalMessage = {
   type: "join" | "offer" | "answer" | "ice"
   from: string
@@ -12,6 +20,23 @@ type SignalMessage = {
   sdp?: RTCSessionDescriptionInit
   candidate?: RTCIceCandidateInit
 }
+
+type VoiceParticipantsMessage = {
+  type: "voice_participants"
+  participants: VoiceParticipant[]
+}
+
+type VoiceJoinedMessage = {
+  type: "voice_joined"
+  participant: VoiceParticipant
+}
+
+type VoiceLeftMessage = {
+  type: "voice_left"
+  participant: VoiceParticipant
+}
+
+type VoiceSocketMessage = SignalMessage | VoiceParticipantsMessage | VoiceJoinedMessage | VoiceLeftMessage
 
 type VoiceChannelPanelProps = {
   channelId: number
@@ -46,6 +71,8 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
   const [isMuted, setIsMuted] = useState(false)
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map())
   const [localVoiceLevel, setLocalVoiceLevel] = useState(0)
+  const [voiceParticipants, setVoiceParticipants] = useState<VoiceParticipant[]>([])
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(true)
 
   const rtcConfig = useMemo<RTCConfiguration>(
     () => ({
@@ -62,6 +89,48 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
 
     ws.send(JSON.stringify(message))
   }, [])
+
+  const upsertParticipant = useCallback((participant: VoiceParticipant) => {
+    setVoiceParticipants((prev) => {
+      const next = prev.filter((entry) => entry.user_id !== participant.user_id)
+      next.push(participant)
+      return next
+    })
+  }, [])
+
+  const removeParticipant = useCallback((participant: VoiceParticipant) => {
+    setVoiceParticipants((prev) => prev.filter((entry) => entry.user_id !== participant.user_id))
+  }, [])
+
+  const fetchParticipants = useCallback(async () => {
+    setIsLoadingParticipants(true)
+
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token) {
+        setVoiceParticipants([])
+        return
+      }
+
+      const response = await fetch(`http://localhost:8000/voice/${channelId}/participants?org_id=${orgId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        setVoiceParticipants([])
+        return
+      }
+
+      const data = await response.json()
+      setVoiceParticipants(Array.isArray(data?.participants) ? data.participants : [])
+    } catch {
+      setVoiceParticipants([])
+    } finally {
+      setIsLoadingParticipants(false)
+    }
+  }, [channelId, orgId])
 
   const removePeer = useCallback((peerId: string) => {
     const pc = peerConnectionsRef.current.get(peerId)
@@ -315,11 +384,30 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       const ws = new WebSocket(buildVoiceWsUrl(channelId, orgId, token))
 
       ws.onmessage = async (event) => {
-        let message: SignalMessage
+        let message: VoiceSocketMessage
 
         try {
           message = JSON.parse(event.data)
         } catch {
+          return
+        }
+
+        if (message.type === "voice_participants") {
+          setVoiceParticipants(Array.isArray(message.participants) ? message.participants : [])
+          return
+        }
+
+        if (message.type === "voice_joined") {
+          if (message.participant) {
+            upsertParticipant(message.participant)
+          }
+          return
+        }
+
+        if (message.type === "voice_left") {
+          if (message.participant) {
+            removeParticipant(message.participant)
+          }
           return
         }
 
@@ -389,7 +477,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     } finally {
       setIsJoining(false)
     }
-  }, [channelId, cleanup, getOrCreatePeerConnection, handleAnswer, handleIce, handleOffer, isJoined, isJoining, orgId, sendSignal])
+  }, [channelId, cleanup, getOrCreatePeerConnection, handleAnswer, handleIce, handleOffer, isJoined, isJoining, orgId, removeParticipant, sendSignal, upsertParticipant])
 
   const leaveVoice = useCallback(() => {
     cleanup()
@@ -402,10 +490,22 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     }
   }, [cleanup])
 
+  useEffect(() => {
+    void fetchParticipants()
+
+    const intervalId = window.setInterval(() => {
+      void fetchParticipants()
+    }, 15000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [fetchParticipants])
+
   const streamEntries = Array.from(remoteStreams.entries())
   const localUserSpeaking = localVoiceLevel > 0.1
   const localLevelPercent = Math.round(localVoiceLevel * 100)
-  const totalParticipants = streamEntries.length + (isJoined ? 1 : 0)
+  const totalParticipants = voiceParticipants.length
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-4 p-6">
@@ -443,6 +543,33 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       <div className="space-y-2">
         <p className="text-sm font-medium">Participants in Voice: {totalParticipants}</p>
 
+        {isLoadingParticipants && (
+          <div className="flex items-center gap-2 rounded-md border bg-background p-3 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading participants...
+          </div>
+        )}
+
+        {!isLoadingParticipants && voiceParticipants.length > 0 && (
+          <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border bg-background p-3">
+            {voiceParticipants.map((participant) => (
+              <div key={participant.user_id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">
+                    {participant.first_name} {participant.last_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{participant.user_tag || "No tag"}</p>
+                </div>
+                <span className="text-xs text-green-600">In voice</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isLoadingParticipants && voiceParticipants.length === 0 && (
+          <p className="text-sm text-muted-foreground">No one is in this voice channel yet.</p>
+        )}
+
         {isJoined && (
           <div
             className={`rounded-md border bg-background p-3 transition-all ${
@@ -465,8 +592,8 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
           </div>
         )}
 
-        {streamEntries.length === 0 && (
-          <p className="text-sm text-muted-foreground">No remote participants yet.</p>
+        {isJoined && streamEntries.length === 0 && (
+          <p className="text-sm text-muted-foreground">Connected to voice, waiting for remote audio streams.</p>
         )}
 
         {streamEntries.map(([peerId, stream]) => (

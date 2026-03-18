@@ -31,10 +31,10 @@ import {
   Building2,
   Smile,
   Paperclip,
-  AtSign,
   MoreVertical,
   Edit,
   Trash2,
+  Reply,
 } from "lucide-react"
 import { toast } from "sonner"
 import Sidebar from "@/components/Sidebar/page"
@@ -61,6 +61,18 @@ interface ChannelDetails {
 interface Message {
   message_id: number
   message_content: string
+  parent_id?: number | null
+  reply_to?: {
+    message_id: number
+    message_content: string
+    sender: {
+      user_id: number
+      first_name: string
+      last_name: string
+      avatar_url: string | null
+      user_tag: string
+    }
+  } | null
   sent_at: string
   edited_at: string
   sender: {
@@ -69,6 +81,12 @@ interface Message {
     last_name: string
     avatar_url: string | null
     user_tag: string
+  }
+}
+
+type EmojiClickEvent = Event & {
+  detail?: {
+    unicode?: string
   }
 }
 
@@ -84,6 +102,10 @@ export default function ChannelPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const emojiPickerContainerRef = useRef<HTMLDivElement | null>(null)
+  const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
 
   // WebSocket states
   const [isConnected, setIsConnected] = useState(false)
@@ -268,6 +290,59 @@ export default function ChannelPage() {
     }
   }, [channel, channelId])
 
+  useEffect(() => {
+    if (!showEmojiPicker || !emojiPickerContainerRef.current) return
+
+    let pickerElement: HTMLElement | null = null
+    let onEmojiClick: ((event: Event) => void) | null = null
+
+    const initializePicker = async () => {
+      await import("emoji-picker-element")
+      if (!emojiPickerContainerRef.current) return
+
+      pickerElement = document.createElement("emoji-picker")
+      pickerElement.setAttribute("style", "height: 320px;")
+
+      onEmojiClick = (event: Event) => {
+        const emoji = (event as EmojiClickEvent).detail?.unicode
+        if (!emoji) return
+        setMessage((prev) => `${prev}${emoji}`)
+        setShowEmojiPicker(false)
+      }
+
+      pickerElement.addEventListener("emoji-click", onEmojiClick as EventListener)
+      emojiPickerContainerRef.current.innerHTML = ""
+      emojiPickerContainerRef.current.appendChild(pickerElement)
+    }
+
+    initializePicker()
+
+    return () => {
+      if (pickerElement && onEmojiClick) {
+        pickerElement.removeEventListener("emoji-click", onEmojiClick as EventListener)
+      }
+      if (emojiPickerContainerRef.current) {
+        emojiPickerContainerRef.current.innerHTML = ""
+      }
+    }
+  }, [showEmojiPicker])
+
+  useEffect(() => {
+    if (!showEmojiPicker) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (emojiPickerContainerRef.current?.contains(target)) return
+      if (emojiButtonRef.current?.contains(target)) return
+      setShowEmojiPicker(false)
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick)
+    }
+  }, [showEmojiPicker])
+
   const fetchMessages = async (orgId: number, token?: string) => {
     setLoadingMessages(true)
     try {
@@ -315,11 +390,13 @@ export default function ChannelPage() {
           type: 'send_message',
           channel_id: channel.channel_id,
           org_id: channel.org_id,
-          message_content: message.trim()
+          message_content: message.trim(),
+          parent_id: replyToMessage?.message_id ?? null,
         }
         
         wsRef.current.send(JSON.stringify(messageData))
         setMessage("")
+        setReplyToMessage(null)
         
         // Don't show toast for WebSocket sends to avoid UI clutter
         // The message will appear immediately via broadcast
@@ -335,48 +412,50 @@ export default function ChannelPage() {
     }
 
     // Fallback to REST API if WebSocket is not connected
-    try {
-      const token = localStorage.getItem('access_token')
-      if (!token) {
-        router.push('/auth/login')
-        return
-      }
+    // try {
+    //   const token = localStorage.getItem('access_token')
+    //   if (!token) {
+    //     router.push('/auth/login')
+    //     return
+    //   }
 
-      const response = await fetch('http://localhost:8000/channel/send_message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          channel_id: channel.channel_id,
-          org_id: channel.org_id,
-          message_content: message.trim()
-        })
-      })
+    //   const response = await fetch('http://localhost:8000/channel/send_message', {
+    //     method: 'POST',
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       'Authorization': `Bearer ${token}`,
+    //     },
+    //     body: JSON.stringify({
+    //       channel_id: channel.channel_id,
+    //       org_id: channel.org_id,
+    //       message_content: message.trim(),
+    //       parent_id: replyToMessage?.message_id ?? null,
+    //     })
+    //   })
 
-      const data = await response.json()
+    //   const data = await response.json()
 
-      if (response.ok) {
-        toast.success("Message sent", {
-          description: "Your message has been sent successfully"
-        })
-        setMessage("")
-        // Refresh messages
-        await fetchMessages(channel.org_id)
-      } else {
-        toast.error("Error", {
-          description: data.detail || "Failed to send message"
-        })
-      }
-    } catch (error) {
-      console.error('Error sending message:', error)
-      toast.error("Error", {
-        description: "An error occurred while sending the message"
-      })
-    } finally {
-      setIsSendingMessage(false)
-    }
+    //   if (response.ok) {
+    //     toast.success("Message sent", {
+    //       description: "Your message has been sent successfully"
+    //     })
+    //     setMessage("")
+    //     setReplyToMessage(null)
+    //     // Refresh messages
+    //     await fetchMessages(channel.org_id)
+    //   } else {
+    //     toast.error("Error", {
+    //       description: data.detail || "Failed to send message"
+    //     })
+    //   }
+    // } catch (error) {
+    //   console.error('Error sending message:', error)
+    //   toast.error("Error", {
+    //     description: "An error occurred while sending the message"
+    //   })
+    // } finally {
+    //   setIsSendingMessage(false)
+    // }
   }
 
   const handleEditMessage = (messageId: number, currentContent: string) => {
@@ -451,6 +530,10 @@ export default function ChannelPage() {
   const handleDeleteMessageClick = (messageId: number) => {
     setMessageToDelete(messageId)
     setDeleteMessageDialogOpen(true)
+  }
+
+  const handleReplyToMessage = (targetMessage: Message) => {
+    setReplyToMessage(targetMessage)
   }
 
   const handleDeleteMessage = async () => {
@@ -703,14 +786,26 @@ export default function ChannelPage() {
                               </p>
                             </div>
                           ) : (
-                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
-                              {msg.message_content}
-                            </p>
+                            <>
+                              {msg.reply_to && (
+                                <div className="mb-2 rounded-md border-l-2 border-primary/40 bg-muted/40 px-3 py-2">
+                                  <p className="text-xs text-muted-foreground">
+                                    Replying to {msg.reply_to.sender.first_name} {msg.reply_to.sender.last_name}
+                                  </p>
+                                  <p className="text-xs text-foreground/80 line-clamp-2 whitespace-pre-wrap break-words">
+                                    {msg.reply_to.message_content}
+                                  </p>
+                                </div>
+                              )}
+                              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
+                                {msg.message_content}
+                              </p>
+                            </>
                           )}
                         </div>
                         
-                        {/* Message Actions - Only show for message sender */}
-                        {isOwnMessage && editingMessageId !== msg.message_id && (
+                        {/* Message Actions */}
+                        {editingMessageId !== msg.message_id && (
                           <div className="transition-opacity">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -724,19 +819,30 @@ export default function ChannelPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => handleEditMessage(msg.message_id, msg.message_content)}
+                                  onClick={() => handleReplyToMessage(msg)}
                                 >
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit Message
+                                  <Reply className="mr-2 h-4 w-4" />
+                                  Reply
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteMessageClick(msg.message_id)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete Message
-                                </DropdownMenuItem>
+                                {isOwnMessage && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => handleEditMessage(msg.message_id, msg.message_content)}
+                                    >
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit Message
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => handleDeleteMessageClick(msg.message_id)}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete Message
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -755,6 +861,12 @@ export default function ChannelPage() {
                       <div className="flex items-start gap-2">
                         {/* Main Input Container */}
                         <div className="flex-1 relative">
+                          {showEmojiPicker && (
+                            <div className="absolute bottom-full right-0 mb-2 z-50 rounded-lg border bg-background shadow-xl overflow-hidden">
+                              <div ref={emojiPickerContainerRef} />
+                            </div>
+                          )}
+
                           <div className="relative flex items-center bg-background rounded-lg border border-input shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                             {/* Input Field */}
                             <Input
@@ -773,6 +885,8 @@ export default function ChannelPage() {
                                 size="icon"
                                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
                                 title="Add emoji"
+                                ref={emojiButtonRef}
+                                onClick={() => setShowEmojiPicker((prev) => !prev)}
                               >
                                 <Smile className="h-4 w-4" />
                               </Button>
@@ -790,6 +904,27 @@ export default function ChannelPage() {
                           
                           {/* Helper Text */}
                           <div className="flex items-center gap-2 mt-2 px-3">
+                            {replyToMessage && (
+                              <div className="flex items-center justify-between gap-2 rounded-md border-l-2 border-primary/40 bg-muted/40 px-3 py-2 w-full">
+                                <div className="min-w-0">
+                                  <p className="text-xs text-muted-foreground">
+                                    Replying to {replyToMessage.sender.first_name} {replyToMessage.sender.last_name}
+                                  </p>
+                                  <p className="text-xs text-foreground/80 line-clamp-1 whitespace-pre-wrap break-words">
+                                    {replyToMessage.message_content}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2"
+                                  onClick={() => setReplyToMessage(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            )}
                             <p className="text-xs text-muted-foreground">
                               Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Enter</kbd> to send
                             </p>

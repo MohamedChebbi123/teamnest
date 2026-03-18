@@ -5,12 +5,11 @@ from services.channel_service import (
     update_channel_service,
     delete_channel_service
 )
-from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, websocket_endpoint as websocket_service, voice_websocket_endpoint as voice_websocket_service
+from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime 
 from fastapi import APIRouter, Depends, Header, Query, WebSocket
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.Channels_input import Channels_input
-from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
 
 router = APIRouter()
@@ -119,15 +118,25 @@ async def websocket_handler(
     db: Session = Depends(connect_databse)
 ):
 
-    return await websocket_service(websocket, channel_id, token, org_id, db)
+    return await send_messages_realtime(websocket, channel_id, token, org_id, db)
 
 
-@router.websocket("/voice/{channel_id}")
-async def voice_websocket_handler(
-    websocket: WebSocket,
-    channel_id: int,
-    authorization: str = Query(...),
-    org_id: int = Query(...),
-    db: Session = Depends(connect_databse)
-):
-    return await voice_websocket_service(websocket, channel_id, authorization, org_id, db)
+# @router.websocket("/voice/{channel_id}")
+# async def voice_websocket_handler(
+#     websocket: WebSocket,
+#     channel_id: int,
+#     authorization: str = Query(...),
+#     org_id: int = Query(...),
+#     db: Session = Depends(connect_databse)
+# ):
+#     return await voice_websocket_service(websocket, channel_id, authorization, org_id, db)
+
+
+# @router.get("/voice/{channel_id}/participants")
+# async def fetch_voice_participants(
+#     channel_id: int,
+#     org_id: int = Query(...),
+#     authorization: str = Header(None),
+#     db: Session = Depends(connect_databse)
+# ):
+#     return fetch_voice_participants_service(channel_id, org_id, authorization, db)
