@@ -14,7 +14,8 @@ from services.team_service import (
     create_channels_for_teams_service,
     fetch_channels_for_teams_service,
     fetch_members_info,
-    revoke_permissions_from_team_memebers
+    revoke_permissions_from_team_memebers,
+    fetch_files_for_team_channel_service
 )
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
@@ -143,3 +144,14 @@ async def get_member_info(
     db: Session = Depends(connect_databse)
 ):
     return fetch_members_info(org_id, team_id, user_id, authorization, db)
+
+
+@router.get("/organization/{org_id}/team/{team_id}/channel/{channel_id}/files")
+async def get_team_channel_files(
+    org_id: int,
+    team_id: int,
+    channel_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_files_for_team_channel_service(org_id, team_id, channel_id, authorization, db)

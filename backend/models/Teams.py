@@ -17,6 +17,7 @@ class Teams(Base):
     channels = relationship("Channels", back_populates="team", cascade="all, delete-orphan")
     team_members = relationship("Team_association", back_populates="team", cascade="all, delete-orphan")
     team_roles = relationship("Team_roles", back_populates="team", cascade="all, delete-orphan")
+    files = relationship("Files", back_populates="team", cascade="all, delete-orphan")
     users = relationship("Users", secondary="team_association", back_populates="teams", viewonly=True)
 
     

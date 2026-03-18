@@ -7,11 +7,15 @@ from models.Organization_members import Organization_members
 from models.Team_association import Team_association
 from models.Team_roles import Team_roles
 from models.Channels import Channels
+from models.Files import Files
 from utils.jwt_handler import verify_token
 from schemas.team_creation import team_creation
 from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
 from schemas.Channels_input import Channels_input
+
+
+
 
 def create_team(data:team_creation,authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -955,3 +959,86 @@ def revoke_permissions_from_team_memebers(team_id: int, user_id: int, authorizat
         }
     }
     
+def fetch_files_for_team_channel_service(
+    org_id: int,
+    team_id: int,
+    channel_id: int,
+    authorization: str,
+    db: Session,
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    if team.org_id != org_id:
+        raise HTTPException(status_code=400, detail="Team does not belong to this organization")
+
+    channel = db.query(Channels).filter(
+        Channels.channel_id == channel_id,
+        Channels.org_id == org_id,
+        Channels.team_id == team_id
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Team channel not found")
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_owner = found_organization.owner_id == user_id
+    is_org_admin = db.query(Organization_members).filter(
+        Organization_members.org_id == org_id,
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+
+    if not is_owner and not is_org_admin and not is_team_member:
+        raise HTTPException(status_code=403, detail="You don't have access to this team channel")
+
+    # Files model is team-scoped (no channel_id column), so this endpoint
+    # returns files posted under the team context for this team channel.
+    files = db.query(Files, Users).join(
+        Users, Files.sender_id == Users.user_id
+    ).filter(
+        Files.team_id == team_id,
+        Files.is_deleted == False
+    ).order_by(Files.sent_at.asc()).all()
+
+    return {
+        "org_id": org_id,
+        "team_id": team_id,
+        "channel_id": channel_id,
+        "files": [
+            {
+                "id": file_record.id,
+                "file_name": file_record.file_name,
+                "file_url": file_record.file_url,
+                "file_size": file_record.file_size,
+                "sent_at": file_record.sent_at,
+                "sender": {
+                    "user_id": sender.user_id,
+                    "first_name": sender.first_name,
+                    "last_name": sender.last_name,
+                    "avatar_url": sender.avatar_url,
+                    "user_tag": sender.user_tag,
+                }
+            }
+            for file_record, sender in files
+        ]
+    }

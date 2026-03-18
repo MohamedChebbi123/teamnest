@@ -29,4 +29,5 @@ class Users(Base):
     owned_organizations = relationship("Organization", back_populates="owner")
     team_associations = relationship("Team_association", back_populates="user")
     team_roles = relationship("Team_roles", back_populates="user")
+    files_sent = relationship("Files", back_populates="sender", cascade="all, delete-orphan")
     teams = relationship("Teams", secondary="team_association", back_populates="users", viewonly=True)

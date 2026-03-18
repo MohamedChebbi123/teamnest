@@ -58,9 +58,17 @@ interface ChannelDetails {
   }
 }
 
-interface Message {
+type ChatMessage = {
   message_id: number
   message_content: string
+  is_file?: boolean
+  file_attachment?: {
+    id: number
+    file_name: string
+    file_url: string
+    file_size: number
+    sent_at: string
+  } | null
   parent_id?: number | null
   reply_to?: {
     message_id: number
@@ -90,6 +98,60 @@ type EmojiClickEvent = Event & {
   }
 }
 
+type RawFetchedMessage = {
+  message_id?: number
+  message_content?: string
+  is_file?: boolean
+  file_attachment?: {
+    id?: number
+    file_name?: string
+    file_url?: string
+    file_size?: number
+    sent_at?: string
+  } | null
+  parent_id?: number | null
+  reply_to?: ChatMessage["reply_to"]
+  sent_at?: string
+  edited_at?: string
+  sender?: ChatMessage["sender"]
+}
+
+const normalizeFetchedMessage = (item: RawFetchedMessage, index: number): ChatMessage | null => {
+  if (!item.sender || !item.sent_at) {
+    return null
+  }
+
+  const fileAttachment = item.file_attachment ?? null
+  const isFile = Boolean(item.is_file && fileAttachment)
+
+  const fallbackId = Number(`${Date.now()}${index}`)
+  const resolvedMessageId = typeof item.message_id === "number"
+    ? item.message_id
+    : (isFile && typeof fileAttachment?.id === "number"
+      ? 1000000000 + fileAttachment.id
+      : fallbackId)
+
+  return {
+    message_id: resolvedMessageId,
+    message_content: item.message_content || "",
+    is_file: isFile,
+    file_attachment: isFile && fileAttachment
+      ? {
+          id: fileAttachment.id ?? 0,
+          file_name: fileAttachment.file_name ?? "file",
+          file_url: fileAttachment.file_url ?? "",
+          file_size: Number(fileAttachment.file_size ?? 0),
+          sent_at: fileAttachment.sent_at ?? item.sent_at,
+        }
+      : null,
+    parent_id: item.parent_id ?? null,
+    reply_to: item.reply_to ?? null,
+    sent_at: item.sent_at,
+    edited_at: item.edited_at || item.sent_at,
+    sender: item.sender,
+  }
+}
+
 export default function ChannelPage() {
   const router = useRouter()
   const params = useParams()
@@ -100,18 +162,20 @@ export default function ChannelPage() {
   const [message, setMessage] = useState("")
   const [showInfo, setShowInfo] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
-  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null)
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const emojiPickerContainerRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // WebSocket states
   const [isConnected, setIsConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
   const isConnectingRef = useRef(false) // Prevent multiple simultaneous connections
 
   // Edit message states
@@ -228,6 +292,30 @@ export default function ChannelPage() {
                   return prev
                 }
                 return [...prev, data.message]
+              })
+            } else if (data.type === 'new_file' && data.file) {
+              setMessages(prev => {
+                const syntheticId = data.file.id + 1000000000
+                const exists = prev.some(msg => msg.message_id === syntheticId)
+                if (exists) return prev
+
+                const fileAsMessage: ChatMessage = {
+                  message_id: syntheticId,
+                  message_content: "",
+                  is_file: true,
+                  file_attachment: {
+                    id: data.file.id,
+                    file_name: data.file.file_name,
+                    file_url: data.file.file_url,
+                    file_size: data.file.file_size,
+                    sent_at: data.file.sent_at,
+                  },
+                  sent_at: data.file.sent_at,
+                  edited_at: data.file.sent_at,
+                  sender: data.file.sender,
+                }
+
+                return [...prev, fileAsMessage]
               })
             } else if (data.type === 'message_edited') {
               // Update edited message
@@ -360,7 +448,13 @@ export default function ChannelPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setMessages(data)
+
+        const rawItems: RawFetchedMessage[] = Array.isArray(data) ? data : []
+        const normalizedMessages = rawItems
+          .map((item, index) => normalizeFetchedMessage(item, index))
+          .filter(Boolean) as ChatMessage[]
+
+        setMessages(normalizedMessages)
       } else {
         const errorData = await response.json()
         toast.error("Error", {
@@ -532,7 +626,7 @@ export default function ChannelPage() {
     setDeleteMessageDialogOpen(true)
   }
 
-  const handleReplyToMessage = (targetMessage: Message) => {
+  const handleReplyToMessage = (targetMessage: ChatMessage) => {
     setReplyToMessage(targetMessage)
   }
 
@@ -582,6 +676,61 @@ export default function ChannelPage() {
     }
   }
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  }
+
+  const isImageAttachment = (fileName: string, fileUrl: string) => {
+    const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i
+    const cleanName = fileName.split("?")[0]
+    const cleanUrl = fileUrl.split("?")[0]
+    return imagePattern.test(cleanName) || imagePattern.test(cleanUrl)
+  }
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+    event.target.value = ""
+
+    if (!selectedFile || !channel || isUploadingFile) return
+
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      toast.error("Realtime unavailable", {
+        description: "Reconnect to channel before sending files"
+      })
+      return
+    }
+
+    setIsUploadingFile(true)
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ""))
+        reader.onerror = () => reject(new Error("Failed to read file"))
+        reader.readAsDataURL(selectedFile)
+      })
+
+      wsRef.current.send(JSON.stringify({
+        type: 'send_file',
+        channel_id: channel.channel_id,
+        org_id: channel.org_id,
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        mime_type: selectedFile.type || 'application/octet-stream',
+        file_base64: fileBase64,
+      }))
+    } catch (error) {
+      console.error('Error preparing file upload:', error)
+      toast.error("Upload failed", {
+        description: "Could not process selected file"
+      })
+    } finally {
+      setIsUploadingFile(false)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -616,13 +765,13 @@ export default function ChannelPage() {
       <OrganizationNavBar organizationId={channel.organization.organization_id} />
       <MembersSidebar organizationId={channel.organization.organization_id} />
       
-      <main className={`ml-[368px] min-h-screen bg-muted/20 transition-all duration-300 ${showInfo ? 'mr-[640px]' : 'mr-80'}`}>
+      <main className={`ml-[368px] min-h-screen bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.08),_transparent_55%),linear-gradient(to_bottom,_hsl(var(--background)),_hsl(var(--muted)/0.25))] transition-all duration-300 ${showInfo ? 'mr-[640px]' : 'mr-80'}`}>
         {/* Channel Header */}
         <header className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="bg-primary/10 p-1.5 rounded-md">
+              <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/70 px-3 py-2">
+                <div className="bg-primary/12 p-1.5 rounded-md">
                   <ChannelIcon className="h-5 w-5 text-primary" />
                 </div>
                 <div>
@@ -639,7 +788,7 @@ export default function ChannelPage() {
             
             <div className="flex items-center gap-2">
               {/* WebSocket Connection Status */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 bg-muted/50">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
                 <span className="text-xs font-medium text-muted-foreground">
                   {isConnected ? 'Live' : 'Offline'}
@@ -669,7 +818,7 @@ export default function ChannelPage() {
               <>
                 {/* Messages Container */}
                 <div className="flex-1 overflow-y-auto px-4 py-6">
-                  <div className="max-w-5xl mx-auto">
+                  <div className="max-w-6xl mx-auto">
                     {/* Channel Welcome Message */}
                     {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -711,21 +860,23 @@ export default function ChannelPage() {
 
                     {/* Messages List */}
                     {messages.length > 0 && (
-                  <div className="space-y-6">
+                  <div className="space-y-2">
                     {messages.map((msg) => {
                       const isOwnMessage = currentUserId === msg.sender.user_id
-                      console.log(`Message ${msg.message_id}: currentUserId=${currentUserId}, senderId=${msg.sender.user_id}, isOwn=${isOwnMessage}`)
                       return (
-                      <div key={msg.message_id} className="flex gap-4 hover:bg-muted/30 -mx-4 px-4 py-2 rounded-lg transition-colors group">
-                        <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                      <div
+                        key={msg.message_id}
+                        className={`group flex gap-3 -mx-2 px-2 py-2 rounded-xl transition-colors ${isOwnMessage ? 'flex-row-reverse hover:bg-primary/5' : 'hover:bg-muted/40'}`}
+                      >
+                        <Avatar className="h-9 w-9 border border-background shadow-sm mt-1">
                           <AvatarImage src={msg.sender.avatar_url || undefined} alt={msg.sender.first_name} />
                           <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                             {msg.sender.first_name[0]}{msg.sender.last_name[0]}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2 mb-1">
-                            <span className="font-semibold text-foreground">
+                        <div className={`min-w-0 max-w-[82%] flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+                          <div className={`flex items-baseline gap-2 mb-1 px-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
+                            <span className="font-semibold text-foreground text-sm">
                               {msg.sender.first_name} {msg.sender.last_name}
                             </span>
                             <span className="text-xs text-muted-foreground">
@@ -741,7 +892,7 @@ export default function ChannelPage() {
                           
                           {/* Message Content or Edit Mode */}
                           {editingMessageId === msg.message_id ? (
-                            <div className="mt-2">
+                            <div className="mt-1 w-full rounded-2xl border border-primary/30 bg-background px-3 py-3 shadow-sm">
                               <Input
                                 value={editMessageContent}
                                 onChange={(e) => setEditMessageContent(e.target.value)}
@@ -786,33 +937,68 @@ export default function ChannelPage() {
                               </p>
                             </div>
                           ) : (
-                            <>
+                            <div className={`w-full rounded-2xl border px-4 py-3 shadow-sm ${isOwnMessage ? 'bg-primary text-primary-foreground border-primary/60 rounded-br-md' : 'bg-background border-border/70 rounded-bl-md'}`}>
+                              {msg.is_file && msg.file_attachment && (
+                                isImageAttachment(msg.file_attachment.file_name, msg.file_attachment.file_url) ? (
+                                  <a
+                                    href={msg.file_attachment.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mb-2 block"
+                                  >
+                                    <img
+                                      src={msg.file_attachment.file_url}
+                                       alt={msg.file_attachment.file_name}
+                                      className="max-h-[320px] w-auto max-w-full rounded-lg border border-border/60 object-contain"
+                                    />
+                                    <p className={`mt-2 text-xs ${isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                      {msg.file_attachment.file_name} • {formatFileSize(msg.file_attachment.file_size)}
+                                    </p>
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={msg.file_attachment.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`mb-2 block rounded-lg border px-3 py-2 transition-colors ${isOwnMessage ? 'border-primary-foreground/30 bg-primary-foreground/10 hover:bg-primary-foreground/20' : 'border-border/70 bg-muted/50 hover:bg-muted/70'}`}
+                                  >
+                                    <p className={`text-sm font-medium ${isOwnMessage ? 'text-primary-foreground' : 'text-foreground'}`}>
+                                      {msg.file_attachment.file_name}
+                                    </p>
+                                    <p className={`text-xs ${isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                      {formatFileSize(msg.file_attachment.file_size)} • Open file
+                                    </p>
+                                  </a>
+                                )
+                              )}
                               {msg.reply_to && (
-                                <div className="mb-2 rounded-md border-l-2 border-primary/40 bg-muted/40 px-3 py-2">
-                                  <p className="text-xs text-muted-foreground">
+                                <div className={`mb-2 rounded-md border-l-2 px-3 py-2 ${isOwnMessage ? 'border-primary-foreground/40 bg-primary-foreground/10' : 'border-primary/40 bg-muted/50'}`}>
+                                  <p className={`text-xs ${isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                                     Replying to {msg.reply_to.sender.first_name} {msg.reply_to.sender.last_name}
                                   </p>
-                                  <p className="text-xs text-foreground/80 line-clamp-2 whitespace-pre-wrap break-words">
+                                  <p className={`text-xs line-clamp-2 whitespace-pre-wrap break-words ${isOwnMessage ? 'text-primary-foreground/90' : 'text-foreground/80'}`}>
                                     {msg.reply_to.message_content}
                                   </p>
                                 </div>
                               )}
-                              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
-                                {msg.message_content}
-                              </p>
-                            </>
+                              {!msg.is_file && (
+                                <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${isOwnMessage ? 'text-primary-foreground' : 'text-foreground'}`}>
+                                  {msg.message_content}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                         
                         {/* Message Actions */}
-                        {editingMessageId !== msg.message_id && (
-                          <div className="transition-opacity">
+                        {!msg.is_file && editingMessageId !== msg.message_id && (
+                          <div className={`self-start md:opacity-0 md:group-hover:opacity-100 transition-opacity ${isOwnMessage ? 'mr-1' : 'ml-1'}`}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 rounded-full bg-background/80 border border-border/70"
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
@@ -855,10 +1041,10 @@ export default function ChannelPage() {
                 </div>
 
                 {/* Message Input Area */}
-                <div className="border-t bg-background/50 backdrop-blur px-4 py-4">
-                  <div className="max-w-5xl mx-auto">
+                <div className="border-t bg-background/70 backdrop-blur px-4 py-4">
+                  <div className="max-w-6xl mx-auto">
                     <form onSubmit={handleSendMessage} className="relative">
-                      <div className="flex items-start gap-2">
+                      <div className="rounded-2xl border border-border/70 bg-background/90 p-3 shadow-sm">
                         {/* Main Input Container */}
                         <div className="flex-1 relative">
                           {showEmojiPicker && (
@@ -867,14 +1053,14 @@ export default function ChannelPage() {
                             </div>
                           )}
 
-                          <div className="relative flex items-center bg-background rounded-lg border border-input shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                          <div className="relative flex items-center bg-muted/35 rounded-full border border-input/80 shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                             {/* Input Field */}
                             <Input
                               placeholder={`Message #${channel.channel_name}`}
                               value={message}
                               onChange={(e) => setMessage(e.target.value)}
                               onKeyDown={handleKeyDown}
-                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pr-24 h-[44px] bg-transparent"
+                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pr-32 h-[50px] bg-transparent text-sm"
                             />
                             
                             {/* Action Buttons */}
@@ -883,7 +1069,7 @@ export default function ChannelPage() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
                                 title="Add emoji"
                                 ref={emojiButtonRef}
                                 onClick={() => setShowEmojiPicker((prev) => !prev)}
@@ -894,16 +1080,24 @@ export default function ChannelPage() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
                                 title="Attach file"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploadingFile}
                               >
-                                <Paperclip className="h-4 w-4" />
+                                {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                               </Button>
                             </div>
                           </div>
                           
                           {/* Helper Text */}
                           <div className="flex items-center gap-2 mt-2 px-3">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              className="hidden"
+                              onChange={handleFileSelected}
+                            />
                             {replyToMessage && (
                               <div className="flex items-center justify-between gap-2 rounded-md border-l-2 border-primary/40 bg-muted/40 px-3 py-2 w-full">
                                 <div className="min-w-0">
@@ -931,16 +1125,18 @@ export default function ChannelPage() {
                           </div>
                         </div>
                         
-                        {/* Send Button */}
-                        <Button 
-                          type="submit" 
-                          size="lg"
-                          disabled={!message.trim() || isSendingMessage}
-                          className="h-[44px] px-6 shadow-sm flex-shrink-0"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          {isSendingMessage ? 'Sending...' : 'Send'}
-                        </Button>
+                        <div className="mt-3 flex justify-end">
+                          {/* Send Button */}
+                          <Button 
+                            type="submit" 
+                            size="lg"
+                            disabled={!message.trim() || isSendingMessage}
+                            className="h-11 rounded-full px-6 shadow-sm"
+                          >
+                            <Send className="h-4 w-4 mr-2" />
+                            {isSendingMessage ? 'Sending...' : 'Send'}
+                          </Button>
+                        </div>
                       </div>
                     </form>
                   </div>

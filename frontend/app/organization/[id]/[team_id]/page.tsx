@@ -33,6 +33,7 @@ import {
   Plus,
   Mic,
   Video,
+  Paperclip,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -92,6 +93,23 @@ interface Channel {
   team_id: number
   org_id: number
   created_at: string
+}
+
+interface TeamChannelFile {
+  id: number
+  file_name: string
+  file_url: string
+  file_size: number
+  sent_at: string
+  channel_id: number
+  channel_name: string
+  sender: {
+    user_id: number
+    first_name: string
+    last_name: string
+    avatar_url: string | null
+    user_tag: string | null
+  }
 }
 
 export default function TeamPage() {
@@ -155,6 +173,14 @@ export default function TeamPage() {
   const [channelDescription, setChannelDescription] = useState("")
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
+  const [teamChannelFiles, setTeamChannelFiles] = useState<TeamChannelFile[]>([])
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  }
 
   const fetchTeamMembers = async (userId?: number) => {
     try {
@@ -209,9 +235,71 @@ export default function TeamPage() {
       if (response.ok) {
         const data = await response.json()
         setChannels(data)
+        await fetchFilesForTeamChannels(data)
       }
     } catch (error) {
       console.error('Error fetching team channels:', error)
+    }
+  }
+
+  const fetchFilesForTeamChannels = async (teamChannels: Channel[]) => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      if (!teamChannels.length) {
+        setTeamChannelFiles([])
+        return
+      }
+
+      const fileResponses = await Promise.all(
+        teamChannels.map(async (channel) => {
+          const response = await fetch(
+            `http://localhost:8000/organization/${organizationId}/team/${teamId}/channel/${channel.channel_id}/files`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            }
+          )
+
+          if (!response.ok) {
+            return [] as TeamChannelFile[]
+          }
+
+          const data = await response.json()
+          const files = Array.isArray(data?.files) ? data.files : []
+
+          return files.map((file: any) => ({
+            id: file.id,
+            file_name: file.file_name,
+            file_url: file.file_url,
+            file_size: file.file_size,
+            sent_at: file.sent_at,
+            channel_id: channel.channel_id,
+            channel_name: channel.channel_name,
+            sender: {
+              user_id: file.sender?.user_id,
+              first_name: file.sender?.first_name,
+              last_name: file.sender?.last_name,
+              avatar_url: file.sender?.avatar_url ?? null,
+              user_tag: file.sender?.user_tag ?? null,
+            }
+          }))
+        })
+      )
+
+      const mergedFiles = fileResponses
+        .flat()
+        .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
+
+      const uniqueById = mergedFiles.filter((file, index, arr) =>
+        arr.findIndex((item) => item.id === file.id) === index
+      )
+
+      setTeamChannelFiles(uniqueById)
+    } catch (error) {
+      console.error('Error fetching team channel files:', error)
     }
   }
 
@@ -868,6 +956,50 @@ export default function TeamPage() {
               </CardFooter>
             </Card>
           </div>
+
+          <Card className="py-0">
+            <CardHeader className="border-b py-4">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>Shared Files</CardTitle>
+                <Badge variant="secondary" className="font-medium">
+                  {teamChannelFiles.length} files
+                </Badge>
+              </div>
+              <CardDescription>Files posted in team-based channels</CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-2">
+              {teamChannelFiles.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No files uploaded in this team channels yet.
+                </div>
+              ) : (
+                teamChannelFiles.slice(0, 12).map((file) => (
+                  <a
+                    key={`${file.channel_id}-${file.id}`}
+                    href={file.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-muted/70"
+                  >
+                    <div className="min-w-0 flex items-center gap-3">
+                      <span className="text-muted-foreground"><Paperclip className="h-4 w-4" /></span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{file.file_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          #{file.channel_name} • {file.sender.first_name} {file.sender.last_name}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      <p>{formatFileSize(file.file_size)}</p>
+                      <p>{new Date(file.sent_at).toLocaleDateString()}</p>
+                    </div>
+                  </a>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Edit Team Dialog */}
