@@ -76,5 +76,28 @@ class VoiceWebsocketManager:
         await self.broadcast(channel_id, message, exclude=sender)
 
 
-# Backward-compatible alias for existing imports.
-Voice_websocket_manager = VoiceWebsocketManager
+
+class DMWebSocketManager:
+    def __init__(self):
+        self.active_connections: Dict[int, List[WebSocket]] = {}
+
+    async def connect(self, user_id: int, websocket: WebSocket):
+        await websocket.accept()
+        user_connections = self.active_connections.setdefault(user_id, [])
+        if websocket not in user_connections:
+            user_connections.append(websocket)
+
+    def disconnect(self, user_id: int, websocket: WebSocket):
+        if user_id in self.active_connections:
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                self.active_connections.pop(user_id, None)
+
+    async def send_to_user(self, user_id: int, message: dict):
+        # Iterate over a copy so dead sockets can be removed safely during send.
+        for ws in list(self.active_connections.get(user_id, [])):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                self.disconnect(user_id, ws)

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Users, ChevronLeft, ChevronRight, Loader2, Mail, Phone, Globe, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -70,6 +72,7 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
   const [memberTeamDetails, setMemberTeamDetails] = useState<NonNullable<MemberDetailsResponse["team"]>[]>([])
   const [loadingMemberDetails, setLoadingMemberDetails] = useState(false)
   const [revokingPermissionKey, setRevokingPermissionKey] = useState<string | null>(null)
+  const [directMessageDraft, setDirectMessageDraft] = useState("")
 
   const minWidth = 250;
   const maxWidth = 500;
@@ -344,6 +347,27 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
     setMemberDetails(null)
     setMemberTeamDetails([])
     setRevokingPermissionKey(null)
+    setDirectMessageDraft("")
+  }
+
+  const startDirectChat = () => {
+    if (!memberDetails) return
+
+    const trimmedMessage = directMessageDraft.trim()
+    if (!trimmedMessage) {
+      toast.error("Message required", {
+        description: "Write a message before opening chat"
+      })
+      return
+    }
+
+    const receiverId = memberDetails.user.user_id
+    const receiverName = `${memberDetails.user.first_name} ${memberDetails.user.last_name}`
+
+    router.push(
+      `/channels?dm_user_id=${receiverId}&dm_name=${encodeURIComponent(receiverName)}&initial_message=${encodeURIComponent(trimmedMessage)}`
+    )
+    setDirectMessageDraft("")
   }
 
   const revokePermission = async (team: TeamInfo, permissionKey: PermissionKey) => {
@@ -571,6 +595,19 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
                     {selectedMember.role_user}
                   </Badge>
                 )}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Direct Message</p>
+                <Input
+                  value={directMessageDraft}
+                  onChange={(event) => setDirectMessageDraft(event.target.value)}
+                  placeholder="Write a message..."
+                  className="h-9"
+                />
+                <Button onClick={startDirectChat} className="w-full" size="sm">
+                  Send And Open Chat
+                </Button>
               </div>
 
               <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">

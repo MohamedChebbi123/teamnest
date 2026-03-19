@@ -28,6 +28,7 @@ import {
   LayoutDashboard, 
   Users, 
   FolderKanban, 
+  MessageCircle,
   Settings,
   Loader2,
   Hash,
@@ -293,6 +294,11 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       name: "Projects", 
       path: `/organization/${organizationId}/projects`, 
       icon: FolderKanban 
+    },
+    {
+      name: "Direct Messages",
+      path: "/channels",
+      icon: MessageCircle
     },
     { 
       name: "Settings", 
@@ -624,6 +630,22 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             )}
           </>
         )}
+      </div>
+
+      {/* Direct Messages Quick Access */}
+      <div className={cn("border-b", navbarWidth > 100 ? "px-3 py-2" : "px-2 py-2")}>
+        <Button
+          variant="outline"
+          onClick={() => router.push('/channels')}
+          title={navbarWidth <= 100 ? "Direct Messages" : undefined}
+          className={cn(
+            "w-full h-9",
+            navbarWidth > 100 ? "justify-start gap-3" : "justify-center px-0"
+          )}
+        >
+          <MessageCircle className="h-4 w-4" />
+          {navbarWidth > 100 && <span className="text-sm">Direct Messages</span>}
+        </Button>
       </div>
 
       {/* Navigation */}
