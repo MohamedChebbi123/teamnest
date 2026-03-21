@@ -523,6 +523,13 @@ export default function ChannelsPage() {
     return message.content || ""
   }
 
+  const isImageAttachment = (fileName: string, fileUrl: string) => {
+    const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i
+    const cleanName = fileName.split("?")[0]
+    const cleanUrl = fileUrl.split("?")[0]
+    return imagePattern.test(cleanName) || imagePattern.test(cleanUrl)
+  }
+
   const resolveReplyTarget = (message: DmMessage) => {
     if (message.reply_to) return message.reply_to
     if (!message.parent_id) return null
@@ -664,9 +671,22 @@ export default function ChannelsPage() {
                                 )}
 
                                 {msg.is_file && msg.file_attachment ? (
-                                  <a href={msg.file_attachment.file_url} target="_blank" rel="noreferrer" className="underline">
-                                    {msg.file_attachment.file_name}
-                                  </a>
+                                  isImageAttachment(msg.file_attachment.file_name, msg.file_attachment.file_url) ? (
+                                    <a href={msg.file_attachment.file_url} target="_blank" rel="noreferrer" className="mb-1 block">
+                                      <img
+                                        src={msg.file_attachment.file_url}
+                                        alt={msg.file_attachment.file_name}
+                                        className="max-h-[280px] w-auto max-w-full rounded-lg border border-white/20 object-contain"
+                                      />
+                                      <p className="mt-1 text-xs underline underline-offset-2 opacity-80">
+                                        {msg.file_attachment.file_name}
+                                      </p>
+                                    </a>
+                                  ) : (
+                                    <a href={msg.file_attachment.file_url} target="_blank" rel="noreferrer" className="underline">
+                                      {msg.file_attachment.file_name}
+                                    </a>
+                                  )
                                 ) : (
                                   <p className="whitespace-pre-wrap">{msg.content}</p>
                                 )}
