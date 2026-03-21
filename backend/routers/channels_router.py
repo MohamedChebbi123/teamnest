@@ -5,7 +5,7 @@ from services.channel_service import (
     update_channel_service,
     delete_channel_service
 )
-from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime 
+from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime, notifications_ws_endpoint 
 from fastapi import APIRouter, Depends, Header, Query, WebSocket
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -119,6 +119,15 @@ async def websocket_handler(
 ):
 
     return await send_messages_realtime(websocket, channel_id, token, org_id, db)
+
+
+@router.websocket("/ws/notifications")
+async def notifications_websocket_handler(
+    websocket: WebSocket,
+    token: str = Query(...),
+    db: Session = Depends(connect_databse),
+):
+    return await notifications_ws_endpoint(websocket, token, db)
 
 
 # @router.websocket("/voice/{channel_id}")

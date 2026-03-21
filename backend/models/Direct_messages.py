@@ -14,6 +14,6 @@ class Direct_messages(Base):
     is_deleted = Column(Boolean, default=False)
     sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     edited_at = Column(DateTime(timezone=True), nullable=True)
-
+    parent_id=Column(Integer,nullable=True)
     sender = relationship("Users", foreign_keys=[sender_id])
     receiver = relationship("Users", foreign_keys=[receiver_id])

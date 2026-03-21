@@ -8,11 +8,44 @@ from utils.jwt_handler import verify_token
 from utils.cloudinary_handler import upload_chat_file_from_base64
 from schemas.Direct_messages_schema import Direct_messages_schema
 from models.Direct_messages import Direct_messages
+from models.Notifications import Notifications
 from models.Users import Users
-from utils.Websocket_manager import DMWebSocketManager
+from utils.Websocket_manager import DMWebSocketManager, notification_manager
 
 dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
+
+
+def _create_direct_message_notification(db: Session, receiver_id: int, message_id: int):
+    notif_kwargs = {
+        "user_id": receiver_id,
+        "type": "direct_message",
+        "message_id": message_id,
+        "created_at": datetime.now(UTC),
+    }
+
+    if hasattr(Notifications, "is_read"):
+        notif_kwargs["is_read"] = False
+    elif hasattr(Notifications, "is_seen"):
+        notif_kwargs["is_seen"] = False
+
+    db.add(Notifications(**notif_kwargs))
+    db.commit()
+
+
+async def _push_direct_message_notification(receiver_id: int, sender_id: int, message_id: int):
+    await notification_manager.send(
+        receiver_id,
+        {
+            "type": "new_notification",
+            "notification": {
+                "type": "direct_message",
+                "message_id": message_id,
+                "sender_id": sender_id,
+                "created_at": datetime.now(UTC).isoformat(),
+            },
+        },
+    )
 
 def messages_users_service(data:Direct_messages_schema, authorization: str, db: Session):
     if not authorization or not authorization.startswith("Bearer "):
@@ -42,27 +75,52 @@ def messages_users_service(data:Direct_messages_schema, authorization: str, db: 
     if not message_content:
         raise HTTPException(status_code=400, detail="Message content cannot be empty")
 
+    parent_id = data.parent_id
+    if parent_id is not None:
+        try:
+            parent_id = int(parent_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="parent_id must be a valid integer")
+
+        parent_message = db.query(Direct_messages).filter(
+            Direct_messages.id == parent_id,
+            Direct_messages.is_deleted == False,
+        ).first()
+
+        if not parent_message:
+            raise HTTPException(status_code=404, detail="Reply target not found")
+
+        if not (
+            (parent_message.sender_id == user_id and parent_message.receiver_id == data.receiver_id)
+            or
+            (parent_message.sender_id == data.receiver_id and parent_message.receiver_id == user_id)
+        ):
+            raise HTTPException(status_code=400, detail="Reply target is not in this conversation")
+
     new_message = Direct_messages(
         sender_id=user_id,
         receiver_id=data.receiver_id,
         content=message_content,
+        parent_id=parent_id,
     )
 
     db.add(new_message)
     db.commit()
     db.refresh(new_message)
 
-    is_file = False
-    file_attachment = None
-    content = new_message.content
+    try:
+        _create_direct_message_notification(db, data.receiver_id, new_message.id)
+    except Exception:
+        db.rollback()
 
     return {
         "message_id": new_message.id,
         "sender_id": new_message.sender_id,
         "receiver_id": new_message.receiver_id,
-        "content": content,
-        "is_file": is_file,
-        "file_attachment": file_attachment,
+        "parent_id": new_message.parent_id,
+        "content": new_message.content,
+        "is_file": False,
+        "file_attachment": None,
         "is_deleted": new_message.is_deleted,
         "sent_at": new_message.sent_at.isoformat() if new_message.sent_at else None,
         "edited_at": new_message.edited_at.isoformat() if new_message.edited_at else None,
@@ -76,7 +134,7 @@ def messages_users_service(data:Direct_messages_schema, authorization: str, db: 
     }
 
 
-def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, file_base64: str, mime_type: str | None, authorization: str, db: Session):
+def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, file_base64: str, mime_type: str | None, authorization: str, db: Session, parent_id: int | None = None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -115,6 +173,27 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
     if file_size <= 0:
         raise HTTPException(status_code=400, detail="file_size must be greater than 0")
 
+    if parent_id is not None:
+        try:
+            parent_id = int(parent_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="parent_id must be a valid integer")
+
+        parent_message = db.query(Direct_messages).filter(
+            Direct_messages.id == parent_id,
+            Direct_messages.is_deleted == False,
+        ).first()
+
+        if not parent_message:
+            raise HTTPException(status_code=404, detail="Reply target not found")
+
+        if not (
+            (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
+            or
+            (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
+        ):
+            raise HTTPException(status_code=400, detail="Reply target is not in this conversation")
+
     file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)
 
     file_payload = {
@@ -127,16 +206,23 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
         sender_id=user_id,
         receiver_id=receiver_id,
         content=DM_FILE_PREFIX + json.dumps(file_payload),
+        parent_id=parent_id,
     )
 
     db.add(new_message)
     db.commit()
     db.refresh(new_message)
 
+    try:
+        _create_direct_message_notification(db, receiver_id, new_message.id)
+    except Exception:
+        db.rollback()
+
     return {
         "message_id": new_message.id,
         "sender_id": new_message.sender_id,
         "receiver_id": new_message.receiver_id,
+        "parent_id": new_message.parent_id,
         "content": "",
         "is_file": True,
         "file_attachment": file_payload,
@@ -197,6 +283,7 @@ def fetch_direct_messages_service(receiver_id: int, authorization: str, db: Sess
                 "message_id": message.id,
                 "sender_id": message.sender_id,
                 "receiver_id": message.receiver_id,
+                "parent_id": message.parent_id,
                 "content": (
                     "" if (message.content and message.content.startswith(DM_FILE_PREFIX)) else message.content
                 ),
@@ -288,6 +375,7 @@ def fetch_direct_conversations_service(authorization: str, db: Session):
                 "message_id": message.id,
                 "sender_id": message.sender_id,
                 "receiver_id": message.receiver_id,
+                "parent_id": message.parent_id,
                 "content": content_preview,
                 "is_file": is_file,
                 "file_attachment": file_attachment,
@@ -340,6 +428,7 @@ def edit_direct_message_service(message_id: int, content: str, authorization: st
         "message_id": message.id,
         "sender_id": message.sender_id,
         "receiver_id": message.receiver_id,
+        "parent_id": message.parent_id,
         "content": message.content,
         "is_file": False,
         "file_attachment": None,
@@ -424,6 +513,7 @@ async def send_direct_messages_realtime(
             if message_type == "send_message":
                 receiver_id = data.get("receiver_id")
                 content = data.get("content", "")
+                parent_id = data.get("parent_id")
 
                 try:
                     receiver_id = int(receiver_id)
@@ -457,15 +547,60 @@ async def send_direct_messages_realtime(
                     })
                     continue
 
+                if parent_id is not None:
+                    try:
+                        parent_id = int(parent_id)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "parent_id must be a valid integer"
+                        })
+                        continue
+
+                    parent_message = db.query(Direct_messages).filter(
+                        Direct_messages.id == parent_id,
+                        Direct_messages.is_deleted == False,
+                    ).first()
+
+                    if not parent_message:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Reply target not found"
+                        })
+                        continue
+
+                    if not (
+                        (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
+                        or
+                        (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
+                    ):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Reply target is not in this conversation"
+                        })
+                        continue
+
                 new_message = Direct_messages(
                     sender_id=user_id,
                     receiver_id=receiver_id,
                     content=message_content,
+                    parent_id=parent_id,
                 )
 
                 db.add(new_message)
                 db.commit()
                 db.refresh(new_message)
+
+                try:
+                    _create_direct_message_notification(db, receiver_id, new_message.id)
+                except Exception:
+                    db.rollback()
+
+                await _push_direct_message_notification(
+                    receiver_id=receiver_id,
+                    sender_id=user_id,
+                    message_id=new_message.id,
+                )
 
                 message_data = {
                     "type": "new_direct_message",
@@ -473,6 +608,7 @@ async def send_direct_messages_realtime(
                         "message_id": new_message.id,
                         "sender_id": new_message.sender_id,
                         "receiver_id": new_message.receiver_id,
+                        "parent_id": new_message.parent_id,
                         "content": new_message.content,
                         "is_file": False,
                         "file_attachment": None,
@@ -499,6 +635,7 @@ async def send_direct_messages_realtime(
                 file_size = data.get("file_size")
                 file_base64 = data.get("file_base64")
                 mime_type = data.get("mime_type")
+                parent_id = data.get("parent_id")
 
                 try:
                     receiver_id = int(receiver_id)
@@ -540,6 +677,39 @@ async def send_direct_messages_realtime(
                     })
                     continue
 
+                if parent_id is not None:
+                    try:
+                        parent_id = int(parent_id)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "parent_id must be a valid integer"
+                        })
+                        continue
+
+                    parent_message = db.query(Direct_messages).filter(
+                        Direct_messages.id == parent_id,
+                        Direct_messages.is_deleted == False,
+                    ).first()
+
+                    if not parent_message:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Reply target not found"
+                        })
+                        continue
+
+                    if not (
+                        (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
+                        or
+                        (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
+                    ):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Reply target is not in this conversation"
+                        })
+                        continue
+
                 try:
                     file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)
                 except HTTPException as exc:
@@ -559,11 +729,23 @@ async def send_direct_messages_realtime(
                     sender_id=user_id,
                     receiver_id=receiver_id,
                     content=DM_FILE_PREFIX + json.dumps(file_payload),
+                    parent_id=parent_id,
                 )
 
                 db.add(new_message)
                 db.commit()
                 db.refresh(new_message)
+
+                try:
+                    _create_direct_message_notification(db, receiver_id, new_message.id)
+                except Exception:
+                    db.rollback()
+
+                await _push_direct_message_notification(
+                    receiver_id=receiver_id,
+                    sender_id=user_id,
+                    message_id=new_message.id,
+                )
 
                 message_data = {
                     "type": "new_direct_message",
@@ -571,6 +753,7 @@ async def send_direct_messages_realtime(
                         "message_id": new_message.id,
                         "sender_id": new_message.sender_id,
                         "receiver_id": new_message.receiver_id,
+                        "parent_id": new_message.parent_id,
                         "content": "",
                         "is_file": True,
                         "file_attachment": file_payload,
@@ -649,6 +832,7 @@ async def send_direct_messages_realtime(
                         "message_id": message.id,
                         "sender_id": message.sender_id,
                         "receiver_id": message.receiver_id,
+                        "parent_id": message.parent_id,
                         "content": message.content,
                         "is_file": False,
                         "file_attachment": None,

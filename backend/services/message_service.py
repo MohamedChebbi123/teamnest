@@ -11,7 +11,7 @@ from models.Channels import Channels
 from models.Users import Users
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
-from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager
+from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
 from utils.cloudinary_handler import upload_chat_file_from_base64
 
 manager=Text_Websocket_manager()
@@ -572,6 +572,43 @@ async def send_messages_realtime(
                 
     except WebSocketDisconnect:
         manager.disconnect(channel_id, websocket)
+
+
+async def notifications_ws_endpoint(
+    websocket: WebSocket,
+    authorization: str,
+    db: Session,
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    if authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+    else:
+        token = authorization
+
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    if not user:
+        await websocket.close(code=1008, reason="User not found")
+        return
+
+    await notification_manager.connect(user_id, websocket)
+
+    try:
+        while True:
+            # Keep connection alive and reserve a path for future client actions.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        notification_manager.disconnect(user_id)
 
 
 async def voice_websocket_endpoint(

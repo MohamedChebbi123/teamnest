@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,7 @@ import {
   Users, 
   FolderKanban, 
   MessageCircle,
+  Bell,
   Settings,
   Loader2,
   Hash,
@@ -87,6 +88,15 @@ interface Team {
   created_at: string
 }
 
+interface LiveNotification {
+  id: string
+  type: string
+  message_id?: number
+  sender_id?: number
+  created_at?: string
+  read: boolean
+}
+
 const getChannelIcon = (category: string, className: string) => {
   const isVoiceChannel = (category || "").toLowerCase() === "voice"
   return isVoiceChannel ? <Volume2 className={className} /> : <Hash className={className} />
@@ -111,6 +121,13 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [isResizing, setIsResizing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+  const [liveNotifications, setLiveNotifications] = useState<LiveNotification[]>([])
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [customSoundUrl, setCustomSoundUrl] = useState<string | null>(null)
+  const [customSoundName, setCustomSoundName] = useState("")
+  const soundInputRef = useRef<HTMLInputElement | null>(null)
+  const customSoundObjectUrlRef = useRef<string | null>(null)
   const [newChannel, setNewChannel] = useState({
     channel_name: "",
     channel_mode: "orgbased",
@@ -279,6 +296,143 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     }
   }, [organizationId, router])
 
+  useEffect(() => {
+    return () => {
+      if (customSoundObjectUrlRef.current) {
+        URL.revokeObjectURL(customSoundObjectUrlRef.current)
+      }
+    }
+  }, [])
+
+  const handlePickNotificationSound = () => {
+    soundInputRef.current?.click()
+  }
+
+  const handleNotificationSoundSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith("audio/")) {
+      toast.error("Invalid file", {
+        description: "Please choose an audio file",
+      })
+      return
+    }
+
+    if (customSoundObjectUrlRef.current) {
+      URL.revokeObjectURL(customSoundObjectUrlRef.current)
+    }
+
+    const nextObjectUrl = URL.createObjectURL(file)
+    customSoundObjectUrlRef.current = nextObjectUrl
+    setCustomSoundUrl(nextObjectUrl)
+    setCustomSoundName(file.name)
+
+    toast.success("Notification sound updated", {
+      description: file.name,
+    })
+
+    event.target.value = ""
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      return
+    }
+
+    const playNotificationSound = () => {
+      if (!soundEnabled || typeof window === "undefined") {
+        return
+      }
+
+      try {
+        if (customSoundUrl) {
+          const audio = new Audio(customSoundUrl)
+          audio.volume = 0.6
+          void audio.play().catch((err) => {
+            console.error("Failed to play custom notification sound:", err)
+          })
+          return
+        }
+
+        const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext
+        if (!AudioContextCtor) {
+          return
+        }
+
+        const context = new AudioContextCtor()
+        const oscillator = context.createOscillator()
+        const gainNode = context.createGain()
+
+        oscillator.type = "sine"
+        oscillator.frequency.setValueAtTime(880, context.currentTime)
+        gainNode.gain.setValueAtTime(0.0001, context.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.01)
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.22)
+
+        oscillator.connect(gainNode)
+        gainNode.connect(context.destination)
+
+        oscillator.start(context.currentTime)
+        oscillator.stop(context.currentTime + 0.22)
+
+        oscillator.onended = () => {
+          context.close().catch(() => undefined)
+        }
+      } catch (err) {
+        console.error("Failed to play notification sound:", err)
+      }
+    }
+
+    const ws = new WebSocket(`ws://localhost:8000/ws/notifications?token=${encodeURIComponent(token)}`)
+
+    ws.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data)
+        if (parsed?.type !== "new_notification") {
+          return
+        }
+
+        const payload = parsed.notification ?? {}
+        const nextNotification: LiveNotification = {
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          type: String(payload.type ?? "direct_message"),
+          message_id: payload.message_id,
+          sender_id: payload.sender_id,
+          created_at: payload.created_at,
+          read: false,
+        }
+
+        setLiveNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
+        playNotificationSound()
+        toast.info("New notification", {
+          description: "You received a new direct message",
+        })
+      } catch (err) {
+        console.error("Failed to parse notification event:", err)
+      }
+    }
+
+    ws.onerror = (err) => {
+      console.error("Notification websocket error:", err)
+    }
+
+    return () => {
+      ws.close()
+    }
+  }, [soundEnabled, customSoundUrl])
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return
+    }
+
+    setLiveNotifications((prev) => prev.map((item) => ({ ...item, read: true })))
+  }, [isNotificationsOpen])
+
   const navigationTabs = [
     { 
       name: "Overview", 
@@ -297,7 +451,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     },
     {
       name: "Direct Messages",
-      path: "/channels",
+      path: "/direct-messages",
       icon: MessageCircle
     },
     { 
@@ -318,6 +472,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     }
     return true
   }
+
+  const unreadNotificationsCount = liveNotifications.filter((item) => !item.read).length
 
   const toggleTeamExpansion = (teamId: number) => {
     const newExpanded = new Set(expandedTeams)
@@ -621,6 +777,56 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                   )}
                 </div>
               </div>
+
+              <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative h-8 w-8">
+                    <Bell className="h-4 w-4" />
+                    {unreadNotificationsCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1 text-[10px]"
+                      >
+                        {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <div className="px-2 py-1.5 text-sm font-medium">Notifications</div>
+                  <DropdownMenuSeparator />
+                  {liveNotifications.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      No notifications yet
+                    </div>
+                  ) : (
+                    liveNotifications.map((notification) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className="cursor-pointer items-start"
+                        onClick={() => {
+                          if (notification.sender_id) {
+                            router.push(`/direct-messages?dm_user_id=${notification.sender_id}`)
+                          }
+                        }}
+                      >
+                        <div className="flex w-full flex-col gap-1 py-1">
+                          <div className="flex items-center gap-2">
+                            <Bell className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-sm font-medium">New message</span>
+                            {!notification.read && <span className="ml-auto h-2 w-2 rounded-full bg-primary" />}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {notification.sender_id
+                              ? `From user #${notification.sender_id}`
+                              : "Direct message notification"}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {organization.organization_description && (
@@ -634,18 +840,116 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
       {/* Direct Messages Quick Access */}
       <div className={cn("border-b", navbarWidth > 100 ? "px-3 py-2" : "px-2 py-2")}>
-        <Button
-          variant="outline"
-          onClick={() => router.push('/channels')}
-          title={navbarWidth <= 100 ? "Direct Messages" : undefined}
-          className={cn(
-            "w-full h-9",
-            navbarWidth > 100 ? "justify-start gap-3" : "justify-center px-0"
+        <input
+          ref={soundInputRef}
+          type="file"
+          accept="audio/*"
+          onChange={handleNotificationSoundSelected}
+          className="hidden"
+        />
+
+        <div className={cn("flex items-center", navbarWidth > 100 ? "gap-2" : "justify-center")}>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/direct-messages')}
+            title={navbarWidth <= 100 ? "Direct Messages" : undefined}
+            className={cn(
+              "relative h-9",
+              navbarWidth > 100 ? "flex-1 justify-start gap-3" : "w-full justify-center px-0"
+            )}
+          >
+            <MessageCircle className="h-4 w-4" />
+            {navbarWidth > 100 && <span className="text-sm">Direct Messages</span>}
+            {unreadNotificationsCount > 0 && (
+              <span
+                className={cn(
+                  "absolute h-2.5 w-2.5 rounded-full bg-red-500",
+                  navbarWidth > 100 ? "right-3" : "right-2 top-2"
+                )}
+              />
+            )}
+          </Button>
+
+          {navbarWidth <= 100 && (
+            <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="relative h-9 w-9">
+                  <Bell className="h-4 w-4" />
+                  {unreadNotificationsCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1 text-[10px]"
+                    >
+                      {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <div className="px-2 py-1.5 text-sm font-medium">Notifications</div>
+                <DropdownMenuSeparator />
+                {liveNotifications.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    No notifications yet
+                  </div>
+                ) : (
+                  liveNotifications.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className="cursor-pointer items-start"
+                      onClick={() => {
+                        if (notification.sender_id) {
+                          router.push(`/direct-messages?dm_user_id=${notification.sender_id}`)
+                        }
+                      }}
+                    >
+                      <div className="flex w-full flex-col gap-1 py-1">
+                        <span className="text-sm font-medium">New message</span>
+                        <span className="text-xs text-muted-foreground">
+                          {notification.sender_id
+                            ? `From user #${notification.sender_id}`
+                            : "Direct message notification"}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-        >
-          <MessageCircle className="h-4 w-4" />
-          {navbarWidth > 100 && <span className="text-sm">Direct Messages</span>}
-        </Button>
+
+          {navbarWidth > 100 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSoundEnabled((prev) => !prev)}
+              className="h-9 px-2 text-xs"
+              title={soundEnabled ? "Mute notification sound" : "Enable notification sound"}
+            >
+              {soundEnabled ? "Sound: On" : "Sound: Off"}
+            </Button>
+          )}
+
+          {navbarWidth > 100 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handlePickNotificationSound}
+              className="h-9 px-2 text-xs"
+              title={customSoundName ? `Current: ${customSoundName}` : "Choose notification sound"}
+            >
+              {customSoundName ? "Change Sound" : "Choose Sound"}
+            </Button>
+          )}
+        </div>
+
+        {navbarWidth > 100 && customSoundName && (
+          <p className="mt-1 truncate px-1 text-[11px] text-muted-foreground" title={customSoundName}>
+            Using: {customSoundName}
+          </p>
+        )}
       </div>
 
       {/* Navigation */}
@@ -668,7 +972,12 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                     active && "bg-primary/10 text-primary hover:bg-primary/15"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <span className="relative inline-flex">
+                    <Icon className="h-4 w-4" />
+                    {tab.name === "Direct Messages" && unreadNotificationsCount > 0 && (
+                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+                    )}
+                  </span>
                   {navbarWidth > 100 && <span className="text-sm">{tab.name}</span>}
                 </Button>
               )

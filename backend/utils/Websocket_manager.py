@@ -95,9 +95,27 @@ class DMWebSocketManager:
                 self.active_connections.pop(user_id, None)
 
     async def send_to_user(self, user_id: int, message: dict):
-        # Iterate over a copy so dead sockets can be removed safely during send.
         for ws in list(self.active_connections.get(user_id, [])):
             try:
                 await ws.send_json(message)
             except Exception:
                 self.disconnect(user_id, ws)
+
+
+class NotificationManager:
+    def __init__(self):
+        self.connections = {}  
+
+    async def connect(self, user_id, websocket):
+        await websocket.accept()
+        self.connections[user_id] = websocket
+
+    def disconnect(self, user_id):
+        self.connections.pop(user_id, None)
+
+    async def send(self, user_id, data):
+        if user_id in self.connections:
+            await self.connections[user_id].send_json(data)
+
+
+notification_manager = NotificationManager()

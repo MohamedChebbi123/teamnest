@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from database.connection import connect_databse
 from schemas.Direct_messages_schema import Direct_messages_schema
+from schemas.Direct_message_file_input import Direct_message_file_input
 from services.direct_messages_service import (
     messages_users_service,
     fetch_direct_messages_service,
@@ -63,16 +64,17 @@ async def delete_direct_message(
 
 @router.post("/direct-messages/file")
 async def send_direct_file(
-    data: dict = Body(...),
+    data: Direct_message_file_input,
     authorization: str = Header(None),
     db: Session = Depends(connect_databse)
 ):
     return send_direct_file_service(
-        receiver_id=data.get("receiver_id"),
-        file_name=str(data.get("file_name", "")),
-        file_size=data.get("file_size"),
-        file_base64=str(data.get("file_base64", "")),
-        mime_type=data.get("mime_type"),
+        receiver_id=data.receiver_id,
+        file_name=data.file_name,
+        file_size=data.file_size,
+        file_base64=data.file_base64,
+        mime_type=data.mime_type,
+        parent_id=data.parent_id,
         authorization=authorization,
         db=db,
     )

@@ -365,7 +365,7 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
     const receiverName = `${memberDetails.user.first_name} ${memberDetails.user.last_name}`
 
     router.push(
-      `/channels?dm_user_id=${receiverId}&dm_name=${encodeURIComponent(receiverName)}&initial_message=${encodeURIComponent(trimmedMessage)}`
+      `/direct-messages?dm_user_id=${receiverId}&dm_name=${encodeURIComponent(receiverName)}&initial_message=${encodeURIComponent(trimmedMessage)}`
     )
     setDirectMessageDraft("")
   }

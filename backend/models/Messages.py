@@ -14,3 +14,4 @@ class Messages(Base):
     edited_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     sent_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     parent_message = relationship("Messages", remote_side=[message_id], backref="replies")
+    notifications = relationship("Notifications", back_populates="message", cascade="all, delete-orphan")
