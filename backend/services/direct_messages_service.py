@@ -16,7 +16,7 @@ dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
 
 
-def _create_direct_message_notification(db: Session, receiver_id: int, message_id: int):
+def create_direct_message_notification(db: Session, receiver_id: int, message_id: int):
     notif_kwargs = {
         "user_id": receiver_id,
         "type": "direct_message",
@@ -109,7 +109,7 @@ def messages_users_service(data:Direct_messages_schema, authorization: str, db: 
     db.refresh(new_message)
 
     try:
-        _create_direct_message_notification(db, data.receiver_id, new_message.id)
+        create_direct_message_notification(db, data.receiver_id, new_message.id)
     except Exception:
         db.rollback()
 
@@ -214,7 +214,7 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
     db.refresh(new_message)
 
     try:
-        _create_direct_message_notification(db, receiver_id, new_message.id)
+        create_direct_message_notification(db, receiver_id, new_message.id)
     except Exception:
         db.rollback()
 
@@ -592,7 +592,7 @@ async def send_direct_messages_realtime(
                 db.refresh(new_message)
 
                 try:
-                    _create_direct_message_notification(db, receiver_id, new_message.id)
+                    create_direct_message_notification(db, receiver_id, new_message.id)
                 except Exception:
                     db.rollback()
 
@@ -737,7 +737,7 @@ async def send_direct_messages_realtime(
                 db.refresh(new_message)
 
                 try:
-                    _create_direct_message_notification(db, receiver_id, new_message.id)
+                    create_direct_message_notification(db, receiver_id, new_message.id)
                 except Exception:
                     db.rollback()
 

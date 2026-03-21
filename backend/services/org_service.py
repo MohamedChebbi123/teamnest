@@ -306,6 +306,7 @@ def fetch_org_members(org_id: int,authorization: str,db: Session):
             "user_id": member.memmber_id,
             "first_name": member.user.first_name,
             "last_name": member.user.last_name,
+            "user_tag": member.user.user_tag,
             "email": member.user.email,
             "profile_picture": member.user.avatar_url,
             "role_user": member.role_user,

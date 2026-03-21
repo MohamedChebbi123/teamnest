@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type ReactNode } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -61,6 +61,7 @@ interface ChannelDetails {
 type ChatMessage = {
   message_id: number
   message_content: string
+  mentions?: MentionedUser[]
   is_file?: boolean
   file_attachment?: {
     id: number
@@ -92,6 +93,20 @@ type ChatMessage = {
   }
 }
 
+type MentionedUser = {
+  user_id: number
+  first_name: string
+  last_name: string
+  user_tag?: string | null
+}
+
+type OrgMember = {
+  user_id: number
+  first_name: string
+  last_name: string
+  user_tag?: string | null
+}
+
 type EmojiClickEvent = Event & {
   detail?: {
     unicode?: string
@@ -101,6 +116,7 @@ type EmojiClickEvent = Event & {
 type RawFetchedMessage = {
   message_id?: number
   message_content?: string
+  mentions?: MentionedUser[]
   is_file?: boolean
   file_attachment?: {
     id?: number
@@ -134,6 +150,7 @@ const normalizeFetchedMessage = (item: RawFetchedMessage, index: number): ChatMe
   return {
     message_id: resolvedMessageId,
     message_content: item.message_content || "",
+    mentions: Array.isArray(item.mentions) ? item.mentions : [],
     is_file: isFile,
     file_attachment: isFile && fileAttachment
       ? {
@@ -152,6 +169,23 @@ const normalizeFetchedMessage = (item: RawFetchedMessage, index: number): ChatMe
   }
 }
 
+const MENTION_REGEX = /(?<!\w)@([A-Za-z0-9_]{2,32})/g
+
+const getMentionContext = (text: string, caret: number) => {
+  const beforeCaret = text.slice(0, caret)
+  const match = beforeCaret.match(/(?:^|\s)@([A-Za-z0-9_]*)$/)
+  if (!match) return null
+
+  const query = match[1] || ""
+  const token = `@${query}`
+
+  return {
+    start: beforeCaret.length - token.length,
+    end: caret,
+    query: query.toLowerCase(),
+  }
+}
+
 export default function ChannelPage() {
   const router = useRouter()
   const params = useParams()
@@ -160,6 +194,8 @@ export default function ChannelPage() {
   const [channel, setChannel] = useState<ChannelDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState("")
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([])
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0)
   const [showInfo, setShowInfo] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -169,6 +205,7 @@ export default function ChannelPage() {
   const emojiPickerContainerRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const messageInputRef = useRef<HTMLInputElement | null>(null)
 
   // WebSocket states
   const [isConnected, setIsConnected] = useState(false)
@@ -223,6 +260,7 @@ export default function ChannelPage() {
           setChannel(data)
           // Fetch messages after channel is loaded
           await fetchMessages(data.org_id, token)
+          await fetchOrgMembers(data.org_id, token)
         } else {
           const errorData = await response.json()
           toast.error("Error", {
@@ -470,6 +508,57 @@ export default function ChannelPage() {
       setLoadingMessages(false)
     }
   }
+
+  const fetchOrgMembers = async (orgId: number, token?: string) => {
+    try {
+      const authToken = token || localStorage.getItem('access_token')
+      if (!authToken) return
+
+      const response = await fetch(`http://localhost:8000/organization/${orgId}/members`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      })
+
+      if (!response.ok) {
+        return
+      }
+
+      const data = await response.json()
+      const members: OrgMember[] = Array.isArray(data)
+        ? data.map((item) => ({
+            user_id: Number(item.user_id),
+            first_name: String(item.first_name || ""),
+            last_name: String(item.last_name || ""),
+            user_tag: item.user_tag ? String(item.user_tag).replace(/^@+/, "") : null,
+          }))
+        : []
+
+      setOrgMembers(members)
+    } catch {
+      // Keep chat usable even if member list fetch fails.
+    }
+  }
+
+  const mentionContext = getMentionContext(message, messageInputRef.current?.selectionStart ?? message.length)
+  const mentionCandidates = mentionContext
+    ? orgMembers.filter((member) => {
+        if (currentUserId !== null && member.user_id === currentUserId) {
+          return false
+        }
+
+        const query = mentionContext.query
+        const tag = (member.user_tag || "").toLowerCase()
+        const fullName = `${member.first_name} ${member.last_name}`.toLowerCase()
+
+        if (!query) {
+          return Boolean(tag)
+        }
+
+        return tag.includes(query) || fullName.includes(query)
+      }).slice(0, 8)
+    : []
+  const showMentionSuggestions = Boolean(mentionContext && mentionCandidates.length > 0)
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -731,7 +820,101 @@ export default function ChannelPage() {
     }
   }
 
+  useEffect(() => {
+    if (!showMentionSuggestions) {
+      setActiveMentionIndex(0)
+      return
+    }
+
+    if (activeMentionIndex >= mentionCandidates.length) {
+      setActiveMentionIndex(0)
+    }
+  }, [showMentionSuggestions, mentionCandidates.length, activeMentionIndex])
+
+  const selectMention = (member: OrgMember) => {
+    if (!mentionContext || !member.user_tag) {
+      return
+    }
+
+    const insertion = `@${member.user_tag} `
+    const before = message.slice(0, mentionContext.start)
+    const after = message.slice(mentionContext.end)
+    const nextMessage = `${before}${insertion}${after}`
+
+    setMessage(nextMessage)
+    setActiveMentionIndex(0)
+
+    requestAnimationFrame(() => {
+      const cursor = before.length + insertion.length
+      messageInputRef.current?.focus()
+      messageInputRef.current?.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  const renderMessageWithMentions = (content: string, isOwnMessage: boolean) => {
+    const nodes: ReactNode[] = []
+    let cursor = 0
+
+    for (const match of content.matchAll(MENTION_REGEX)) {
+      const start = match.index ?? -1
+      if (start < 0) continue
+
+      const fullMention = match[0]
+      const end = start + fullMention.length
+
+      if (start > cursor) {
+        nodes.push(content.slice(cursor, start))
+      }
+
+      nodes.push(
+        <span
+          key={`${start}-${end}`}
+          className={isOwnMessage ? 'rounded px-1 font-semibold bg-primary-foreground/20' : 'rounded px-1 font-semibold bg-primary/10 text-primary'}
+        >
+          {fullMention}
+        </span>
+      )
+
+      cursor = end
+    }
+
+    if (cursor < content.length) {
+      nodes.push(content.slice(cursor))
+    }
+
+    return nodes.length ? nodes : content
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showMentionSuggestions) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setActiveMentionIndex((prev) => (prev + 1) % mentionCandidates.length)
+        return
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setActiveMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length)
+        return
+      }
+
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        const selected = mentionCandidates[activeMentionIndex]
+        if (selected) {
+          selectMention(selected)
+        }
+        return
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setActiveMentionIndex(0)
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage(e)
@@ -983,7 +1166,7 @@ export default function ChannelPage() {
                               )}
                               {!msg.is_file && (
                                 <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${isOwnMessage ? 'text-primary-foreground' : 'text-foreground'}`}>
-                                  {msg.message_content}
+                                  {renderMessageWithMentions(msg.message_content, isOwnMessage)}
                                 </p>
                               )}
                             </div>
@@ -1056,12 +1239,39 @@ export default function ChannelPage() {
                           <div className="relative flex items-center bg-muted/35 rounded-full border border-input/80 shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                             {/* Input Field */}
                             <Input
+                              ref={messageInputRef}
                               placeholder={`Message #${channel.channel_name}`}
                               value={message}
-                              onChange={(e) => setMessage(e.target.value)}
+                              onChange={(e) => {
+                                setMessage(e.target.value)
+                                setActiveMentionIndex(0)
+                              }}
                               onKeyDown={handleKeyDown}
                               className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pr-32 h-[50px] bg-transparent text-sm"
                             />
+
+                            {showMentionSuggestions && (
+                              <div className="absolute left-0 right-0 bottom-[58px] z-40 mx-2 rounded-xl border border-border/70 bg-background shadow-xl">
+                                <div className="max-h-60 overflow-y-auto p-1">
+                                  {mentionCandidates.map((member, index) => (
+                                    <button
+                                      key={member.user_id}
+                                      type="button"
+                                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${index === activeMentionIndex ? 'bg-primary/10 text-primary' : 'hover:bg-muted/70'}`}
+                                      onMouseDown={(event) => {
+                                        event.preventDefault()
+                                        selectMention(member)
+                                      }}
+                                    >
+                                      <span className="font-semibold">@{member.user_tag || `${member.first_name}${member.last_name}`}</span>
+                                      <span className="truncate text-xs text-muted-foreground">
+                                        {member.first_name} {member.last_name}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             
                             {/* Action Buttons */}
                             <div className="absolute right-2 flex items-center gap-1">

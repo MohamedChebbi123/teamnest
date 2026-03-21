@@ -1,7 +1,7 @@
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime, UTC
 import os
-
+import re
 from utils.jwt_handler import verify_token
 from models.Messages import Messages
 from models.Files import Files
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from models.Organization_members import Organization_members
 from models.Channels import Channels
 from models.Users import Users
+from models.Notifications import Notifications
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
 from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
@@ -16,6 +17,81 @@ from utils.cloudinary_handler import upload_chat_file_from_base64
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
+
+
+def get_user_tag(content:str):
+    if not content:
+        return []
+    tags = re.findall(r"(?<!\w)@([A-Za-z0-9_]{2,32})", str(content))
+    return list({tag.lower() for tag in tags})
+
+
+def resolve_mentioned_users(db: Session, org_id: int, tags: list[str], sender_id: int) -> list[Users]:
+    if not tags:
+        return []
+
+    tag_set = set(tags)
+    org_users = db.query(Users).join(
+        Organization_members,
+        Organization_members.memmber_id == Users.user_id
+    ).filter(
+        Organization_members.org_id == org_id,
+        Users.user_tag.isnot(None),
+        Users.user_id != sender_id,
+    ).all()
+
+    result: list[Users] = []
+    for user in org_users:
+        normalized_tag = str(user.user_tag).strip().lstrip("@").lower()
+        if normalized_tag in tag_set:
+            result.append(user)
+
+    return result
+
+
+def create_mention_notifications(db: Session, mentioned_users: list[Users], message_id: int):
+    if not mentioned_users:
+        return
+
+    for user in mentioned_users:
+        notification_kwargs = {
+            "user_id": user.user_id,
+            "type": "channel_mention",
+            "message_id": message_id,
+            "created_at": datetime.now(UTC),
+        }
+
+        if hasattr(Notifications, "is_seen"):
+            notification_kwargs["is_seen"] = False
+        elif hasattr(Notifications, "is_read"):
+            notification_kwargs["is_read"] = False
+
+        db.add(Notifications(**notification_kwargs))
+
+    db.commit()
+
+
+async def push_mention_notification(
+    receiver_id: int,
+    sender_id: int,
+    message_id: int,
+    channel_id: int,
+    org_id: int,
+):
+    await notification_manager.send(
+        receiver_id,
+        {
+            "type": "new_notification",
+            "notification": {
+                "type": "channel_mention",
+                "message_id": message_id,
+                "sender_id": sender_id,
+                "channel_id": channel_id,
+                "org_id": org_id,
+                "created_at": datetime.now(UTC).isoformat(),
+            },
+        },
+    )
 
 
 def _resolve_unique_file_name(db: Session, file_name: str) -> str:
@@ -259,6 +335,19 @@ def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Sessi
     
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    org_users = db.query(Users).join(
+        Organization_members,
+        Organization_members.memmber_id == Users.user_id
+    ).filter(
+        Organization_members.org_id == org_id,
+        Users.user_tag.isnot(None),
+    ).all()
+    users_by_tag = {
+        str(member.user_tag).strip().lstrip("@").lower(): member
+        for member in org_users
+        if member.user_tag
+    }
     
     messages = db.query(
         Messages,
@@ -273,6 +362,19 @@ def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Sessi
     result = []
 
     for message, user in messages:
+        mention_tags = get_user_tag(message.message_content)
+        mentions = []
+        for mention_tag in mention_tags:
+            mentioned_user = users_by_tag.get(mention_tag)
+            if not mentioned_user:
+                continue
+            mentions.append({
+                "user_id": mentioned_user.user_id,
+                "first_name": mentioned_user.first_name,
+                "last_name": mentioned_user.last_name,
+                "user_tag": mentioned_user.user_tag,
+            })
+
         reply_to = None
         if message.parent_id:
             parent_message_data = db.query(Messages, Users).join(
@@ -300,6 +402,7 @@ def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Sessi
         result.append({
             "message_id": message.message_id,
             "message_content": message.message_content,
+            "mentions": mentions,
             "parent_id": message.parent_id,
             "reply_to": reply_to,
             "sent_at": message.sent_at,
@@ -486,6 +589,14 @@ async def send_messages_realtime(
             if data.get("type") == "send_message":
                 parent_message = None
                 parent_id = data.get("parent_id")
+                content = str(data.get("message_content") or "").strip()
+
+                if not content:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": "Message content cannot be empty"
+                    })
+                    continue
 
                 if parent_id is not None:
                     try:
@@ -511,7 +622,7 @@ async def send_messages_realtime(
                         continue
 
                 new_message = Messages(
-                    message_content=data.get("message_content"),
+                    message_content=content,
                     sender_id=user_id,
                     channel_id=channel_id,
                     parent_id=parent_message.message_id if parent_message else None
@@ -522,6 +633,34 @@ async def send_messages_realtime(
                 db.refresh(new_message)
                 
                 sender = db.query(Users).filter(Users.user_id == user_id).first()
+                mention_tags = get_user_tag(new_message.message_content)
+                mentioned_users = resolve_mentioned_users(db, org_id, mention_tags, user_id)
+                mentions_payload = [
+                    {
+                        "user_id": mentioned.user_id,
+                        "first_name": mentioned.first_name,
+                        "last_name": mentioned.last_name,
+                        "user_tag": mentioned.user_tag,
+                    }
+                    for mentioned in mentioned_users
+                ]
+
+                try:
+                    create_mention_notifications(db, mentioned_users, new_message.message_id)
+                except Exception:
+                    db.rollback()
+
+                for mentioned in mentioned_users:
+                    try:
+                        await push_mention_notification(
+                            receiver_id=mentioned.user_id,
+                            sender_id=user_id,
+                            message_id=new_message.message_id,
+                            channel_id=channel_id,
+                            org_id=org_id,
+                        )
+                    except Exception:
+                        continue
 
                 reply_to = None
                 if parent_message:
@@ -544,6 +683,7 @@ async def send_messages_realtime(
                     "message": {
                         "message_id": new_message.message_id,
                         "message_content": new_message.message_content,
+                        "mentions": mentions_payload,
                         "parent_id": new_message.parent_id,
                         "reply_to": reply_to,
                         "sent_at": new_message.sent_at.isoformat(),
