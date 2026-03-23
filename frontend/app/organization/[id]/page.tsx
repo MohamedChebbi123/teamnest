@@ -633,367 +633,260 @@ export default function OrganizationPage() {
     <>
       <Sidebar />
       <OrganizationNavBar organizationId={organizationId as string} />
-    
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/15 p-4 md:p-6 lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
-        <div className="max-w-6xl mx-auto space-y-6">
-          {/* Organization Header */}
-          <Card className="rounded-xl border bg-card shadow-sm">
-            <CardHeader className="p-6">
-              <div className="flex flex-col items-start gap-6">
-                <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-lg flex-shrink-0">
-                  <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl">
-                    <Building2 className="h-10 w-10 sm:h-12 sm:w-12" />
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="w-full space-y-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                      <CardTitle className="text-2xl sm:text-3xl break-words">{organization.organization_name}</CardTitle>
-                      <Badge variant="secondary" className="text-xs sm:text-sm">
-                        #{organization.organaization_tag}
-                      </Badge>
-                      {organization.organization_plan && (
-                        <Badge variant={organization.organization_plan === "pro" ? "default" : "outline"} className="text-xs">
-                          {organization.organization_plan.toUpperCase()}
-                        </Badge>
-                      )}
-                    </div>
-                    {organization.organization_description && (
-                      <CardDescription className="mt-2 text-sm text-muted-foreground md:text-base">
-                        {organization.organization_description}
-                      </CardDescription>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="default" className="transition-colors hover:bg-primary/90">
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Add Member
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add Member to Organization</DialogTitle>
-                          <DialogDescription>
-                            Invite a user to join {organization.organization_name} by their user tag
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="userTag">User Tag</Label>
-                            <Input
-                              id="userTag"
-                              placeholder="Enter user tag (e.g., @username)"
-                              value={userTag}
-                              onChange={(e) => setUserTag(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="role">Role</Label>
-                            <select
-                              id="role"
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              value={roleUser}
-                              onChange={(e) => setRoleUser(e.target.value as "ADMIN" | "MEMBER")}
-                            >
-                              <option value="MEMBER">Member</option>
-                              <option value="ADMIN">Admin</option>
-                            </select>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setAddMemberDialogOpen(false)
-                              setUserTag("")
-                              setRoleUser("MEMBER")
-                            }}
-                            disabled={addingMember}
-                          >
-                            Cancel
-                          </Button>
-                          <Button onClick={handleAddMember} disabled={addingMember}>
-                            {addingMember ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Adding...
-                              </>
-                            ) : (
-                              "Add Member"
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    <Button variant="outline" className="transition-colors hover:bg-accent/60">
-                      <Users className="h-4 w-4 mr-2" />
-                      View Members
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="transition-colors hover:bg-accent/60">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Settings
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>Organization Settings</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Settings className="h-4 w-4 mr-2" />
-                          General Settings
-                        </DropdownMenuItem>
-                        {isOwner && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Organization
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => setDeleteDialogOpen(true)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Organization
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    
-                    {/* Edit Dialog */}
-                    <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                      <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>Edit Organization</DialogTitle>
-                              <DialogDescription>
-                                Update your organization details
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="editName">Organization Name</Label>
-                                <Input
-                                  id="editName"
-                                  placeholder="Enter organization name"
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="editDescription">Description</Label>
-                                <Input
-                                  id="editDescription"
-                                  placeholder="Enter organization description"
-                                  value={editDescription}
-                                  onChange={(e) => setEditDescription(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="editPlan">Plan</Label>
-                                <select
-                                  id="editPlan"
-                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                  value={editPlan}
-                                  onChange={(e) => setEditPlan(e.target.value)}
-                                >
-                                  <option value="free">Free</option>
-                                  <option value="pro">Pro</option>
-                                  <option value="enterprise">Enterprise</option>
-                                </select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="editImage">Organization Image</Label>
-                                <Input
-                                  id="editImage"
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => setEditImage(e.target.files?.[0] || null)}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setEditDialogOpen(false)
-                                  setEditName(organization.organization_name)
-                                  setEditDescription(organization.organization_description || "")
-                                  setEditPlan(organization.organization_plan || "free")
-                                  setEditImage(null)
-                                }}
-                                disabled={updating}
-                              >
-                                Cancel
-                              </Button>
-                              <Button onClick={handleEditOrganization} disabled={updating}>
-                                {updating ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Updating...
-                                  </>
-                                ) : (
-                                  "Save Changes"
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                    
-                    {/* Delete Dialog */}
-                    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                      <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Delete Organization</DialogTitle>
-                              <DialogDescription>
-                                Are you sure you want to delete {organization.organization_name}? This action cannot be undone.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => setDeleteDialogOpen(false)}
-                                disabled={deleting}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                onClick={handleDeleteOrganization}
-                                disabled={deleting}
-                              >
-                                {deleting ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Deleting...
-                                  </>
-                                ) : (
-                                  "Delete Organization"
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                  </div>
+
+      <div className="min-h-screen bg-background lg:ml-[308px] xl:ml-[368px] lg:mr-[250px] xl:mr-[320px]">
+        <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+          {/* ── Header ── */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <Avatar className="h-12 w-12 rounded-xl border shadow-sm shrink-0">
+                <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
+                <AvatarFallback className="rounded-xl bg-muted text-muted-foreground">
+                  <Building2 className="h-6 w-6" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl font-semibold tracking-tight truncate">{organization.organization_name}</h1>
+                  {organization.organization_plan && (
+                    <Badge
+                      variant={organization.organization_plan === "pro" ? "default" : "secondary"}
+                      className="text-[11px] font-medium shrink-0"
+                    >
+                      {organization.organization_plan.toUpperCase()}
+                    </Badge>
+                  )}
                 </div>
+                <p className="text-sm text-muted-foreground truncate">#{organization.organaization_tag}</p>
               </div>
-            </CardHeader>
-          </Card>
+            </div>
 
-          <Separator className="bg-border/70" />
+            <div className="flex items-center gap-2 shrink-0">
+              <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Member
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Member to Organization</DialogTitle>
+                    <DialogDescription>
+                      Invite a user to join {organization.organization_name} by their user tag
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="userTag">User Tag</Label>
+                      <Input
+                        id="userTag"
+                        placeholder="Enter user tag (e.g., @username)"
+                        value={userTag}
+                        onChange={(e) => setUserTag(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Role</Label>
+                      <select
+                        id="role"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={roleUser}
+                        onChange={(e) => setRoleUser(e.target.value as "ADMIN" | "MEMBER")}
+                      >
+                        <option value="MEMBER">Member</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => { setAddMemberDialogOpen(false); setUserTag(""); setRoleUser("MEMBER") }}
+                      disabled={addingMember}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddMember} disabled={addingMember}>
+                      {addingMember ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding...</> : "Add Member"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
-          {/* Organization Stats */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-            <Card className="rounded-xl border bg-card shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Total Members</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-sm text-muted-foreground">No members yet</p>
-              </CardContent>
-            </Card>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>Organization</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Settings className="h-4 w-4 mr-2" />
+                    General Settings
+                  </DropdownMenuItem>
+                  {isOwner && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Organization
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setDeleteDialogOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Organization
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
 
-            <Card className="rounded-xl border bg-card shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Active Teams</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="text-2xl font-bold">{loadingTeams ? '...' : teams.length}</div>
-                <p className="text-sm text-muted-foreground">
-                  {teams.length === 0 ? 'No teams yet' : teams.length === 1 ? '1 team' : `${teams.length} teams`}
-                </p>
-              </CardContent>
-            </Card>
+          {organization.organization_description && (
+            <p className="text-sm text-muted-foreground leading-relaxed -mt-2">
+              {organization.organization_description}
+            </p>
+          )}
 
-            <Card className="rounded-xl border bg-card shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Plan</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="text-2xl font-bold capitalize">
-                  {organization.organization_plan || "Free"}
+          <Separator />
+
+          {/* ── Stats ── */}
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="rounded-xl transition-all duration-200 hover:shadow-md">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="h-9 w-9 rounded-md bg-muted flex items-center justify-center shrink-0">
+                  <Users className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <p className="text-sm text-muted-foreground">Current subscription</p>
+                <div>
+                  <p className="text-sm text-muted-foreground">Members</p>
+                  <p className="text-2xl font-bold">0</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-xl transition-all duration-200 hover:shadow-md">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="h-9 w-9 rounded-md bg-muted flex items-center justify-center shrink-0">
+                  <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Teams</p>
+                  <p className="text-2xl font-bold">{loadingTeams ? "—" : teams.length}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-xl transition-all duration-200 hover:shadow-md">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="h-9 w-9 rounded-md bg-muted flex items-center justify-center shrink-0">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Plan</p>
+                  <p className="text-2xl font-bold capitalize">{organization.organization_plan || "Free"}</p>
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          <Separator className="bg-border/70" />
+          {/* ── Main Content ── */}
+          <div className="grid grid-cols-3 gap-6">
 
-          {/* Additional Content Sections */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <Card className="rounded-xl border bg-card shadow-sm lg:col-span-8">
-              <CardHeader className="p-6 pb-2">
-                <CardTitle className="text-xl font-semibold">Teams</CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">Teams in your organization</CardDescription>
+            {/* Teams — 2 cols */}
+            <Card className="col-span-2 rounded-xl">
+              <CardHeader className="px-6 py-5 flex flex-row items-center justify-between space-y-0 border-b">
+                <div>
+                  <CardTitle className="text-base font-semibold">Teams</CardTitle>
+                  <CardDescription className="mt-0.5">All teams within {organization.organization_name}</CardDescription>
+                </div>
+                <Button size="sm" onClick={() => setCreateTeamDialogOpen(true)}>
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  New Team
+                </Button>
               </CardHeader>
-              <CardContent className="p-6 pt-2">
+              <CardContent className="p-0">
                 {loadingTeams ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : teams.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    No teams yet. Create your first team!
+                  <div className="flex flex-col items-center gap-3 py-16 text-center px-6">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                      <FolderKanban className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">No teams yet</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Create your first team to get started</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setCreateTeamDialogOpen(true)}>
+                      Create Team
+                    </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {teams.map((team) => (
-                      <div
-                        key={team.team_id}
-                        onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
-                        className="group flex cursor-pointer items-center justify-between rounded-xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/30 hover:shadow-md"
-                      >
-                        <div className="flex-1">
-                          <h4 className="text-base font-semibold transition-colors group-hover:text-primary">{team.team_name}</h4>
-                          {team.description && (
-                            <p className="text-sm text-muted-foreground">{team.description}</p>
-                          )}
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            Max size: {team.team_size} members
-                          </p>
+                  <div>
+                    {teams.map((team, index) => (
+                      <div key={team.team_id}>
+                        <div
+                          onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                          className="group flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-muted/50 transition-all duration-200"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar className="h-9 w-9 rounded-lg shrink-0">
+                              <AvatarFallback className="rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                                {team.team_name.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{team.team_name}</p>
+                              {team.description && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">{team.description}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-4">
+                            <Badge variant="secondary" className="text-xs gap-1">
+                              <Users className="h-3 w-3" />
+                              {team.team_size}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingTeam(team)
+                                setEditTeamName(team.team_name)
+                                setEditTeamSize(team.team_size.toString())
+                                setEditTeamDescription(team.description || "")
+                                setEditTeamDialogOpen(true)
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setDeletingTeam(team)
+                                setDeleteTeamDialogOpen(true)
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="h-6 px-2 text-xs">{team.team_size}</Badge>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-accent"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingTeam(team)
-                              setEditTeamName(team.team_name)
-                              setEditTeamSize(team.team_size.toString())
-                              setEditTeamDescription(team.description || "")
-                              setEditTeamDialogOpen(true)
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-destructive/10"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDeletingTeam(team)
-                              setDeleteTeamDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        {index < teams.length - 1 && <Separator />}
                       </div>
                     ))}
                   </div>
@@ -1001,67 +894,147 @@ export default function OrganizationPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-xl border bg-card shadow-sm lg:col-span-4">
-              <CardHeader className="p-6 pb-2">
-                <CardTitle className="text-xl font-semibold">Quick Actions</CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">Common tasks and settings</CardDescription>
+            {/* Quick Actions — 1 col */}
+            <Card className="col-span-1 rounded-xl h-fit">
+              <CardHeader className="px-6 py-5 border-b">
+                <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 p-6 pt-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start transition-colors hover:bg-accent/60"
+              <CardContent className="p-3 space-y-0.5">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
                   onClick={() => setAddMemberDialogOpen(true)}
                 >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Invite Team Members
+                  <UserPlus className="h-4 w-4 shrink-0" />
+                  Invite Members
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start transition-colors hover:bg-accent/60"
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
                   onClick={() => setCreateTeamDialogOpen(true)}
                 >
-                  <FolderKanban className="h-4 w-4 mr-2" />
+                  <FolderKanban className="h-4 w-4 shrink-0" />
                   Create a Team
                 </Button>
-                <Button variant="outline" className="w-full justify-start transition-colors hover:bg-accent/60">
-                  Organization Settings
-                </Button>
+                {isOwner && (
+                  <>
+                    <Separator className="my-1" />
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
+                      onClick={() => setEditDialogOpen(true)}
+                    >
+                      <Edit className="h-4 w-4 shrink-0" />
+                      Edit Organization
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-3 h-9 text-sm font-normal text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 shrink-0" />
+                      Delete Organization
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
+
       <MembersSidebar organizationId={organizationId as string} />
-      
-      {/* Create Team Dialog */}
-      <Dialog open={createTeamDialogOpen} onOpenChange={setCreateTeamDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+
+      {/* ── Edit Organization Dialog ── */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create New Team</DialogTitle>
-            <DialogDescription>
-              Create a team within {organization?.organization_name}
-            </DialogDescription>
+            <DialogTitle>Edit Organization</DialogTitle>
+            <DialogDescription>Update your organization details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="teamName">Team Name *</Label>
-              <Input
-                id="teamName"
-                placeholder="Enter team name"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-              />
+              <Label htmlFor="editName">Organization Name</Label>
+              <Input id="editName" placeholder="Enter organization name" value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="teamSize">Team Size *</Label>
-              <Input
-                id="teamSize"
-                type="number"
-                min="1"
-                placeholder="Enter maximum team size"
-                value={teamSize}
-                onChange={(e) => setTeamSize(e.target.value)}
-              />
+              <Label htmlFor="editDescription">Description</Label>
+              <Input id="editDescription" placeholder="Enter organization description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editPlan">Plan</Label>
+              <select
+                id="editPlan"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={editPlan}
+                onChange={(e) => setEditPlan(e.target.value)}
+              >
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editImage">Organization Image</Label>
+              <Input id="editImage" type="file" accept="image/*" onChange={(e) => setEditImage(e.target.files?.[0] || null)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditDialogOpen(false)
+                setEditName(organization.organization_name)
+                setEditDescription(organization.organization_description || "")
+                setEditPlan(organization.organization_plan || "free")
+                setEditImage(null)
+              }}
+              disabled={updating}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditOrganization} disabled={updating}>
+              {updating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Updating...</> : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Organization Dialog ── */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Organization</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{organization.organization_name}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteOrganization} disabled={deleting}>
+              {deleting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</> : "Delete Organization"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Create Team Dialog ── */}
+      <Dialog open={createTeamDialogOpen} onOpenChange={setCreateTeamDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create New Team</DialogTitle>
+            <DialogDescription>Create a team within {organization?.organization_name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamName">Team Name <span className="text-destructive">*</span></Label>
+              <Input id="teamName" placeholder="Enter team name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="teamSize">Team Size <span className="text-destructive">*</span></Label>
+              <Input id="teamSize" type="number" min="1" placeholder="Maximum team size" value={teamSize} onChange={(e) => setTeamSize(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="teamDescription">Description</Label>
@@ -1070,69 +1043,40 @@ export default function OrganizationPage() {
                 placeholder="Enter team description (optional)"
                 value={teamDescription}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setTeamDescription(e.target.value)}
-                rows={4}
+                rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setCreateTeamDialogOpen(false)
-                setTeamName("")
-                setTeamSize("")
-                setTeamDescription("")
-              }}
+              onClick={() => { setCreateTeamDialogOpen(false); setTeamName(""); setTeamSize(""); setTeamDescription("") }}
               disabled={creatingTeam}
             >
               Cancel
             </Button>
             <Button onClick={handleCreateTeam} disabled={creatingTeam}>
-              {creatingTeam ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <FolderKanban className="h-4 w-4 mr-2" />
-                  Create Team
-                </>
-              )}
+              {creatingTeam ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</> : <><FolderKanban className="h-4 w-4 mr-2" />Create Team</>}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Edit Team Dialog */}
+
+      {/* ── Edit Team Dialog ── */}
       <Dialog open={editTeamDialogOpen} onOpenChange={setEditTeamDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Team</DialogTitle>
-            <DialogDescription>
-              Update team details
-            </DialogDescription>
+            <DialogDescription>Update team details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="editTeamName">Team Name *</Label>
-              <Input
-                id="editTeamName"
-                placeholder="Enter team name"
-                value={editTeamName}
-                onChange={(e) => setEditTeamName(e.target.value)}
-              />
+              <Label htmlFor="editTeamName">Team Name <span className="text-destructive">*</span></Label>
+              <Input id="editTeamName" placeholder="Enter team name" value={editTeamName} onChange={(e) => setEditTeamName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editTeamSize">Team Size *</Label>
-              <Input
-                id="editTeamSize"
-                type="number"
-                min="1"
-                placeholder="Enter maximum team size"
-                value={editTeamSize}
-                onChange={(e) => setEditTeamSize(e.target.value)}
-              />
+              <Label htmlFor="editTeamSize">Team Size <span className="text-destructive">*</span></Label>
+              <Input id="editTeamSize" type="number" min="1" placeholder="Maximum team size" value={editTeamSize} onChange={(e) => setEditTeamSize(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="editTeamDescription">Description</Label>
@@ -1141,68 +1085,44 @@ export default function OrganizationPage() {
                 placeholder="Enter team description (optional)"
                 value={editTeamDescription}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditTeamDescription(e.target.value)}
-                rows={4}
+                rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setEditTeamDialogOpen(false)
-                setEditingTeam(null)
-              }}
+              onClick={() => { setEditTeamDialogOpen(false); setEditingTeam(null) }}
               disabled={isEditingTeam}
             >
               Cancel
             </Button>
             <Button onClick={handleEditTeam} disabled={isEditingTeam}>
-              {isEditingTeam ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Save Changes"
-              )}
+              {isEditingTeam ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Updating...</> : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Delete Team Dialog */}
+
+      {/* ── Delete Team Dialog ── */}
       <Dialog open={deleteTeamDialogOpen} onOpenChange={setDeleteTeamDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Team</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {deletingTeam?.team_name}? This action cannot be undone.
+              Are you sure you want to delete <strong>{deletingTeam?.team_name}</strong>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setDeleteTeamDialogOpen(false)
-                setDeletingTeam(null)
-              }}
+              onClick={() => { setDeleteTeamDialogOpen(false); setDeletingTeam(null) }}
               disabled={isDeletingTeam}
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteTeam}
-              disabled={isDeletingTeam}
-            >
-              {isDeletingTeam ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete Team"
-              )}
+            <Button variant="destructive" onClick={handleDeleteTeam} disabled={isDeletingTeam}>
+              {isDeletingTeam ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</> : "Delete Team"}
             </Button>
           </DialogFooter>
         </DialogContent>

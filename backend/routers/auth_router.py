@@ -10,7 +10,8 @@ from services.auth_service import (
     edit_email_country_phone,
     send_password_reset_code_service,
     verify_reset_code_service,
-    reset_password_service
+    reset_password_service,
+    get_user_info_by_id_service
 )
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
@@ -144,3 +145,9 @@ async def reset_password(
     db: Session = Depends(connect_databse)
 ):
     return await reset_password_service(email, reset_code, new_password, db)
+
+
+
+@router.get("/get_user_info")
+async def get_user_info_service(user_id:int,authorization: str = Header(None),db: Session = Depends(connect_databse)):
+    return await get_user_info_by_id_service(user_id,authorization,db)

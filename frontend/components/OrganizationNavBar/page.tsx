@@ -345,6 +345,9 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       return
     }
 
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+    let ws: WebSocket | null = null
+
     const playNotificationSound = () => {
       if (!soundEnabled || typeof window === "undefined") {
         return
@@ -389,45 +392,56 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       }
     }
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/notifications?token=${encodeURIComponent(token)}`)
+    const connect = () => {
+      if (ws && ws.readyState === WebSocket.OPEN) return
 
-    ws.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data)
-        if (parsed?.type !== "new_notification") {
-          return
+      ws = new WebSocket(`ws://localhost:8000/ws/notifications?token=${encodeURIComponent(token)}`)
+
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data)
+          if (parsed?.type !== "new_notification") {
+            return
+          }
+
+          const payload = parsed.notification ?? {}
+          const nextNotification: LiveNotification = {
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            type: String(payload.type ?? "direct_message"),
+            message_id: payload.message_id,
+            sender_id: payload.sender_id,
+            channel_id: payload.channel_id,
+            org_id: payload.org_id,
+            created_at: payload.created_at,
+            read: false,
+          }
+
+          setLiveNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
+          playNotificationSound()
+          toast.info("New notification", {
+            description: nextNotification.type === "channel_mention"
+              ? "You were mentioned in a channel"
+              : "You received a new direct message",
+          })
+        } catch (err) {
+          console.error("Failed to parse notification event:", err)
         }
+      }
 
-        const payload = parsed.notification ?? {}
-        const nextNotification: LiveNotification = {
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          type: String(payload.type ?? "direct_message"),
-          message_id: payload.message_id,
-          sender_id: payload.sender_id,
-          channel_id: payload.channel_id,
-          org_id: payload.org_id,
-          created_at: payload.created_at,
-          read: false,
-        }
+      ws.onerror = () => {
+        // Browser WebSocket errors never expose details — silence the noise
+      }
 
-        setLiveNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
-        playNotificationSound()
-        toast.info("New notification", {
-          description: nextNotification.type === "channel_mention"
-            ? "You were mentioned in a channel"
-            : "You received a new direct message",
-        })
-      } catch (err) {
-        console.error("Failed to parse notification event:", err)
+      ws.onclose = () => {
+        reconnectTimeout = setTimeout(connect, 3000)
       }
     }
 
-    ws.onerror = (err) => {
-      console.error("Notification websocket error:", err)
-    }
+    connect()
 
     return () => {
-      ws.close()
+      if (reconnectTimeout) clearTimeout(reconnectTimeout)
+      ws?.close()
     }
   }, [soundEnabled, customSoundUrl])
 

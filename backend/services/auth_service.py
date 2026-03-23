@@ -438,3 +438,35 @@ async def reset_password_service(email: str, reset_code: str, new_password: str,
     db.refresh(user)
     
     return {"message": "Password reset successful. You can now login with your new password"}
+
+
+
+async def get_user_info_by_id_service(user_id:int,authorization: str,db: Session):
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "user_id": user.user_id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "country": user.country,
+        "avatar_url": user.avatar_url,
+        "joined_at": user.joined_at,
+        "last_login_at": user.last_login_at,
+        "user_tag": user.user_tag,
+        "is_verified": user.is_verified,
+    }
+    

@@ -2,13 +2,31 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import Sidebar from "@/components/Sidebar/page"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Loader2, MessageCircle, SendHorizontal, Smile, Paperclip, Pencil, Trash2, Search, Reply, X } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import {
+  Loader2, MessageCircle, SendHorizontal, Smile, Paperclip,
+  Pencil, Trash2, Search, Reply, X, Download, FileIcon,
+  UserRound, MapPin, Calendar, CheckCircle2, ChevronRight,
+} from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+
+type ReceiverInfo = {
+  user_id: number
+  first_name: string
+  last_name: string
+  country?: string | null
+  avatar_url?: string | null
+  joined_at?: string | null
+  last_login_at?: string | null
+  user_tag?: string | null
+  is_verified?: boolean
+}
 
 type DmReplyMessage = {
   message_id: number
@@ -81,6 +99,24 @@ type ConversationItem = {
 
 const EMOJI_LIST = ["😀", "😂", "😍", "🤔", "😎", "😭", "🔥", "👍", "❤️", "🎉", "🙏", "✅"]
 
+const formatTime = (dateStr: string) => {
+  const date = new Date(dateStr)
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+}
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const isImageAttachment = (fileName: string, fileUrl: string) => {
+  const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i
+  const cleanName = fileName.split("?")[0]
+  const cleanUrl = fileUrl.split("?")[0]
+  return imagePattern.test(cleanName) || imagePattern.test(cleanUrl)
+}
+
 export default function ChannelsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -103,15 +139,37 @@ export default function ChannelsPage() {
   const [editingContent, setEditingContent] = useState("")
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [replyingTo, setReplyingTo] = useState<DmMessage | null>(null)
+  const [showProfilePanel, setShowProfilePanel] = useState(false)
+  const [receiverInfo, setReceiverInfo] = useState<ReceiverInfo | null>(null)
+  const [loadingReceiverInfo, setLoadingReceiverInfo] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const initialMessageHandledRef = useRef<string | null>(null)
   const selectedReceiverRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     selectedReceiverRef.current = receiverId ? Number(receiverId) : null
+  }, [receiverId])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  useEffect(() => {
+    if (!receiverId) { setReceiverInfo(null); setShowProfilePanel(false); return }
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+    setLoadingReceiverInfo(true)
+    fetch(`http://localhost:8000/get_user_info?user_id=${receiverId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setReceiverInfo(data))
+      .catch(() => setReceiverInfo(null))
+      .finally(() => setLoadingReceiverInfo(false))
   }, [receiverId])
 
   const fetchConversations = async () => {
@@ -121,18 +179,11 @@ export default function ChannelsPage() {
     setLoadingConversations(true)
     try {
       const response = await fetch("http://localhost:8000/direct-messages", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch conversations")
-      }
-
+      if (!response.ok) throw new Error("Failed to fetch conversations")
       const data = await response.json()
-      const nextConversations = Array.isArray(data.conversations) ? data.conversations : []
-      setConversations(nextConversations)
+      setConversations(Array.isArray(data.conversations) ? data.conversations : [])
     } catch (error) {
       console.error("Error fetching conversations:", error)
     } finally {
@@ -150,16 +201,9 @@ export default function ChannelsPage() {
     const fetchCurrentUser = async () => {
       try {
         const response = await fetch("http://localhost:8000/profile", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         })
-
-        if (!response.ok) {
-          router.push("/auth/login")
-          return
-        }
-
+        if (!response.ok) { router.push("/auth/login"); return }
         const data = await response.json()
         setCurrentUserId(data.user_id)
       } catch {
@@ -173,36 +217,23 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("access_token")
-    if (!token || !receiverId) {
-      setMessages([])
-      return
-    }
+    if (!token || !receiverId) { setMessages([]); return }
 
     const fetchConversation = async () => {
       setLoadingMessages(true)
       try {
         const response = await fetch(`http://localhost:8000/direct-messages/${receiverId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         })
-
         if (!response.ok) {
-          if (response.status === 401) {
-            router.push("/auth/login")
-            return
-          }
+          if (response.status === 401) { router.push("/auth/login"); return }
           throw new Error("Failed to fetch direct messages")
         }
-
         const data = await response.json()
-        const fetchedMessages = Array.isArray(data.messages) ? data.messages : []
-        setMessages(fetchedMessages)
+        setMessages(Array.isArray(data.messages) ? data.messages : [])
       } catch (error) {
         console.error("Error fetching direct messages:", error)
-        toast.error("Error", {
-          description: "Failed to load direct messages"
-        })
+        toast.error("Error", { description: "Failed to load direct messages" })
       } finally {
         setLoadingMessages(false)
       }
@@ -220,9 +251,7 @@ export default function ChannelsPage() {
 
       const ws = new WebSocket(`ws://localhost:8000/ws/direct-messages?token=${token}`)
 
-      ws.onopen = () => {
-        setIsConnected(true)
-      }
+      ws.onopen = () => setIsConnected(true)
 
       ws.onmessage = (event) => {
         try {
@@ -231,29 +260,25 @@ export default function ChannelsPage() {
           if (data.type === "new_direct_message" && data.message) {
             const message = data.message as DmMessage
             const selectedReceiver = selectedReceiverRef.current
-
             if (selectedReceiver !== null) {
               const inCurrentConversation =
                 message.sender_id === selectedReceiver || message.receiver_id === selectedReceiver
-
               if (inCurrentConversation) {
                 setMessages((previous) => {
                   const exists = previous.some((item) => item.message_id === message.message_id)
-                  if (exists) return previous
-                  return [...previous, message]
+                  return exists ? previous : [...previous, message]
                 })
               }
             }
-
             fetchConversations()
             return
           }
 
           if (data.type === "direct_message_edited" && data.message) {
             const edited = data.message as DmMessage
-            setMessages((previous) => previous.map((item) => (
+            setMessages((previous) => previous.map((item) =>
               item.message_id === edited.message_id ? edited : item
-            )))
+            ))
             fetchConversations()
             return
           }
@@ -277,23 +302,15 @@ export default function ChannelsPage() {
         reconnectTimeoutRef.current = setTimeout(connect, 3000)
       }
 
-      ws.onerror = () => {
-        setIsConnected(false)
-      }
-
+      ws.onerror = () => setIsConnected(false)
       wsRef.current = ws
     }
 
     connect()
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
-      if (wsRef.current) {
-        wsRef.current.close()
-        wsRef.current = null
-      }
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
     }
   }, [])
 
@@ -314,17 +331,11 @@ export default function ChannelsPage() {
         wsRef.current.send(JSON.stringify(payload))
       } else {
         const token = localStorage.getItem("access_token")
-        if (!token) {
-          router.push("/auth/login")
-          return
-        }
+        if (!token) { router.push("/auth/login"); return }
 
         const response = await fetch("http://localhost:8000/direct-messages", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             sender_id: currentUserId,
             receiver_id: Number(receiverId),
@@ -333,28 +344,20 @@ export default function ChannelsPage() {
           }),
         })
 
-        if (!response.ok) {
-          throw new Error("Failed to send message")
-        }
-
+        if (!response.ok) throw new Error("Failed to send message")
         const created = await response.json()
         setMessages((previous) => {
           const exists = previous.some((item) => item.message_id === created.message_id)
-          if (exists) return previous
-          return [...previous, created]
+          return exists ? previous : [...previous, created]
         })
         fetchConversations()
       }
 
-      if (!customMessage) {
-        setMessageInput("")
-      }
+      if (!customMessage) setMessageInput("")
       setReplyingTo(null)
     } catch (error) {
       console.error("Error sending direct message:", error)
-      toast.error("Error", {
-        description: "Failed to send message"
-      })
+      toast.error("Error", { description: "Failed to send message" })
     } finally {
       setIsSendingMessage(false)
     }
@@ -368,35 +371,22 @@ export default function ChannelsPage() {
     setIsSavingEdit(true)
     try {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "edit_message",
-          message_id: editingMessageId,
-          content: trimmed,
-        }))
+        wsRef.current.send(JSON.stringify({ type: "edit_message", message_id: editingMessageId, content: trimmed }))
       } else {
         const token = localStorage.getItem("access_token")
-        if (!token) {
-          router.push("/auth/login")
-          return
-        }
+        if (!token) { router.push("/auth/login"); return }
 
         const response = await fetch(`http://localhost:8000/direct-messages/${editingMessageId}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ content: trimmed }),
         })
 
-        if (!response.ok) {
-          throw new Error("Failed to edit message")
-        }
-
+        if (!response.ok) throw new Error("Failed to edit message")
         const updated = await response.json()
-        setMessages((previous) => previous.map((item) => (
+        setMessages((previous) => previous.map((item) =>
           item.message_id === updated.message_id ? updated : item
-        )))
+        ))
         fetchConversations()
       }
 
@@ -413,32 +403,19 @@ export default function ChannelsPage() {
   const deleteMessage = async (messageId: number) => {
     try {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "delete_message",
-          message_id: messageId,
-        }))
+        wsRef.current.send(JSON.stringify({ type: "delete_message", message_id: messageId }))
       } else {
         const token = localStorage.getItem("access_token")
-        if (!token) {
-          router.push("/auth/login")
-          return
-        }
+        if (!token) { router.push("/auth/login"); return }
 
         const response = await fetch(`http://localhost:8000/direct-messages/${messageId}`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         })
 
-        if (!response.ok) {
-          throw new Error("Failed to delete message")
-        }
-
+        if (!response.ok) throw new Error("Failed to delete message")
         setMessages((previous) => previous.filter((item) => item.message_id !== messageId))
-        if (replyingTo?.message_id === messageId) {
-          setReplyingTo(null)
-        }
+        if (replyingTo?.message_id === messageId) setReplyingTo(null)
         fetchConversations()
       }
     } catch (error) {
@@ -456,18 +433,13 @@ export default function ChannelsPage() {
 
   const uploadFileMessage = async (file: File) => {
     if (!receiverId) return
-
     setIsUploadingFile(true)
     try {
       const fileBase64 = await fileToDataUrl(file)
-
       if (!(wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
-        toast.error("Realtime required", {
-          description: "File upload needs an active realtime connection"
-        })
+        toast.error("Realtime required", { description: "File upload needs an active realtime connection" })
         return
       }
-
       wsRef.current.send(JSON.stringify({
         type: "send_file",
         receiver_id: Number(receiverId),
@@ -478,9 +450,7 @@ export default function ChannelsPage() {
         parent_id: replyingTo?.message_id ?? null,
       }))
       setReplyingTo(null)
-      toast.success("File sent", {
-        description: `${file.name} is being delivered in realtime`
-      })
+      toast.success("File sent", { description: `${file.name} is being delivered in realtime` })
     } catch (error) {
       console.error("Error uploading file:", error)
       toast.error("Error", { description: "Failed to upload file" })
@@ -492,10 +462,8 @@ export default function ChannelsPage() {
   useEffect(() => {
     if (!receiverId || !initialMessage || initialMessageHandledRef.current === receiverId) return
     if (currentUserId === null) return
-
     initialMessageHandledRef.current = receiverId
     sendMessage(initialMessage)
-
     const params = new URLSearchParams(searchParams.toString())
     params.delete("initial_message")
     router.replace(`/direct-messages?${params.toString()}`)
@@ -517,17 +485,8 @@ export default function ChannelsPage() {
 
   const getMessagePreview = (message: DmReplyMessage | DmMessage | null) => {
     if (!message) return ""
-    if (message.is_file) {
-      return `[File] ${message.file_attachment?.file_name || "Attachment"}`
-    }
+    if (message.is_file) return `[File] ${message.file_attachment?.file_name || "Attachment"}`
     return message.content || ""
-  }
-
-  const isImageAttachment = (fileName: string, fileUrl: string) => {
-    const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i
-    const cleanName = fileName.split("?")[0]
-    const cleanUrl = fileUrl.split("?")[0]
-    return imagePattern.test(cleanName) || imagePattern.test(cleanUrl)
   }
 
   const resolveReplyTarget = (message: DmMessage) => {
@@ -536,297 +495,505 @@ export default function ChannelsPage() {
     return messages.find((item) => item.message_id === message.parent_id) || null
   }
 
+  const isGroupedWithPrev = (index: number) => {
+    if (index === 0) return false
+    const prev = messages[index - 1]
+    const curr = messages[index]
+    if (prev.sender_id !== curr.sender_id) return false
+    const diff = new Date(curr.sent_at).getTime() - new Date(prev.sent_at).getTime()
+    return diff < 5 * 60 * 1000
+  }
+
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
-      <div className="mx-auto grid h-[calc(100vh-3rem)] w-full max-w-6xl grid-cols-1 gap-3 md:grid-cols-[320px_1fr]">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageCircle className="h-4 w-4" />
-              Direct Messages
-            </CardTitle>
-            <div className="relative mt-1">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search users..."
-                className="pl-8"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[calc(100vh-13rem)]">
-              <div className="space-y-1 p-2">
-                {loadingConversations ? (
-                  <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading conversations...
-                  </div>
-                ) : filteredConversations.length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">No conversations yet.</p>
-                ) : (
-                  filteredConversations.map((item) => {
-                    const isActive = activeReceiverId === item.user.user_id
-                    const preview = item.last_message.is_file
-                      ? `[File] ${item.last_message.file_attachment?.file_name || "Attachment"}`
-                      : (item.last_message.content || "")
+    <div className="flex h-screen overflow-hidden bg-background">
+      <Sidebar />
 
-                    return (
-                      <button
-                        key={item.user.user_id}
-                        onClick={() => {
-                          router.push(`/direct-messages?dm_user_id=${item.user.user_id}&dm_name=${encodeURIComponent(`${item.user.first_name} ${item.user.last_name}`)}`)
-                        }}
-                        className={`w-full rounded-lg border p-3 text-left transition-colors ${isActive ? "bg-muted border-primary/30" : "hover:bg-muted/50"}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>
-                              {`${item.user.first_name[0] || ""}${item.user.last_name[0] || ""}`.toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
-                              {item.user.first_name} {item.user.last_name}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">{preview}</p>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        <Card className="flex min-h-0 flex-col overflow-hidden">
-          {activeReceiverId === null ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              Select a conversation to start chatting.
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback>{activeReceiverName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{activeReceiverName}</p>
-                    <p className="text-xs text-muted-foreground">Direct chat</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">{isConnected ? "Live" : "Connecting..."}</p>
-              </div>
-
-              <ScrollArea className="min-h-0 flex-1 bg-muted/20 px-4 py-4">
-                <div className="space-y-2">
-                  {loadingMessages ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading messages...
-                    </div>
-                  ) : messages.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No messages yet. Say hello.</p>
-                  ) : (
-                    messages.map((msg) => {
-                      const isMine = currentUserId !== null && msg.sender_id === currentUserId
-                      const isEditing = editingMessageId === msg.message_id
-
-                      return (
-                        <div key={msg.message_id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isMine ? "bg-primary text-primary-foreground" : "bg-card border text-foreground"}`}>
-                            {!isMine && msg.sender && (
-                              <p className="mb-1 text-[10px] font-semibold uppercase opacity-70">
-                                {msg.sender.first_name} {msg.sender.last_name}
-                              </p>
-                            )}
-
-                            {isEditing ? (
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  value={editingContent}
-                                  onChange={(event) => setEditingContent(event.target.value)}
-                                  className="h-8 bg-background text-foreground"
-                                />
-                                <Button size="sm" onClick={editMessage} disabled={isSavingEdit}>
-                                  {isSavingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
-                                </Button>
-                                <Button size="sm" variant="secondary" onClick={() => { setEditingMessageId(null); setEditingContent("") }}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                {resolveReplyTarget(msg) && (
-                                  <div className={`mb-2 rounded-md border px-2 py-1 text-xs ${isMine ? "border-primary-foreground/30 bg-primary-foreground/10" : "border-border bg-muted/60"}`}>
-                                    <p className="font-medium opacity-80">
-                                      Replying to {resolveReplyTarget(msg)?.sender?.first_name || "message"}
-                                    </p>
-                                    <p className="truncate opacity-90">{getMessagePreview(resolveReplyTarget(msg))}</p>
-                                  </div>
-                                )}
-
-                                {msg.is_file && msg.file_attachment ? (
-                                  isImageAttachment(msg.file_attachment.file_name, msg.file_attachment.file_url) ? (
-                                    <a href={msg.file_attachment.file_url} target="_blank" rel="noreferrer" className="mb-1 block">
-                                      <img
-                                        src={msg.file_attachment.file_url}
-                                        alt={msg.file_attachment.file_name}
-                                        className="max-h-[280px] w-auto max-w-full rounded-lg border border-white/20 object-contain"
-                                      />
-                                      <p className="mt-1 text-xs underline underline-offset-2 opacity-80">
-                                        {msg.file_attachment.file_name}
-                                      </p>
-                                    </a>
-                                  ) : (
-                                    <a href={msg.file_attachment.file_url} target="_blank" rel="noreferrer" className="underline">
-                                      {msg.file_attachment.file_name}
-                                    </a>
-                                  )
-                                ) : (
-                                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                                )}
-                              </>
-                            )}
-
-                            {!isEditing && (
-                              <div className="mt-2 flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => setReplyingTo(msg)}
-                                  className="rounded p-1 hover:bg-black/10"
-                                  aria-label="Reply to message"
-                                >
-                                  <Reply className="h-3.5 w-3.5" />
-                                </button>
-                                {!msg.is_file && (
-                                  <button
-                                    onClick={() => {
-                                      setEditingMessageId(msg.message_id)
-                                      setEditingContent(msg.content)
-                                    }}
-                                    className="rounded p-1 hover:bg-black/10"
-                                    aria-label="Edit message"
-                                    disabled={!isMine}
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => deleteMessage(msg.message_id)}
-                                  className="rounded p-1 hover:bg-black/10"
-                                  aria-label="Delete message"
-                                  disabled={!isMine}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </ScrollArea>
-
-            </>
-          )}
-
-          <div className="border-t p-3">
-            {activeReceiverId !== null && replyingTo && (
-                  <div className="mb-2 flex items-start justify-between gap-2 rounded-lg border bg-muted/50 p-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Replying to {replyingTo.sender.first_name} {replyingTo.sender.last_name}
-                      </p>
-                      <p className="truncate text-sm">{getMessagePreview(replyingTo)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setReplyingTo(null)}
-                      className="rounded p-1 hover:bg-muted"
-                      aria-label="Cancel reply"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-
-            {activeReceiverId !== null && isUploadingFile && (
-              <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Uploading file...
-              </div>
-            )}
-
-            {activeReceiverId !== null && showEmojiPicker && (
-              <div className="mb-2 flex flex-wrap gap-1 rounded-lg border bg-card p-2">
-                {EMOJI_LIST.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => setMessageInput((previous) => previous + emoji)}
-                    className="rounded px-2 py-1 text-lg hover:bg-muted"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) {
-                  uploadFileMessage(file)
-                }
-                event.currentTarget.value = ""
-              }}
+      {/* DM List Sidebar — pl-20 offsets the fixed 80px Sidebar */}
+      <div className="flex h-full w-[300px] flex-shrink-0 flex-col border-r bg-muted/40 pl-20">
+        <div className="px-4 pb-3 pt-5">
+          <div className="mb-3 flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-sm font-semibold tracking-wide">Direct Messages</h2>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="h-8 rounded-lg bg-background pl-9 text-sm"
             />
+          </div>
+        </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setShowEmojiPicker((previous) => !previous)}
-                disabled={isComposerDisabled}
-              >
-                <Smile className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isComposerDisabled}
-              >
-                {isUploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-              </Button>
-              <Input
-                value={messageInput}
-                onChange={(event) => setMessageInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault()
-                    sendMessage()
-                  }
-                }}
-                placeholder={activeReceiverId === null ? "Select a conversation to type a message..." : "Type your message..."}
-                disabled={isComposerDisabled}
-              />
-              <Button onClick={() => sendMessage()} size="icon" aria-label="Send message" disabled={isComposerDisabled}>
-                {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
-              </Button>
+        <ScrollArea className="flex-1 px-2 pb-2">
+          <div className="space-y-0.5">
+            {loadingConversations ? (
+              <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading...
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <p className="px-3 py-4 text-xs text-muted-foreground">No conversations yet.</p>
+            ) : (
+              filteredConversations.map((item) => {
+                const isActive = activeReceiverId === item.user.user_id
+                const initials = `${item.user.first_name[0] || ""}${item.user.last_name[0] || ""}`.toUpperCase()
+                const preview = item.last_message.is_file
+                  ? `[File] ${item.last_message.file_attachment?.file_name || "Attachment"}`
+                  : (item.last_message.content || "")
+
+                return (
+                  <button
+                    key={item.user.user_id}
+                    onClick={() => router.push(
+                      `/direct-messages?dm_user_id=${item.user.user_id}&dm_name=${encodeURIComponent(`${item.user.first_name} ${item.user.last_name}`)}`
+                    )}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
+                      isActive
+                        ? "bg-muted"
+                        : "hover:bg-muted/70"
+                    )}
+                  >
+                    <Avatar className="h-9 w-9 flex-shrink-0">
+                      <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {item.user.first_name} {item.user.last_name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{preview}</p>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Chat Area — always mounted, never conditionally unmounted */}
+      <div className="flex flex-1 flex-col overflow-hidden bg-muted/20">
+
+        {/* Header — always rendered, hidden via opacity when no receiver */}
+        <div className={cn(
+          "flex flex-shrink-0 items-center justify-between px-5 py-3 transition-opacity duration-150",
+          activeReceiverId === null && "pointer-events-none opacity-0"
+        )}>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarFallback className="text-xs font-medium">
+                {activeReceiverName.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-semibold">{activeReceiverName}</p>
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  isConnected ? "bg-emerald-500" : "bg-muted-foreground"
+                )} />
+                <span className="text-xs text-muted-foreground">
+                  {isConnected ? "Online" : "Connecting..."}
+                </span>
+              </div>
             </div>
           </div>
-        </Card>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-8 w-8 rounded-lg text-muted-foreground", showProfilePanel && "bg-muted text-foreground")}
+            onClick={() => setShowProfilePanel((p) => !p)}
+            aria-label="Toggle profile"
+          >
+            <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", showProfilePanel && "rotate-180")} />
+          </Button>
+        </div>
+        <Separator className={cn(activeReceiverId === null && "opacity-0")} />
+
+        {/* Messages */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-4 py-4">
+            {activeReceiverId === null ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+                <MessageCircle className="h-12 w-12 opacity-30" />
+                <p className="text-sm font-medium">Select a conversation to start chatting</p>
+              </div>
+            ) : loadingMessages ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading messages...
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+                <MessageCircle className="h-8 w-8 opacity-20" />
+                <p className="text-sm">No messages yet. Say hello.</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {messages.map((msg, index) => {
+                  const isMine = currentUserId !== null && msg.sender_id === currentUserId
+                  const isEditing = editingMessageId === msg.message_id
+                  const grouped = isGroupedWithPrev(index)
+                  const replyTarget = resolveReplyTarget(msg)
+
+                  return (
+                    <div
+                      key={msg.message_id}
+                      className={cn(
+                        "group flex items-end gap-2 px-2",
+                        isMine ? "flex-row-reverse" : "flex-row",
+                        grouped ? "mt-0.5" : "mt-3"
+                      )}
+                    >
+                      {/* Avatar column */}
+                      <div className="w-8 flex-shrink-0">
+                        {!isMine && !grouped && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-[10px] font-medium">
+                              {`${msg.sender.first_name[0] || ""}${msg.sender.last_name[0] || ""}`.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+
+                      {/* Bubble + actions */}
+                      <div className={cn("flex max-w-[65%] flex-col gap-0.5", isMine && "items-end")}>
+                        {!grouped && !isMine && (
+                          <p className="mb-0.5 ml-1 text-[11px] font-semibold text-muted-foreground">
+                            {msg.sender.first_name} {msg.sender.last_name}
+                          </p>
+                        )}
+
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 rounded-2xl bg-muted px-3 py-2">
+                            <Input
+                              value={editingContent}
+                              onChange={(e) => setEditingContent(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); editMessage() } }}
+                              className="h-7 min-w-[200px] border-none bg-background text-sm shadow-none"
+                              autoFocus
+                            />
+                            <Button size="sm" className="h-7 px-3 text-xs" onClick={editMessage} disabled={isSavingEdit}>
+                              {isSavingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => { setEditingMessageId(null); setEditingContent("") }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className={cn(
+                            "relative rounded-2xl px-3 py-2 text-sm transition-all duration-150",
+                            isMine ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                          )}>
+                            {/* Reply preview */}
+                            {replyTarget && (
+                              <div className={cn(
+                                "mb-1.5 rounded-lg px-2 py-1 text-xs",
+                                isMine
+                                  ? "border border-primary-foreground/20 bg-primary-foreground/10"
+                                  : "border bg-background/60"
+                              )}>
+                                <p className="font-medium opacity-80">
+                                  {replyTarget.sender?.first_name || "Message"}
+                                </p>
+                                <p className="truncate opacity-70">{getMessagePreview(replyTarget)}</p>
+                              </div>
+                            )}
+
+                            {/* Content */}
+                            {msg.is_file && msg.file_attachment ? (
+                              isImageAttachment(msg.file_attachment.file_name, msg.file_attachment.file_url) ? (
+                                <a
+                                  href={msg.file_attachment.file_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block overflow-hidden rounded-xl"
+                                >
+                                  <img
+                                    src={msg.file_attachment.file_url}
+                                    alt={msg.file_attachment.file_name}
+                                    className="max-h-[300px] w-auto max-w-[340px] rounded-xl object-contain transition-opacity duration-150 hover:opacity-90"
+                                  />
+                                </a>
+                              ) : (
+                                <div className="flex items-center gap-3 rounded-xl bg-background/10 px-3 py-2">
+                                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-background/20">
+                                    <FileIcon className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{msg.file_attachment.file_name}</p>
+                                    <p className="text-xs opacity-70">{formatFileSize(msg.file_attachment.file_size)}</p>
+                                  </div>
+                                  <a
+                                    href={msg.file_attachment.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex-shrink-0 rounded-lg p-1.5 transition-colors hover:bg-background/20"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </a>
+                                </div>
+                              )
+                            ) : (
+                              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                            )}
+
+                            {/* Timestamp */}
+                            <p className={cn(
+                              "mt-1 text-[10px] leading-none",
+                              isMine ? "text-right text-primary-foreground/60" : "text-right text-muted-foreground"
+                            )}>
+                              {formatTime(msg.sent_at)}
+                              {msg.edited_at && " · edited"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Floating message actions */}
+                      {!isEditing && (
+                        <div className={cn(
+                          "flex flex-shrink-0 items-center gap-0.5 self-center rounded-lg border bg-background p-0.5 shadow-sm",
+                          "opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                        )}>
+                          <button
+                            onClick={() => setReplyingTo(msg)}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            aria-label="Reply"
+                          >
+                            <Reply className="h-3.5 w-3.5" />
+                          </button>
+                          {isMine && !msg.is_file && (
+                            <button
+                              onClick={() => { setEditingMessageId(msg.message_id); setEditingContent(msg.content) }}
+                              className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              aria-label="Edit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {isMine && (
+                            <button
+                              onClick={() => deleteMessage(msg.message_id)}
+                              className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              aria-label="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Input Area — always rendered */}
+        <div className="flex-shrink-0 px-4 pb-4 pt-2">
+          {replyingTo && (
+            <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border bg-muted/50 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Replying to {replyingTo.sender.first_name} {replyingTo.sender.last_name}
+                </p>
+                <p className="truncate text-xs text-foreground/70">{getMessagePreview(replyingTo)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="flex-shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {isUploadingFile && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Uploading file...
+            </div>
+          )}
+
+          {showEmojiPicker && (
+            <div className="mb-2 flex flex-wrap gap-1 rounded-xl border bg-card p-2 shadow-sm">
+              {EMOJI_LIST.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => setMessageInput((prev) => prev + emoji)}
+                  className="rounded-lg px-2 py-1 text-lg transition-colors hover:bg-muted"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) uploadFileMessage(file)
+              e.currentTarget.value = ""
+            }}
+          />
+
+          <div className={cn(
+            "flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 transition-all duration-200",
+            "focus-within:ring-2 focus-within:ring-primary/50"
+          )}>
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              disabled={isComposerDisabled}
+              className="flex-shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:opacity-40"
+            >
+              <Smile className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isComposerDisabled}
+              className="flex-shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:opacity-40"
+            >
+              {isUploadingFile
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Paperclip className="h-4 w-4" />
+              }
+            </button>
+            <input
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); sendMessage() }
+              }}
+              placeholder={activeReceiverId === null ? "Select a conversation..." : "Message..."}
+              disabled={isComposerDisabled}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-40"
+            />
+            <Button
+              onClick={() => sendMessage()}
+              size="icon"
+              aria-label="Send message"
+              disabled={isComposerDisabled || !messageInput.trim()}
+              className="h-7 w-7 flex-shrink-0 rounded-lg"
+            >
+              {isSendingMessage
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <SendHorizontal className="h-3.5 w-3.5" />
+              }
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Panel */}
+      <div className={cn(
+        "flex h-full flex-shrink-0 flex-col border-l bg-muted/30 transition-all duration-300 overflow-hidden",
+        showProfilePanel && activeReceiverId !== null ? "w-[280px]" : "w-0"
+      )}>
+        {receiverInfo && (
+          <div className="flex h-full flex-col">
+            {/* Panel Header */}
+            <div className="flex flex-shrink-0 items-center justify-between px-4 py-3 border-b">
+              <p className="text-sm font-semibold">Profile</p>
+              <button
+                onClick={() => setShowProfilePanel(false)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="flex flex-col items-center px-5 py-6 gap-4">
+                {/* Avatar */}
+                <div className="relative">
+                  {receiverInfo.avatar_url ? (
+                    <img
+                      src={receiverInfo.avatar_url}
+                      alt={receiverInfo.first_name}
+                      className="h-20 w-20 rounded-full object-cover ring-2 ring-background shadow"
+                    />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-lg font-semibold ring-2 ring-background shadow">
+                      {receiverInfo.first_name[0]}{receiverInfo.last_name[0]}
+                    </div>
+                  )}
+                  {receiverInfo.is_verified && (
+                    <span className="absolute bottom-0 right-0 rounded-full bg-background p-0.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </span>
+                  )}
+                </div>
+
+                {/* Name + tag */}
+                <div className="text-center">
+                  <p className="text-base font-semibold">
+                    {receiverInfo.first_name} {receiverInfo.last_name}
+                  </p>
+                  {receiverInfo.user_tag && (
+                    <p className="text-xs text-muted-foreground mt-0.5">#{receiverInfo.user_tag}</p>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Info rows */}
+                <div className="w-full space-y-3">
+                  {receiverInfo.country && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <MapPin className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <span className="text-foreground">{receiverInfo.country}</span>
+                    </div>
+                  )}
+                  {receiverInfo.joined_at && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Calendar className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Joined</p>
+                        <p className="text-foreground">
+                          {new Date(receiverInfo.joined_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {receiverInfo.last_login_at && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <UserRound className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Last seen</p>
+                        <p className="text-foreground">
+                          {new Date(receiverInfo.last_login_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {loadingReceiverInfo && (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
     </div>
   )
