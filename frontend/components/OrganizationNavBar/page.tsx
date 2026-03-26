@@ -23,17 +23,33 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { 
-  Building2, 
-  LayoutDashboard, 
-  Users, 
-  FolderKanban, 
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  Building2,
+  LayoutDashboard,
+  Users,
+  FolderKanban,
   MessageCircle,
   Bell,
   Settings,
   Loader2,
   Hash,
   Volume2,
+  VolumeX,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -719,28 +735,78 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
 
+  const isExpanded = navbarWidth > 100
+
+  const NotificationList = ({ notifications }: { notifications: LiveNotification[] }) => (
+    <>
+      {notifications.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 px-3 py-8">
+          <Bell className="h-7 w-7 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">No notifications yet</p>
+        </div>
+      ) : (
+        notifications.map((notification) => (
+          <DropdownMenuItem
+            key={notification.id}
+            className={cn("cursor-pointer px-3 py-2.5 gap-2.5", !notification.read && "bg-primary/5")}
+            onClick={() => {
+              if (notification.type === "channel_mention" && notification.channel_id) {
+                router.push(`/channels/${notification.channel_id}`)
+                return
+              }
+              if (notification.sender_id) {
+                router.push(`/direct-messages?dm_user_id=${notification.sender_id}`)
+              }
+            }}
+          >
+            <div className={cn("mt-0.5 rounded-full p-1.5 flex-shrink-0", notification.type === "channel_mention" ? "bg-purple-500/10" : "bg-blue-500/10")}>
+              {notification.type === "channel_mention"
+                ? <Hash className="h-3 w-3 text-purple-500" />
+                : <MessageCircle className="h-3 w-3 text-blue-500" />
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">
+                  {notification.type === "channel_mention" ? "New mention" : "New message"}
+                </span>
+                {!notification.read && <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {notification.type === "channel_mention"
+                  ? "Mentioned in a channel"
+                  : notification.sender_id
+                    ? `From user #${notification.sender_id}`
+                    : "Direct message notification"}
+              </span>
+            </div>
+          </DropdownMenuItem>
+        ))
+      )}
+    </>
+  )
+
   if (loading) {
     return (
-      <aside 
-        style={{ 
-          width: isMobile ? '280px' : `${navbarWidth}px`,
-          left: isMobile ? '0' : `var(--main-sidebar-width, ${MAIN_SIDEBAR_WIDTH}px)`
-        }}
-        className={cn(
-          "fixed top-0 h-screen bg-background border-r flex items-center justify-center z-30",
-          isMobile ? "-translate-x-full" : "hidden lg:block",
-          isResizing ? 'select-none' : ''
-        )}
-      >
-        <div
-          onMouseDown={startResizing}
-          className="hidden lg:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
-        />
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          {navbarWidth > 100 && <p className="text-sm text-muted-foreground">Loading...</p>}
-        </div>
-      </aside>
+      <TooltipProvider>
+        <aside
+          style={{
+            width: isMobile ? '280px' : `${navbarWidth}px`,
+            left: isMobile ? '0' : `var(--main-sidebar-width, ${MAIN_SIDEBAR_WIDTH}px)`
+          }}
+          className={cn(
+            "fixed top-0 h-screen bg-sidebar border-r flex items-center justify-center z-30",
+            isMobile ? "-translate-x-full" : "hidden lg:flex",
+            isResizing ? 'select-none' : ''
+          )}
+        >
+          <div onMouseDown={startResizing} className="hidden lg:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/40 transition-colors z-50" />
+          <div className="flex flex-col items-center gap-2.5">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            {isExpanded && <p className="text-xs text-muted-foreground">Loading...</p>}
+          </div>
+        </aside>
+      </TooltipProvider>
     )
   }
 
@@ -749,738 +815,605 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   return (
-    <>
-    {/* Set CSS variable for org navbar width */}
-    <style jsx global>{`
-      :root {
-        --org-navbar-width: ${navbarWidth}px;
-      }
-    `}</style>
-    
-    <aside 
-      style={{ 
-        width: isMobile ? '280px' : `${navbarWidth}px`,
-        left: isMobile ? '0' : `var(--main-sidebar-width, ${MAIN_SIDEBAR_WIDTH}px)`
-      }}
-      className={cn(
-        "fixed top-0 h-screen bg-muted/35 border-r flex flex-col z-30 shadow-sm backdrop-blur-[1px] transition-transform duration-300",
-        isMobile ? (isMobileNavOpen ? "translate-x-0" : "-translate-x-full") : "hidden lg:block",
-        isResizing ? 'select-none' : ''
-      )}
-    >
-      {/* Resize Handle - Hidden on mobile */}
-      <div
-        onMouseDown={startResizing}
-        className="hidden lg:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-50"
-      />
+    <TooltipProvider delayDuration={300}>
+      <>
+      <style jsx global>{`
+        :root {
+          --org-navbar-width: ${navbarWidth}px;
+        }
+      `}</style>
 
-      {/* Toggle Button */}
-      <button
-        onClick={() => setNavbarWidth(navbarWidth > 100 ? 64 : 240)}
-        className="absolute -right-3 top-6 bg-muted/60 border border-border rounded-full p-1 hover:bg-accent transition-colors shadow-md z-50"
-      >
-        {navbarWidth > 100 ? (
-          <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+      <aside
+        style={{
+          width: isMobile ? '280px' : `${navbarWidth}px`,
+          left: isMobile ? '0' : `var(--main-sidebar-width, ${MAIN_SIDEBAR_WIDTH}px)`
+        }}
+        className={cn(
+          "fixed top-0 h-screen bg-sidebar border-r flex flex-col z-30 transition-transform duration-300",
+          isMobile ? (isMobileNavOpen ? "translate-x-0" : "-translate-x-full") : "hidden lg:flex",
+          isResizing ? 'select-none' : ''
         )}
-      </button>
+      >
+        {/* Resize Handle */}
+        <div
+          onMouseDown={startResizing}
+          className="hidden lg:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/40 transition-colors z-50"
+        />
 
-      {/* Organization Header */}
-      <div className={cn("border-b", navbarWidth > 100 ? "p-4 space-y-3" : "p-2")}>
-        {navbarWidth <= 100 ? (
-          <div className="flex justify-center">
-            <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-              <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
-              <AvatarFallback className="bg-primary/10 text-primary">
-                <Building2 className="h-5 w-5" />
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                  <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    <Building2 className="h-6 w-6" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-sm truncate">{organization.organization_name}</h2>
-                  <p className="text-xs text-muted-foreground">#{organization.organaization_tag}</p>
-                  {organization.organization_plan && (
-                    <Badge 
-                      variant={organization.organization_plan === "pro" ? "default" : "secondary"}
-                      className="mt-1 text-xs"
-                    >
-                      {organization.organization_plan.toUpperCase()}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+        {/* Collapse Toggle */}
+        <button
+          onClick={() => setNavbarWidth(navbarWidth > 100 ? 64 : 240)}
+          className="absolute -right-3.5 top-6 bg-background border border-border rounded-full p-1.5 hover:bg-accent hover:border-primary/30 transition-all shadow-sm z-50"
+        >
+          {isExpanded
+            ? <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+            : <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          }
+        </button>
 
+        {/* Organization Header */}
+        <div className={cn("border-b", isExpanded ? "p-4 space-y-2" : "p-2 py-3")}>
+          {!isExpanded ? (
+            <div className="flex flex-col items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Avatar className="h-9 w-9 ring-2 ring-background shadow-sm cursor-pointer">
+                    <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      <Building2 className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="font-medium">{organization.organization_name}</TooltipContent>
+              </Tooltip>
               <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative h-8 w-8">
                     <Bell className="h-4 w-4" />
                     {unreadNotificationsCount > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1 text-[10px]"
-                      >
-                        {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
-                      </Badge>
+                      <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-sidebar" />
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <div className="px-2 py-1.5 text-sm font-medium">Notifications</div>
+                <DropdownMenuContent align="end" className="w-72">
+                  <div className="px-3 py-2 text-sm font-semibold">Notifications</div>
                   <DropdownMenuSeparator />
-                  {liveNotifications.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      No notifications yet
-                    </div>
-                  ) : (
-                    liveNotifications.map((notification) => (
-                      <DropdownMenuItem
-                        key={notification.id}
-                        className="cursor-pointer items-start"
-                        onClick={() => {
-                          if (notification.type === "channel_mention" && notification.channel_id) {
-                            router.push(`/channels/${notification.channel_id}`)
-                            return
-                          }
-
-                          if (notification.sender_id) {
-                            router.push(`/direct-messages?dm_user_id=${notification.sender_id}`)
-                          }
-                        }}
-                      >
-                        <div className="flex w-full flex-col gap-1 py-1">
-                          <div className="flex items-center gap-2">
-                            <Bell className="h-3.5 w-3.5 text-primary" />
-                            <span className="text-sm font-medium">
-                              {notification.type === "channel_mention" ? "New mention" : "New message"}
-                            </span>
-                            {!notification.read && <span className="ml-auto h-2 w-2 rounded-full bg-primary" />}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {notification.type === "channel_mention"
-                              ? "Mentioned in a channel"
-                              : (notification.sender_id
-                                ? `From user #${notification.sender_id}`
-                                : "Direct message notification")}
-                          </span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                  )}
+                  <NotificationList notifications={liveNotifications} />
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-
-            {organization.organization_description && (
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                {organization.organization_description}
-              </p>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Direct Messages Quick Access */}
-      <div className={cn("border-b", navbarWidth > 100 ? "px-3 py-2" : "px-2 py-2")}>
-        <input
-          ref={soundInputRef}
-          type="file"
-          accept="audio/*"
-          onChange={handleNotificationSoundSelected}
-          className="hidden"
-        />
-
-        <div className={cn("flex items-center", navbarWidth > 100 ? "gap-2" : "justify-center")}>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/direct-messages')}
-            title={navbarWidth <= 100 ? "Direct Messages" : undefined}
-            className={cn(
-              "relative h-9",
-              navbarWidth > 100 ? "flex-1 justify-start gap-3" : "w-full justify-center px-0"
-            )}
-          >
-            <MessageCircle className="h-4 w-4" />
-            {navbarWidth > 100 && <span className="text-sm">Direct Messages</span>}
-            {unreadDirectMessagesCount > 0 && (
-              <span
-                className={cn(
-                  "absolute h-2.5 w-2.5 rounded-full bg-red-500",
-                  navbarWidth > 100 ? "right-3" : "right-2 top-2"
-                )}
-              />
-            )}
-          </Button>
-
-          {navbarWidth <= 100 && (
-            <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="relative h-9 w-9">
-                  <Bell className="h-4 w-4" />
-                  {unreadNotificationsCount > 0 && (
-                    <Badge
-                      variant="destructive"
-                      className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full px-1 text-[10px]"
-                    >
-                      {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <div className="px-2 py-1.5 text-sm font-medium">Notifications</div>
-                <DropdownMenuSeparator />
-                {liveNotifications.length === 0 ? (
-                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    No notifications yet
-                  </div>
-                ) : (
-                  liveNotifications.map((notification) => (
-                    <DropdownMenuItem
-                      key={notification.id}
-                      className="cursor-pointer items-start"
-                      onClick={() => {
-                        if (notification.type === "channel_mention" && notification.channel_id) {
-                          router.push(`/channels/${notification.channel_id}`)
-                          return
-                        }
-
-                        if (notification.sender_id) {
-                          router.push(`/direct-messages?dm_user_id=${notification.sender_id}`)
-                        }
-                      }}
-                    >
-                      <div className="flex w-full flex-col gap-1 py-1">
-                        <span className="text-sm font-medium">
-                          {notification.type === "channel_mention" ? "New mention" : "New message"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {notification.type === "channel_mention"
-                            ? "Mentioned in a channel"
-                            : (notification.sender_id
-                              ? `From user #${notification.sender_id}`
-                              : "Direct message notification")}
-                        </span>
-                      </div>
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {navbarWidth > 100 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setSoundEnabled((prev) => !prev)}
-              className="h-9 px-2 text-xs"
-              title={soundEnabled ? "Mute notification sound" : "Enable notification sound"}
-            >
-              {soundEnabled ? "Sound: On" : "Sound: Off"}
-            </Button>
-          )}
-
-          {navbarWidth > 100 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handlePickNotificationSound}
-              className="h-9 px-2 text-xs"
-              title={customSoundName ? `Current: ${customSoundName}` : "Choose notification sound"}
-            >
-              {customSoundName ? "Change Sound" : "Choose Sound"}
-            </Button>
-          )}
-        </div>
-
-        {navbarWidth > 100 && customSoundName && (
-          <p className="mt-1 truncate px-1 text-[11px] text-muted-foreground" title={customSoundName}>
-            Using: {customSoundName}
-          </p>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <nav className={cn("flex-1 overflow-y-auto space-y-1", navbarWidth > 100 ? "p-3" : "p-2")}>
-        <div className="space-y-1">
-          {navigationTabs
-            .filter(canAccessTab)
-            .map((tab) => {
-              const Icon = tab.icon
-              const active = isTabActive(tab.path)
-              return (
-                <Button
-                  key={tab.name}
-                  variant={active ? "secondary" : "ghost"}
-                  onClick={() => router.push(tab.path)}
-                  title={navbarWidth <= 100 ? tab.name : undefined}
-                  className={cn(
-                    "w-full h-9",
-                    navbarWidth > 100 ? "justify-start gap-3" : "justify-center px-0",
-                    active && "bg-primary/10 text-primary hover:bg-primary/15"
-                  )}
-                >
-                  <span className="relative inline-flex">
-                    <Icon className="h-4 w-4" />
-                    {tab.name === "Direct Messages" && unreadDirectMessagesCount > 0 && (
-                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+          ) : (
+            <>
+              <div className="flex items-start gap-3">
+                <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm flex-shrink-0">
+                  <AvatarImage src={organization.organaization_picture} alt={organization.organization_name} />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    <Building2 className="h-5 w-5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h2 className="font-semibold text-sm truncate leading-tight">{organization.organization_name}</h2>
+                    {organization.organization_plan && (
+                      <Badge
+                        variant={organization.organization_plan === "pro" ? "default" : "secondary"}
+                        className="text-[10px] h-4 px-1.5 flex-shrink-0"
+                      >
+                        {organization.organization_plan.toUpperCase()}
+                      </Badge>
                     )}
-                  </span>
-                  {navbarWidth > 100 && <span className="text-sm">{tab.name}</span>}
-                </Button>
-              )
-            })}
-        </div>
-
-        {/* Channels Section */}
-        <div className="pt-4 mt-4 border-t">
-          {navbarWidth > 100 && (
-            <div className="flex items-center justify-between mb-2 px-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Channels
-              </h3>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-5 w-5"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Create Channel</DialogTitle>
-                  <DialogDescription>
-                    Add a new channel to your organization. Channels help organize conversations.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="channel_name">Channel Name</Label>
-                    <Input
-                      id="channel_name"
-                      placeholder="e.g., general, announcements"
-                      value={newChannel.channel_name}
-                      onChange={(e) => setNewChannel({ ...newChannel, channel_name: e.target.value })}
-                      maxLength={50}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      3-50 characters. Letters, numbers, spaces, hyphens, underscores.
-                    </p>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="channel_mode">Channel Mode</Label>
-                    <select
-                      id="channel_mode"
-                      value={newChannel.channel_mode}
-                      onChange={(e) => setNewChannel({ ...newChannel, channel_mode: e.target.value })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <option value="announcement">Announcement</option>
-                      <option value="orgbased">Organization Based</option>
-                      <option value="teambased">Team Based</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="channel_category">Channel Category</Label>
-                    <select
-                      id="channel_category"
-                      value={newChannel.channel_category}
-                      onChange={(e) => setNewChannel({ ...newChannel, channel_category: e.target.value })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <option value="text">Text</option>
-                      <option value="voice">Voice</option>
-                      <option value="video">Video</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description (Optional)</Label>
-                    <Input
-                      id="description"
-                      placeholder="What is this channel about?"
-                      value={newChannel.description}
-                      onChange={(e) => setNewChannel({ ...newChannel, description: e.target.value })}
-                    />
-                  </div>
+                  <p className="text-xs text-muted-foreground truncate">#{organization.organaization_tag}</p>
                 </div>
-                <DialogFooter>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsDialogOpen(false)}
-                    disabled={isCreatingChannel}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    onClick={handleCreateChannel}
-                    disabled={isCreatingChannel}
-                  >
-                    {isCreatingChannel ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Create Channel"
+                <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative h-7 w-7 flex-shrink-0">
+                      <Bell className="h-3.5 w-3.5" />
+                      {unreadNotificationsCount > 0 && (
+                        <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-destructive ring-1 ring-sidebar" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80">
+                    <div className="px-3 py-2 text-sm font-semibold">Notifications</div>
+                    <DropdownMenuSeparator />
+                    <NotificationList notifications={liveNotifications} />
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              {organization.organization_description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                  {organization.organization_description}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* DM + Sound Controls */}
+        <div className={cn("border-b", isExpanded ? "p-3" : "p-2")}>
+          <input
+            ref={soundInputRef}
+            type="file"
+            accept="audio/*"
+            onChange={handleNotificationSoundSelected}
+            className="hidden"
+          />
+          {isExpanded ? (
+            <div className="space-y-1.5">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/direct-messages')}
+                className="relative w-full justify-start gap-2.5 h-9 px-3 text-sm font-medium hover:bg-accent"
+              >
+                <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                <span>Direct Messages</span>
+                {unreadDirectMessagesCount > 0 && (
+                  <Badge variant="destructive" className="ml-auto h-5 min-w-5 rounded-full px-1 text-[10px]">
+                    {unreadDirectMessagesCount > 99 ? "99+" : unreadDirectMessagesCount}
+                  </Badge>
+                )}
+              </Button>
+              <div className="flex items-center gap-1 px-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSoundEnabled((prev) => !prev)}
+                      className="h-7 w-7 flex-shrink-0"
+                    >
+                      {soundEnabled
+                        ? <Volume2 className="h-3.5 w-3.5" />
+                        : <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />
+                      }
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{soundEnabled ? "Mute notifications" : "Unmute notifications"}</TooltipContent>
+                </Tooltip>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handlePickNotificationSound}
+                  className="h-7 flex-1 justify-start px-2 text-xs text-muted-foreground hover:text-foreground truncate"
+                  title={customSoundName ? `Current: ${customSoundName}` : "Choose notification sound"}
+                >
+                  <span className="truncate">{customSoundName || "Default sound"}</span>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => router.push('/direct-messages')} className="relative h-9 w-9">
+                    <MessageCircle className="h-4 w-4" />
+                    {unreadDirectMessagesCount > 0 && (
+                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-1 ring-sidebar" />
                     )}
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </TooltipTrigger>
+                <TooltipContent side="right">Direct Messages</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => setSoundEnabled((prev) => !prev)} className="h-9 w-9">
+                    {soundEnabled
+                      ? <Volume2 className="h-4 w-4" />
+                      : <VolumeX className="h-4 w-4 text-muted-foreground" />
+                    }
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{soundEnabled ? "Mute notifications" : "Unmute notifications"}</TooltipContent>
+              </Tooltip>
             </div>
           )}
-          
-          {navbarWidth <= 100 ? (
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="w-full h-9"
-              onClick={() => setIsDialogOpen(true)}
-              title="Create Channel"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          ) : null}
-          
-          <div className="space-y-0.5">
-            {channels.filter(channel => !channel.team_id).length === 0 ? (
-              navbarWidth > 100 && (
-                <p className="text-xs text-muted-foreground px-2 py-2">
-                  No channels yet. Click + to create one.
-                </p>
-              )
-            ) : (
-              channels.filter(channel => !channel.team_id).map((channel) => (
-                <div
-                  key={channel.channel_id}
-                  className={cn(
-                    "flex items-center",
-                    navbarWidth <= 100 ? "justify-center" : "gap-1"
-                  )}
-                >
+        </div>
+
+        {/* Navigation */}
+        <ScrollArea className="flex-1">
+          <nav className={cn("space-y-0.5", isExpanded ? "p-3" : "p-2")}>
+            {/* Main Nav Tabs */}
+            <div className="space-y-0.5">
+              {navigationTabs.filter(canAccessTab).map((tab) => {
+                const Icon = tab.icon
+                const active = isTabActive(tab.path)
+                return isExpanded ? (
                   <Button
+                    key={tab.name}
                     variant="ghost"
-                    title={navbarWidth <= 100 ? channel.channel_name : undefined}
+                    onClick={() => router.push(tab.path)}
                     className={cn(
-                      "h-8",
-                      navbarWidth <= 100 ? "w-full justify-center px-0" : "flex-1 justify-start gap-2 px-2"
+                      "w-full h-9 justify-start gap-3 px-3 text-sm font-normal",
+                      active
+                        ? "bg-primary/10 text-primary font-medium hover:bg-primary/15"
+                        : "text-foreground/70 hover:text-foreground hover:bg-accent"
                     )}
-                    onClick={() => router.push(`/channels/${channel.channel_id}`)}
                   >
                     <span className="relative inline-flex">
-                      {getChannelIcon(channel.channel_category, "h-3.5 w-3.5 text-muted-foreground")}
-                      {unreadMentionChannelIds.has(channel.channel_id) && (
-                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+                      <Icon className="h-4 w-4" />
+                      {tab.name === "Direct Messages" && unreadDirectMessagesCount > 0 && (
+                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
                       )}
                     </span>
-                    {navbarWidth > 100 && <span className="text-sm truncate">{channel.channel_name}</span>}
+                    <span>{tab.name}</span>
+                    {active && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
                   </Button>
-                  {navbarWidth > 100 && canEditDeleteChannel(channel) && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleEditChannel(channel)}
-                          className="cursor-pointer"
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Channel
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteClick(channel)}
-                          className="cursor-pointer text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Channel
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Teams Section */}
-        <div className="pt-4 mt-4 border-t">
-          {navbarWidth > 100 && (
-            <div className="flex items-center justify-between mb-2 px-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                My Teams
-              </h3>
-            </div>
-          )}
-          
-          <div className="space-y-0.5">
-            {teams.length === 0 ? (
-              navbarWidth > 100 && (
-                <p className="text-xs text-muted-foreground px-2 py-2">
-                  No teams enrolled yet.
-                </p>
-              )
-            ) : (
-              teams.map((team) => {
-                const teamChannels = getTeamChannels(team.team_id)
-                const isExpanded = expandedTeams.has(team.team_id)
-                
-                return (
-                  <div key={team.team_id} className="space-y-0.5">
-                    {/* Team Header */}
-                    <div className="flex items-center">
-                      {navbarWidth > 100 && teamChannels.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-6 flex-shrink-0"
-                          onClick={() => toggleTeamExpansion(team.team_id)}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </Button>
-                      )}
+                ) : (
+                  <Tooltip key={tab.name}>
+                    <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
-                        title={navbarWidth <= 100 ? team.team_name : undefined}
+                        onClick={() => router.push(tab.path)}
                         className={cn(
-                          "h-8 flex-1",
-                          navbarWidth <= 100 ? "justify-center px-0" : "justify-start gap-2",
-                          navbarWidth > 100 && teamChannels.length === 0 && "px-2"
+                          "w-full h-9 justify-center px-0",
+                          active
+                            ? "bg-primary/10 text-primary hover:bg-primary/15"
+                            : "text-foreground/70 hover:text-foreground hover:bg-accent"
                         )}
-                        onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
                       >
-                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        {navbarWidth > 100 && (
-                          <>
-                            <span className="text-sm truncate">{team.team_name}</span>
-                            {teamChannels.length > 0 && (
-                              <span className="text-xs text-muted-foreground ml-auto">
-                                {teamChannels.length}
-                              </span>
-                            )}
-                          </>
-                        )}
+                        <span className="relative inline-flex">
+                          <Icon className="h-4 w-4" />
+                          {tab.name === "Direct Messages" && unreadDirectMessagesCount > 0 && (
+                            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+                          )}
+                        </span>
                       </Button>
-                    </div>
-                    
-                    {/* Team Channels */}
-                    {navbarWidth > 100 && isExpanded && teamChannels.length > 0 && (
-                      <div className="ml-6 space-y-0.5">
-                        {teamChannels.map((channel) => (
-                          <div
-                            key={channel.channel_id}
-                            className="flex items-center gap-1"
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{tab.name}</TooltipContent>
+                  </Tooltip>
+                )
+              })}
+            </div>
+
+            {/* Channels Section */}
+            <div className="mt-4">
+              <Separator className="mb-3" />
+              {isExpanded ? (
+                <div className="flex items-center justify-between mb-1 px-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Channels</span>
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 rounded-sm">
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Create Channel</DialogTitle>
+                        <DialogDescription>Add a new channel to your organization.</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="channel_name">Channel Name</Label>
+                          <Input
+                            id="channel_name"
+                            placeholder="e.g., general, announcements"
+                            value={newChannel.channel_name}
+                            onChange={(e) => setNewChannel({ ...newChannel, channel_name: e.target.value })}
+                            maxLength={50}
+                          />
+                          <p className="text-xs text-muted-foreground">3-50 characters.</p>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Channel Mode</Label>
+                          <Select value={newChannel.channel_mode} onValueChange={(v) => setNewChannel({ ...newChannel, channel_mode: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="announcement">Announcement</SelectItem>
+                              <SelectItem value="orgbased">Organization Based</SelectItem>
+                              <SelectItem value="teambased">Team Based</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Channel Category</Label>
+                          <Select value={newChannel.channel_category} onValueChange={(v) => setNewChannel({ ...newChannel, channel_category: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text">Text</SelectItem>
+                              <SelectItem value="voice">Voice</SelectItem>
+                              <SelectItem value="video">Video</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="description">Description (Optional)</Label>
+                          <Input
+                            id="description"
+                            placeholder="What is this channel about?"
+                            value={newChannel.description}
+                            onChange={(e) => setNewChannel({ ...newChannel, description: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isCreatingChannel}>Cancel</Button>
+                        <Button onClick={handleCreateChannel} disabled={isCreatingChannel}>
+                          {isCreatingChannel ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</> : "Create Channel"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="w-full h-8 mb-1" onClick={() => setIsDialogOpen(true)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Create Channel</TooltipContent>
+                </Tooltip>
+              )}
+
+              <div className="space-y-0.5">
+                {channels.filter(channel => !channel.team_id).length === 0
+                  ? isExpanded && <p className="text-xs text-muted-foreground px-2 py-2">No channels yet.</p>
+                  : channels.filter(channel => !channel.team_id).map((channel) =>
+                    isExpanded ? (
+                      <div key={channel.channel_id} className="group flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "flex-1 h-8 justify-start gap-2 px-2 font-normal text-foreground/70 hover:text-foreground hover:bg-accent",
+                            pathname === `/channels/${channel.channel_id}` && "bg-accent text-foreground"
+                          )}
+                          onClick={() => router.push(`/channels/${channel.channel_id}`)}
+                        >
+                          <span className="relative inline-flex flex-shrink-0">
+                            {getChannelIcon(channel.channel_category, "h-3.5 w-3.5")}
+                            {unreadMentionChannelIds.has(channel.channel_id) && (
+                              <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+                            )}
+                          </span>
+                          <span className="text-sm truncate">{channel.channel_name}</span>
+                        </Button>
+                        {canEditDeleteChannel(channel) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditChannel(channel)} className="cursor-pointer">
+                                <Edit className="mr-2 h-4 w-4" />Edit Channel
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDeleteClick(channel)} className="cursor-pointer text-destructive focus:text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />Delete Channel
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    ) : (
+                      <Tooltip key={channel.channel_id}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="w-full h-8 justify-center px-0 text-foreground/70 hover:text-foreground hover:bg-accent"
+                            onClick={() => router.push(`/channels/${channel.channel_id}`)}
                           >
-                            <Button
-                              variant="ghost"
-                              className="h-7 flex-1 justify-start gap-2 px-2"
-                              onClick={() => router.push(`/channels/${channel.channel_id}`)}
-                            >
-                              <span className="relative inline-flex">
-                                {getChannelIcon(channel.channel_category, "h-3 w-3 text-muted-foreground")}
-                                {unreadMentionChannelIds.has(channel.channel_id) && (
-                                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+                            <span className="relative inline-flex">
+                              {getChannelIcon(channel.channel_category, "h-3.5 w-3.5")}
+                              {unreadMentionChannelIds.has(channel.channel_id) && (
+                                <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+                              )}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{channel.channel_name}</TooltipContent>
+                      </Tooltip>
+                    )
+                  )
+                }
+              </div>
+            </div>
+
+            {/* Teams Section */}
+            <div className="mt-4">
+              <Separator className="mb-3" />
+              {isExpanded && (
+                <div className="flex items-center justify-between mb-1 px-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">My Teams</span>
+                </div>
+              )}
+              <div className="space-y-0.5">
+                {teams.length === 0
+                  ? isExpanded && <p className="text-xs text-muted-foreground px-2 py-2">No teams enrolled yet.</p>
+                  : teams.map((team) => {
+                      const teamChannels = getTeamChannels(team.team_id)
+                      const isTeamExpanded = expandedTeams.has(team.team_id)
+                      return (
+                        <div key={team.team_id} className="space-y-0.5">
+                          {isExpanded ? (
+                            <div className="flex items-center gap-1">
+                              {teamChannels.length > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-6 flex-shrink-0"
+                                  onClick={() => toggleTeamExpansion(team.team_id)}
+                                >
+                                  {isTeamExpanded
+                                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                  }
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                className={cn(
+                                  "h-8 flex-1 justify-start gap-2 font-normal text-foreground/70 hover:text-foreground hover:bg-accent",
+                                  teamChannels.length === 0 && "px-2"
                                 )}
-                              </span>
-                              <span className="text-xs truncate">{channel.channel_name}</span>
-                            </Button>
-                            {canEditDeleteChannel(channel) && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                                onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                              >
+                                <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="text-sm truncate">{team.team_name}</span>
+                                {teamChannels.length > 0 && (
+                                  <span className="text-xs text-muted-foreground ml-auto">{teamChannels.length}</span>
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  className="w-full h-8 justify-center px-0 text-foreground/70 hover:text-foreground hover:bg-accent"
+                                  onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                                >
+                                  <Users className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">{team.team_name}</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {isExpanded && isTeamExpanded && teamChannels.length > 0 && (
+                            <div className="ml-6 space-y-0.5">
+                              {teamChannels.map((channel) => (
+                                <div key={channel.channel_id} className="group flex items-center gap-1">
                                   <Button
                                     variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
-                                    onClick={(e) => e.stopPropagation()}
+                                    className={cn(
+                                      "h-7 flex-1 justify-start gap-2 px-2 font-normal text-foreground/70 hover:text-foreground hover:bg-accent",
+                                      pathname === `/channels/${channel.channel_id}` && "bg-accent text-foreground"
+                                    )}
+                                    onClick={() => router.push(`/channels/${channel.channel_id}`)}
                                   >
-                                    <MoreVertical className="h-3 w-3" />
+                                    <span className="relative inline-flex flex-shrink-0">
+                                      {getChannelIcon(channel.channel_category, "h-3 w-3")}
+                                      {unreadMentionChannelIds.has(channel.channel_id) && (
+                                        <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+                                      )}
+                                    </span>
+                                    <span className="text-xs truncate">{channel.channel_name}</span>
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => handleEditChannel(channel)}
-                                    className="cursor-pointer"
-                                  >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Channel
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteClick(channel)}
-                                    className="cursor-pointer text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Channel
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-      </nav>
+                                  {canEditDeleteChannel(channel) && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <MoreVertical className="h-3 w-3" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditChannel(channel)} className="cursor-pointer">
+                                          <Edit className="mr-2 h-4 w-4" />Edit Channel
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleDeleteClick(channel)} className="cursor-pointer text-destructive focus:text-destructive">
+                                          <Trash2 className="mr-2 h-4 w-4" />Delete Channel
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                }
+              </div>
+            </div>
+          </nav>
+        </ScrollArea>
 
-      {/* Edit Channel Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Channel</DialogTitle>
-            <DialogDescription>
-              Update channel details.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit_channel_name">Channel Name</Label>
-              <Input
-                id="edit_channel_name"
-                placeholder="e.g., general, announcements"
-                value={editChannelData.channel_name}
-                onChange={(e) => setEditChannelData({ ...editChannelData, channel_name: e.target.value })}
-                maxLength={50}
-              />
-              <p className="text-xs text-muted-foreground">
-                3-50 characters. Letters, numbers, spaces, hyphens, underscores.
-              </p>
+        {/* Edit Channel Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Channel</DialogTitle>
+              <DialogDescription>Update channel details.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit_channel_name">Channel Name</Label>
+                <Input
+                  id="edit_channel_name"
+                  placeholder="e.g., general, announcements"
+                  value={editChannelData.channel_name}
+                  onChange={(e) => setEditChannelData({ ...editChannelData, channel_name: e.target.value })}
+                  maxLength={50}
+                />
+                <p className="text-xs text-muted-foreground">3-50 characters.</p>
+              </div>
+              <div className="grid gap-2">
+                <Label>Channel Mode</Label>
+                <Select value={editChannelData.channel_mode} onValueChange={(v) => setEditChannelData({ ...editChannelData, channel_mode: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="announcement">Announcement</SelectItem>
+                    <SelectItem value="orgbased">Organization Based</SelectItem>
+                    <SelectItem value="teambased">Team Based</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Channel Category</Label>
+                <Select value={editChannelData.channel_category} onValueChange={(v) => setEditChannelData({ ...editChannelData, channel_category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="voice">Voice</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit_description">Description (Optional)</Label>
+                <Input
+                  id="edit_description"
+                  placeholder="What is this channel about?"
+                  value={editChannelData.description}
+                  onChange={(e) => setEditChannelData({ ...editChannelData, description: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit_channel_mode">Channel Mode</Label>
-              <select
-                id="edit_channel_mode"
-                value={editChannelData.channel_mode}
-                onChange={(e) => setEditChannelData({ ...editChannelData, channel_mode: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="announcement">Announcement</option>
-                <option value="orgbased">Organization Based</option>
-                <option value="teambased">Team Based</option>
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit_channel_category">Channel Category</Label>
-              <select
-                id="edit_channel_category"
-                value={editChannelData.channel_category}
-                onChange={(e) => setEditChannelData({ ...editChannelData, channel_category: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="text">Text</option>
-                <option value="voice">Voice</option>
-                <option value="video">Video</option>
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit_description">Description (Optional)</Label>
-              <Input
-                id="edit_description"
-                placeholder="What is this channel about?"
-                value={editChannelData.description}
-                onChange={(e) => setEditChannelData({ ...editChannelData, description: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setEditDialogOpen(false)}
-              disabled={isEditingChannel}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              onClick={handleUpdateChannel}
-              disabled={isEditingChannel}
-            >
-              {isEditingChannel ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Channel"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={isEditingChannel}>Cancel</Button>
+              <Button onClick={handleUpdateChannel} disabled={isEditingChannel}>
+                {isEditingChannel ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating...</> : "Update Channel"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete Channel Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Channel</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete <span className="font-semibold">#{deletingChannel?.channel_name}</span>? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setDeleteDialogOpen(false)}
-              disabled={isDeletingChannel}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              variant="destructive"
-              onClick={handleDeleteChannel}
-              disabled={isDeletingChannel}
-            >
-              {isDeletingChannel ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete Channel"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </aside>
-    </>
+        {/* Delete Channel Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Delete Channel</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete <span className="font-semibold">#{deletingChannel?.channel_name}</span>? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingChannel}>Cancel</Button>
+              <Button variant="destructive" onClick={handleDeleteChannel} disabled={isDeletingChannel}>
+                {isDeletingChannel ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete Channel"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </aside>
+      </>
+    </TooltipProvider>
   )
 }

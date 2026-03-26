@@ -12,6 +12,7 @@ class Tasks(Base):
     team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=False)
     created_by=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     parent_task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)  # self-reference
+    subtask_group = Column(String, nullable=True)  # group/family label for subtasks
     priotrity=Column(String,nullable=False)
     status=Column(String,nullable=False)
     is_deleted=Column(Boolean,default=False)

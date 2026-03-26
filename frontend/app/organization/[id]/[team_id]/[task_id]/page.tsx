@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Loader2, Plus, Calendar, CalendarDays, User, Flag, CheckCircle2, Circle, Clock, LayoutGrid, List, ChevronRight, ChevronLeft, ChevronDown, AlertCircle, Pencil, Trash2, Check, X } from "lucide-react"
+import { ArrowLeft, Loader2, Plus, Calendar, CalendarDays, User, Flag, CheckCircle2, Circle, Clock, LayoutGrid, List, ChevronRight, ChevronLeft, ChevronDown, AlertCircle, Pencil, Trash2, Check, X, FolderOpen } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -51,6 +51,7 @@ interface Task {
   team_id: number
   created_by: number
   parent_task_id: number | null
+  subtask_group: string | null
   created_at: string
   updated_at: string
   assignees: Assignee[]
@@ -142,6 +143,7 @@ export default function TasksPage() {
   const [subtaskTitle, setSubtaskTitle] = useState("")
   const [subtaskDescription, setSubtaskDescription] = useState("")
   const [subtaskPriority, setSubtaskPriority] = useState("medium")
+  const [subtaskGroup, setSubtaskGroup] = useState("")
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false)
 
   // Assignees
@@ -149,6 +151,7 @@ export default function TasksPage() {
   const [taskAssigneeIds, setTaskAssigneeIds] = useState<number[]>([])
   const [subtaskAssigneeIds, setSubtaskAssigneeIds] = useState<number[]>([])
   const [expandedSubtaskId, setExpandedSubtaskId] = useState<number | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   // Subtask edit
   const [editingSubtask, setEditingSubtask] = useState<Task | null>(null)
@@ -157,6 +160,7 @@ export default function TasksPage() {
   const [editSubPriority, setEditSubPriority] = useState("medium")
   const [editSubStatus, setEditSubStatus] = useState("todo")
   const [editSubAssigneeIds, setEditSubAssigneeIds] = useState<number[]>([])
+  const [editSubGroup, setEditSubGroup] = useState("")
   const [isEditingSubtask, setIsEditingSubtask] = useState(false)
   const [deletingSubtaskId, setDeletingSubtaskId] = useState<number | null>(null)
 
@@ -271,6 +275,7 @@ export default function TasksPage() {
             priority: subtaskPriority,
             status: "todo",
             parent_task_id: subtaskParentId,
+            subtask_group: subtaskGroup.trim() || null,
             assignee_ids: subtaskAssigneeIds,
           }),
         }
@@ -283,6 +288,7 @@ export default function TasksPage() {
         setSubtaskTitle("")
         setSubtaskDescription("")
         setSubtaskPriority("medium")
+        setSubtaskGroup("")
         setSubtaskAssigneeIds([])
       } else {
         toast.error("Error", { description: data.detail || "Failed to create subtask" })
@@ -366,7 +372,7 @@ export default function TasksPage() {
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: editSubTitle, description: editSubDescription, priority: editSubPriority, status: editSubStatus, assignee_ids: editSubAssigneeIds }),
+          body: JSON.stringify({ title: editSubTitle, description: editSubDescription, priority: editSubPriority, status: editSubStatus, subtask_group: editSubGroup.trim() || null, assignee_ids: editSubAssigneeIds }),
         }
       )
       const data = await res.json()
@@ -1069,6 +1075,7 @@ export default function TasksPage() {
                             setSubtaskTitle("")
                             setSubtaskDescription("")
                             setSubtaskPriority("medium")
+                            setSubtaskGroup("")
                             setSubtaskOpen(true)
                           }}
                         >
@@ -1086,8 +1093,21 @@ export default function TasksPage() {
                             style={{ width: `${(doneSubs / subs.length) * 100}%` }}
                           />
                         </div>
-                        <div className="space-y-1.5">
-                          {subs.map(sub => {
+                        {(() => {
+                          // Group subtasks: grouped ones by their group name, ungrouped ones separately
+                          const grouped: Record<string, Task[]> = {}
+                          const ungrouped: Task[] = []
+                          subs.forEach(sub => {
+                            if (sub.subtask_group) {
+                              if (!grouped[sub.subtask_group]) grouped[sub.subtask_group] = []
+                              grouped[sub.subtask_group].push(sub)
+                            } else {
+                              ungrouped.push(sub)
+                            }
+                          })
+                          const groupNames = Object.keys(grouped)
+
+                          const renderSubtask = (sub: Task) => {
                             const subCol = COLUMNS.find(c => c.key === sub.status) ?? COLUMNS[0]
                             const SubIcon = subCol.icon
                             const subPriority = PRIORITY_CONFIG[sub.priotrity] ?? PRIORITY_CONFIG.medium
@@ -1122,13 +1142,11 @@ export default function TasksPage() {
                                 </button>
                                 {isExpanded && (
                                   <div className="px-4 pb-3 pt-1 border-t bg-muted/10 space-y-3">
-                                    {/* Description */}
                                     {sub.description && (
                                       <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">
                                         {sub.description}
                                       </p>
                                     )}
-                                    {/* Priority & Status */}
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${subPriority.bg} ${subPriority.color}`}>
                                         <Flag className={`h-2.5 w-2.5 ${subPriority.icon_color}`} />
@@ -1138,7 +1156,6 @@ export default function TasksPage() {
                                         Created {formatDate(sub.created_at)}
                                       </span>
                                     </div>
-                                    {/* Assignees */}
                                     {sub.assignees?.length > 0 && (
                                       <div>
                                         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Assigned to</p>
@@ -1158,7 +1175,6 @@ export default function TasksPage() {
                                     {sub.assignees?.length === 0 && (
                                       <p className="text-[11px] text-muted-foreground italic">No one assigned</p>
                                     )}
-                                    {/* Edit / Delete actions */}
                                     {canCreate && (
                                       <div className="flex items-center gap-2 pt-2 border-t border-dashed">
                                         <Button
@@ -1172,6 +1188,7 @@ export default function TasksPage() {
                                             setEditSubDescription(sub.description)
                                             setEditSubPriority(sub.priotrity)
                                             setEditSubStatus(sub.status)
+                                            setEditSubGroup(sub.subtask_group || "")
                                             setEditSubAssigneeIds(sub.assignees?.map(a => a.user_id) || [])
                                           }}
                                         >
@@ -1200,8 +1217,79 @@ export default function TasksPage() {
                                 )}
                               </div>
                             )
-                          })}
-                        </div>
+                          }
+
+                          return (
+                            <div className="space-y-3">
+                              {/* Grouped subtasks */}
+                              {groupNames.map(groupName => {
+                                const groupSubs = grouped[groupName]
+                                const groupDone = groupSubs.filter(s => s.status === "done").length
+                                const isCollapsed = collapsedGroups.has(groupName)
+                                return (
+                                  <div key={groupName} className="rounded-lg border overflow-hidden">
+                                    <button
+                                      onClick={() => setCollapsedGroups(prev => {
+                                        const next = new Set(prev)
+                                        if (next.has(groupName)) next.delete(groupName)
+                                        else next.add(groupName)
+                                        return next
+                                      })}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
+                                    >
+                                      <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+                                      <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                                      <span className="text-xs font-semibold flex-1 truncate">{groupName}</span>
+                                      <span className="text-[10px] text-muted-foreground shrink-0">
+                                        {groupDone}/{groupSubs.length}
+                                      </span>
+                                      <div className="w-12 h-1 rounded-full bg-muted overflow-hidden shrink-0">
+                                        <div
+                                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                                          style={{ width: `${(groupDone / groupSubs.length) * 100}%` }}
+                                        />
+                                      </div>
+                                      {canCreate && (
+                                        <div
+                                          role="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setSubtaskParentId(selectedTask!.id)
+                                            setSubtaskGroup(groupName)
+                                            setSubtaskTitle("")
+                                            setSubtaskDescription("")
+                                            setSubtaskPriority("medium")
+                                            setSubtaskAssigneeIds([])
+                                            setSubtaskOpen(true)
+                                          }}
+                                          className="h-5 w-5 rounded flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                          title={`Add subtask to ${groupName}`}
+                                        >
+                                          <Plus className="h-3.5 w-3.5" />
+                                        </div>
+                                      )}
+                                    </button>
+                                    {!isCollapsed && (
+                                      <div className="space-y-1.5 p-1.5">
+                                        {groupSubs.map(renderSubtask)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              {/* Ungrouped subtasks */}
+                              {ungrouped.length > 0 && groupNames.length > 0 && (
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-1">Ungrouped</p>
+                              )}
+                              {ungrouped.length > 0 && (
+                                <div className="space-y-1.5">
+                                  {ungrouped.map(renderSubtask)}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </>
                     )}
 
@@ -1450,6 +1538,21 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="subtask_group">
+                <span className="flex items-center gap-1.5">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Group (optional)
+                </span>
+              </Label>
+              <Input
+                id="subtask_group"
+                placeholder="e.g. Design, Backend, Testing..."
+                value={subtaskGroup}
+                onChange={e => setSubtaskGroup(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">Subtasks with the same group name will be grouped together</p>
+            </div>
             {teamMembers.length > 0 && (
               <div className="grid gap-2">
                 <Label>Assign to</Label>
@@ -1540,6 +1643,20 @@ export default function TasksPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_sub_group">
+                <span className="flex items-center gap-1.5">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Group (optional)
+                </span>
+              </Label>
+              <Input
+                id="edit_sub_group"
+                placeholder="e.g. Design, Backend, Testing..."
+                value={editSubGroup}
+                onChange={e => setEditSubGroup(e.target.value)}
+              />
             </div>
             {teamMembers.length > 0 && (
               <div className="grid gap-2">

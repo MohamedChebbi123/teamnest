@@ -7,6 +7,7 @@ class Task_input(BaseModel):
     priority: str
     status: str
     parent_task_id: Optional[int] = None
+    subtask_group: Optional[str] = None
     assignee_ids: Optional[List[int]] = []
 
 class Task_update(BaseModel):
@@ -15,4 +16,5 @@ class Task_update(BaseModel):
     priority: Optional[str] = None
     status: Optional[str] = None
     parent_task_id: Optional[int] = None
+    subtask_group: Optional[str] = None
     assignee_ids: Optional[List[int]] = None

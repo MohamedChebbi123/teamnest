@@ -17,6 +17,7 @@ def task_to_dict(task):
         "team_id": task.team_id,
         "created_by": task.created_by,
         "parent_task_id": task.parent_task_id,
+        "subtask_group": task.subtask_group,
         "priotrity": task.priotrity,
         "status": task.status,
         "is_deleted": task.is_deleted,
@@ -95,7 +96,8 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, autho
         created_by=user_id,
         priotrity=task_data.priority,
         status=task_data.status,
-        parent_task_id=task_data.parent_task_id
+        parent_task_id=task_data.parent_task_id,
+        subtask_group=task_data.subtask_group
     )
 
     db.add(new_task)
@@ -189,6 +191,8 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
         task.status = task_data.status
     if task_data.parent_task_id is not None:
         task.parent_task_id = task_data.parent_task_id
+    if task_data.subtask_group is not None:
+        task.subtask_group = task_data.subtask_group
 
     if task_data.assignee_ids is not None:
         # Validate all assignees are team members
