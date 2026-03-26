@@ -32,3 +32,5 @@ class Users(Base):
     files_sent = relationship("Files", back_populates="sender", cascade="all, delete-orphan")
     notifications = relationship("Notifications", back_populates="user", cascade="all, delete-orphan")
     teams = relationship("Teams", secondary="team_association", back_populates="users", viewonly=True)
+    tasks_created = relationship("Tasks", foreign_keys="Tasks.created_by", back_populates="creator")
+    task_assignments = relationship("Task_assignees", back_populates="user", cascade="all, delete-orphan")

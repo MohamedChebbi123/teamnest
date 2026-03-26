@@ -18,8 +18,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { 
-  Users, 
+  Users,
   Loader2,
+  ClipboardList,
   ArrowLeft,
   Edit,
   UserPlus,
@@ -174,6 +175,7 @@ export default function TeamPage() {
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const [teamChannelFiles, setTeamChannelFiles] = useState<TeamChannelFile[]>([])
+
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -384,6 +386,7 @@ export default function TeamPage() {
 
         // Fetch team channels
         await fetchTeamChannels()
+
 
       } catch (error) {
         console.error('Error fetching team data:', error)
@@ -815,6 +818,10 @@ export default function TeamPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => router.push(`/organization/${organizationId}/${teamId}/tasks`)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Tasks
+              </Button>
               {(userRole === "OWNER" || currentUserPermissions.can_create_channels) && (
                 <Button variant="outline" onClick={() => setCreateChannelDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -1441,6 +1448,7 @@ export default function TeamPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </main>
     </div>
   )
