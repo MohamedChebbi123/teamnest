@@ -6,7 +6,7 @@ from models.Task_assignees import Task_assignees
 from models.Organization import Organization
 from models.Team_association import Team_association
 from models.Team_roles import Team_roles
-from schemas.Task_input import Task_input, Task_update
+from schemas.Task_input import Task_input, Task_update, Task_status_update
 
 
 def task_to_dict(task):
@@ -258,3 +258,117 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, authorization: 
     db.commit()
 
     return {"message": "Task deleted successfully"}
+
+
+
+def get_my_tasks_service(task_id:int,authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.is_deleted == False).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Check if user is assigned to this task
+    is_assigned = db.query(Task_assignees).filter(
+        Task_assignees.task_id == task_id,
+        Task_assignees.user_id == user_id
+    ).first()
+
+    if not is_assigned:
+        raise HTTPException(status_code=403, detail="You are not assigned to this task")
+
+    return task_to_dict(task) 
+
+
+def fetch_my_tasks_service(team_id: int, org_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+
+    if not is_team_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this team")
+
+    tasks = db.query(Tasks).join(
+        Task_assignees, Task_assignees.task_id == Tasks.id
+    ).filter(
+        Tasks.team_id == team_id,
+        Tasks.is_deleted == False,
+        Task_assignees.user_id == user_id
+    ).all()
+
+    return [task_to_dict(t) for t in tasks]
+
+
+def update_my_task_status_service(task_id: int, team_id: int, org_id: int, status_data: Task_status_update, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+
+    if not is_team_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this team")
+
+    allowed_statuses = {"todo", "in_progress", "review", "done"}
+    if status_data.status not in allowed_statuses:
+        raise HTTPException(status_code=400, detail="Invalid task status")
+
+    task = db.query(Tasks).filter(
+        Tasks.id == task_id,
+        Tasks.team_id == team_id,
+        Tasks.is_deleted == False
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    is_assigned = db.query(Task_assignees).filter(
+        Task_assignees.task_id == task_id,
+        Task_assignees.user_id == user_id
+    ).first()
+    if not is_assigned:
+        raise HTTPException(status_code=403, detail="You are not assigned to this task")
+
+    task.status = status_data.status
+    db.commit()
+    db.refresh(task)
+
+    return task_to_dict(task)

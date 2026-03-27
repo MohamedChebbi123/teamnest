@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Loader2, Plus, Calendar, CalendarDays, User, Flag, CheckCircle2, Circle, Clock, LayoutGrid, List, ChevronRight, ChevronLeft, ChevronDown, AlertCircle, Pencil, Trash2, Check, X, FolderOpen } from "lucide-react"
+import { ArrowLeft, Loader2, Plus, Calendar, CalendarDays, User, Flag, CheckCircle2, Circle, Clock, LayoutGrid, List, ChevronRight, ChevronLeft, ChevronDown, AlertCircle, Pencil, Trash2, Check, X, FolderOpen, Eye } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -79,6 +79,16 @@ const COLUMNS = [
     count_bg: "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400",
   },
   {
+    key: "review",
+    label: "Review",
+    icon: Eye,
+    color: "text-purple-500",
+    bg: "bg-purple-500",
+    headerBg: "bg-purple-50 dark:bg-purple-900/20",
+    cardBorder: "border-l-purple-400",
+    count_bg: "bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400",
+  },
+  {
     key: "done",
     label: "Done",
     icon: CheckCircle2,
@@ -103,10 +113,12 @@ export default function TasksPage() {
   const teamId = params.team_id as string
 
   const [tasks, setTasks] = useState<Task[]>([])
+  const [myTasks, setMyTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<string>("MEMBER")
   const [canManageTasks, setCanManageTasks] = useState(false)
-  const [viewMode, setViewMode] = useState<"board" | "list" | "calendar">("board")
+  const [viewMode, setViewMode] = useState<"board" | "list" | "calendar" | "my-tasks">("board")
+  const [userId, setUserId] = useState<number | null>(null)
   const [filterPriority, setFilterPriority] = useState<string>("all")
   const [weekStart, setWeekStart] = useState<Date>(() => {
     const d = new Date()
@@ -178,6 +190,22 @@ export default function TasksPage() {
     }
   }
 
+  const fetchMyTasks = async () => {
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token) return
+      const tasks_list = await fetch(
+        `http://localhost:8000/organization/${organizationId}/team/${teamId}/my-tasks`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (tasks_list.ok) {
+        setMyTasks(await tasks_list.json())
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -189,6 +217,7 @@ export default function TasksPage() {
         })
         let userId: number | null = null
         if (userRes.ok) userId = (await userRes.json()).user_id
+        setUserId(userId)
 
         const orgRes = await fetch(
           `http://localhost:8000/organization/${organizationId}/members`,
@@ -221,6 +250,12 @@ export default function TasksPage() {
     }
     if (organizationId && teamId) init()
   }, [organizationId, teamId])
+
+  useEffect(() => {
+    if (userId) {
+      fetchMyTasks()
+    }
+  }, [userId, tasks])
 
   const handleCreateTask = async () => {
     if (!taskTitle.trim()) { toast.error("Error", { description: "Title is required" }); return }
@@ -357,6 +392,32 @@ export default function TasksPage() {
       toast.error("Error", { description: "An error occurred" })
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleUpdateTaskStatus = async (taskId: number, newStatus: string) => {
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token) return
+      const res = await fetch(
+        `http://localhost:8000/organization/${organizationId}/team/${teamId}/my-tasks/${taskId}/status`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      )
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(`Task marked as ${newStatus.replace('_', ' ')}`)
+        setTasks(prev => prev.map(t => t.id === data.id ? data : t))
+        setMyTasks(prev => prev.map(t => t.id === data.id ? data : t))
+        setSelectedTask(prev => (prev && prev.id === data.id ? data : prev))
+      } else {
+        toast.error("Error", { description: data.detail || "Failed to update task" })
+      }
+    } catch {
+      toast.error("Error", { description: "An error occurred" })
     }
   }
 
@@ -530,9 +591,20 @@ export default function TasksPage() {
                   <CalendarDays className="h-3.5 w-3.5" />
                   Calendar
                 </button>
+                <button
+                  onClick={() => setViewMode("my-tasks")}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+                    viewMode === "my-tasks"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  My Tasks
+                </button>
               </div>
 
-              {canCreate && (
+              {canCreate && viewMode !== "my-tasks" && (
                 <Button onClick={() => setCreateOpen(true)} size="sm">
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   New Task
@@ -820,7 +892,7 @@ export default function TasksPage() {
                 )
               })}
             </div>
-          ) : (
+          ) : viewMode === "list" ? (
             /* List View */
             <div className="space-y-1 max-w-4xl mx-auto">
               {COLUMNS.map(col => {
@@ -897,7 +969,124 @@ export default function TasksPage() {
                 </div>
               )}
             </div>
-          )}
+          ) : viewMode === "my-tasks" ? (
+            /* My Tasks View */
+            <div className="space-y-1 max-w-4xl mx-auto">
+              {myTasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <AlertCircle className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="text-sm font-medium mb-1">No tasks assigned to you</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tasks assigned to you will appear here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm font-semibold">My Assigned Tasks</span>
+                    <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">
+                      {myTasks.length}
+                    </span>
+                  </div>
+                  {myTasks.map(task => {
+                    const col = COLUMNS.find(c => c.key === task.status) ?? COLUMNS[0]
+                    const priority = PRIORITY_CONFIG[task.priotrity] ?? PRIORITY_CONFIG.medium
+                    const Icon = col.icon
+                    return (
+                      <div key={task.id} className="w-full rounded-lg border bg-background px-4 py-3 hover:bg-muted/40 hover:shadow-sm transition-all">
+                        <button
+                          onClick={() => { setSelectedTask(task); setExpandedSubtaskId(null); setDetailOpen(true) }}
+                          className="w-full flex items-center gap-4 text-left group"
+                        >
+                          <Icon className={`h-4 w-4 shrink-0 ${col.color}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                                {task.title}
+                              </h3>
+                              <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0 text-[10px] font-semibold shrink-0 ${priority.bg} ${priority.color}`}>
+                                <Flag className={`h-2.5 w-2.5 ${priority.icon_color}`} />
+                                {priority.label}
+                              </span>
+                            </div>
+                            {task.description && (
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">{task.description}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[10px] text-muted-foreground">{formatDate(task.created_at)}</span>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                          </div>
+                        </button>
+
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleUpdateTaskStatus(task.id, "todo")
+                            }}
+                            className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                              task.status === "todo"
+                                ? "bg-slate-500 text-white"
+                                : "border text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            To Do
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleUpdateTaskStatus(task.id, "in_progress")
+                            }}
+                            className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                              task.status === "in_progress"
+                                ? "bg-blue-500 text-white"
+                                : "border text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                            }`}
+                          >
+                            In Progress
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleUpdateTaskStatus(task.id, "review")
+                            }}
+                            className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                              task.status === "review"
+                                ? "bg-purple-500 text-white"
+                                : "border text-purple-600 hover:bg-purple-50 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                            }`}
+                          >
+                            Review
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleUpdateTaskStatus(task.id, "done")
+                            }}
+                            className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                              task.status === "done"
+                                ? "bg-emerald-500 text-white"
+                                : "border text-emerald-600 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                            }`}
+                          >
+                            Done
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
           {/* Create Task Side Panel */}
@@ -953,6 +1142,7 @@ export default function TasksPage() {
                     <SelectContent>
                       <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1065,7 +1255,7 @@ export default function TasksPage() {
                           </span>
                         )}
                       </div>
-                      {canCreate && (
+                      {canCreate && viewMode !== "my-tasks" && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -1175,7 +1365,7 @@ export default function TasksPage() {
                                     {sub.assignees?.length === 0 && (
                                       <p className="text-[11px] text-muted-foreground italic">No one assigned</p>
                                     )}
-                                    {canCreate && (
+                                    {canCreate && viewMode !== "my-tasks" && (
                                       <div className="flex items-center gap-2 pt-2 border-t border-dashed">
                                         <Button
                                           size="sm"
@@ -1249,7 +1439,7 @@ export default function TasksPage() {
                                           style={{ width: `${(groupDone / groupSubs.length) * 100}%` }}
                                         />
                                       </div>
-                                      {canCreate && (
+                                      {canCreate && viewMode !== "my-tasks" && (
                                         <div
                                           role="button"
                                           onClick={(e) => {
@@ -1303,7 +1493,7 @@ export default function TasksPage() {
 
                 <div className="border-t px-6 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {canCreate && (
+                    {canCreate && viewMode !== "my-tasks" && (
                       <>
                         <Button
                           size="sm"
@@ -1389,6 +1579,7 @@ export default function TasksPage() {
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1455,6 +1646,7 @@ export default function TasksPage() {
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1639,6 +1831,7 @@ export default function TasksPage() {
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                   </SelectContent>
                 </Select>

@@ -18,3 +18,7 @@ class Task_update(BaseModel):
     parent_task_id: Optional[int] = None
     subtask_group: Optional[str] = None
     assignee_ids: Optional[List[int]] = None
+
+
+class Task_status_update(BaseModel):
+    status: str
