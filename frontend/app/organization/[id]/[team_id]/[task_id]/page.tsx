@@ -395,6 +395,28 @@ export default function TasksPage() {
     }
   }
 
+  const handleReviewTask = async (taskId: number, action: "accept" | "reject") => {
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token) return
+      const res = await fetch(
+        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${taskId}/review?action=${action}`,
+        { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }
+      )
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(action === "accept" ? "Task accepted — marked as Done" : "Task rejected — moved back to In Progress")
+        setTasks(prev => prev.map(t => t.id === data.id ? data : t))
+        setMyTasks(prev => prev.map(t => t.id === data.id ? data : t))
+        setSelectedTask(prev => (prev && prev.id === data.id ? data : prev))
+      } else {
+        toast.error("Error", { description: data.detail || "Failed to review task" })
+      }
+    } catch {
+      toast.error("Error", { description: "An error occurred" })
+    }
+  }
+
   const handleUpdateTaskStatus = async (taskId: number, newStatus: string) => {
     try {
       const token = localStorage.getItem("access_token")
@@ -483,8 +505,8 @@ export default function TasksPage() {
 
   const parentTasks = tasks.filter(t => t.parent_task_id === null)
   const filteredTasks = filterPriority === "all"
-    ? parentTasks
-    : parentTasks.filter(t => t.priotrity === filterPriority)
+    ? tasks
+    : tasks.filter(t => t.priotrity === filterPriority)
 
   const tasksForColumn = (status: string) => filteredTasks.filter(t => t.status === status)
 
@@ -821,6 +843,14 @@ export default function TasksPage() {
                               onClick={() => { setSelectedTask(task); setExpandedSubtaskId(null); setDetailOpen(true) }}
                               className={`w-full text-left rounded-lg border border-l-[3px] ${col.cardBorder} bg-background p-3.5 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 group`}
                             >
+                              {/* Subtask indicator */}
+                              {task.parent_task_id !== null && (
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
+                                  <ChevronRight className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{tasks.find(t => t.id === task.parent_task_id)?.title ?? "Subtask"}</span>
+                                </div>
+                              )}
+
                               {/* Priority badge */}
                               <div className="flex items-center justify-between mb-2">
                                 <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${priority.bg} ${priority.color}`}>
@@ -1069,7 +1099,8 @@ export default function TasksPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleUpdateTaskStatus(task.id, "done")
+                              const nextStatus = task.status === "in_progress" ? "review" : "done"
+                              handleUpdateTaskStatus(task.id, nextStatus)
                             }}
                             className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                               task.status === "done"
@@ -1080,6 +1111,24 @@ export default function TasksPage() {
                             Done
                           </button>
                         </div>
+                        {task.status === "review" && (canManageTasks || userRole === "OWNER") && !task.assignees.some(a => a.user_id === userId) && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleReviewTask(task.id, "accept") }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                            >
+                              <Check className="w-3 h-3" /> Accept
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleReviewTask(task.id, "reject") }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+                            >
+                              <X className="w-3 h-3" /> Reject
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1239,6 +1288,24 @@ export default function TasksPage() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Accept / Reject (Review) */}
+                  {selectedTask.status === "review" && (canManageTasks || userRole === "OWNER") && !selectedTask.assignees.some(a => a.user_id === userId) && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
+                        onClick={() => { handleReviewTask(selectedTask.id, "accept"); setDetailOpen(false) }}
+                      >
+                        <Check className="mr-2 h-4 w-4" /> Accept
+                      </Button>
+                      <Button
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => { handleReviewTask(selectedTask.id, "reject"); setDetailOpen(false) }}
+                      >
+                        <X className="mr-2 h-4 w-4" /> Reject
+                      </Button>
                     </div>
                   )}
 

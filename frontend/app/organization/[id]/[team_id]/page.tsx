@@ -82,6 +82,7 @@ interface TeamMember {
     can_manage_roles: boolean
     can_kick_members: boolean
     can_make_announcement: boolean
+    can_manage_tasks : Boolean
   } | null
 }
 
@@ -145,6 +146,7 @@ export default function TeamPage() {
   const [canManageRoles, setCanManageRoles] = useState(false)
   const [canKickMembers, setCanKickMembers] = useState(false)
   const [canMakeAnnouncement, setCanMakeAnnouncement] = useState(false)
+  const [canManageTasks, setCanManageTasks] = useState(false)
   const [isAddingMember, setIsAddingMember] = useState(false)
 
   // Edit permissions dialog
@@ -157,6 +159,7 @@ export default function TeamPage() {
   const [editCanManageRoles, setEditCanManageRoles] = useState(false)
   const [editCanKickMembers, setEditCanKickMembers] = useState(false)
   const [editCanMakeAnnouncement, setEditCanMakeAnnouncement] = useState(false)
+  const [editCanManageTasks, setEditCanManageTasks] = useState(false)
   const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false)
 
   // Current user's permissions
@@ -498,7 +501,8 @@ export default function TeamPage() {
             can_delete_messages: canDeleteMessages,
             can_manage_roles: canManageRoles,
             can_kick_members: canKickMembers,
-            can_make_announcement: canMakeAnnouncement
+            can_make_announcement: canMakeAnnouncement,
+            can_manage_tasks: canManageTasks
           })
         }
       )
@@ -519,6 +523,7 @@ export default function TeamPage() {
         setCanManageRoles(false)
         setCanKickMembers(false)
         setCanMakeAnnouncement(false)
+        setCanManageTasks(false)
         // Refresh team members
         await fetchTeamMembers()
       } else {
@@ -551,6 +556,7 @@ export default function TeamPage() {
       setEditCanManageRoles(member.permissions.can_manage_roles)
       setEditCanKickMembers(member.permissions.can_kick_members)
       setEditCanMakeAnnouncement(member.permissions.can_make_announcement)
+      setEditCanManageTasks(member.permissions.can_manage_tasks === true)
     }
     setEditPermissionsOpen(true)
     setMemberDetailsOpen(false)
@@ -582,7 +588,8 @@ export default function TeamPage() {
             can_delete_messages: editCanDeleteMessages,
             can_manage_roles: editCanManageRoles,
             can_kick_members: editCanKickMembers,
-            can_make_announcement: editCanMakeAnnouncement
+            can_make_announcement: editCanMakeAnnouncement,
+            can_manage_tasks: editCanManageTasks
           })
         }
       )
@@ -1123,6 +1130,7 @@ export default function TeamPage() {
                     { id: "can_delete_messages", label: "Delete Messages", checked: canDeleteMessages, onChange: setCanDeleteMessages },
                     { id: "can_manage_roles", label: "Manage Roles", checked: canManageRoles, onChange: setCanManageRoles },
                     { id: "can_kick_members", label: "Kick Members", checked: canKickMembers, onChange: setCanKickMembers },
+                    { id: "can_manage_tasks", label: "Manage Tasks", checked: canManageTasks, onChange: setCanManageTasks },
                   ].map((perm) => (
                     <label
                       key={perm.id}
@@ -1237,6 +1245,7 @@ export default function TeamPage() {
                           { label: "Manage Roles", value: selectedMember.permissions.can_manage_roles },
                           { label: "Kick Members", value: selectedMember.permissions.can_kick_members },
                           { label: "Announcements", value: selectedMember.permissions.can_make_announcement },
+                          { label: "Manage Tasks", value: selectedMember.permissions.can_manage_tasks === true },
                         ].map((perm) => (
                           <div
                             key={perm.label}
@@ -1322,6 +1331,7 @@ export default function TeamPage() {
                     { id: "edit_can_delete_messages", label: "Delete Messages", checked: editCanDeleteMessages, onChange: setEditCanDeleteMessages },
                     { id: "edit_can_manage_roles", label: "Manage Roles", checked: editCanManageRoles, onChange: setEditCanManageRoles },
                     { id: "edit_can_kick_members", label: "Kick Members", checked: editCanKickMembers, onChange: setEditCanKickMembers },
+                    { id: "edit_can_manage_tasks", label: "Manage Tasks", checked: editCanManageTasks, onChange: setEditCanManageTasks },
                   ].map((perm) => (
                     <label
                       key={perm.id}

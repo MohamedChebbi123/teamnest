@@ -17,7 +17,7 @@ class Tasks(Base):
     status=Column(String,nullable=False)
     is_deleted=Column(Boolean,default=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.now(UTC), onupdate=datetime.now(UTC))
-    
+    finished=Column(Boolean,default=False)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
     # Relationships

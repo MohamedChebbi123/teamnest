@@ -372,3 +372,66 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
     db.refresh(task)
 
     return task_to_dict(task)
+
+
+
+def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    if action not in ("accept", "reject"):
+        raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    if not is_team_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this team")
+
+    task = db.query(Tasks).filter(
+        Tasks.id == task_id,
+        Tasks.team_id == team_id,
+        Tasks.is_deleted == False
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != "review":
+        raise HTTPException(status_code=400, detail="Task is not in review status")
+
+    # Assignees cannot accept or reject their own task
+    is_assignee = db.query(Task_assignees).filter(
+        Task_assignees.task_id == task_id,
+        Task_assignees.user_id == user_id
+    ).first()
+    if is_assignee:
+        raise HTTPException(status_code=403, detail="Assignees cannot accept or reject their own task")
+
+    # Only org owner or users with can_manage_tasks role can review
+    is_owner = found_organization.owner_id == user_id
+    if not is_owner:
+        role = db.query(Team_roles).filter(
+            Team_roles.team_id == team_id,
+            Team_roles.user_id == user_id
+        ).first()
+        if not role or not role.can_manage_tasks:
+            raise HTTPException(status_code=403, detail="You do not have permission to review tasks")
+
+    task.status = "done" if action == "accept" else "in_progress"
+    db.commit()
+    db.refresh(task)
+
+    return task_to_dict(task)

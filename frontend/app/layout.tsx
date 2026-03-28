@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        {children}
+        <AntdRegistry>
+          {children}
+        </AntdRegistry>
         <Toaster />
       </body>
     </html>

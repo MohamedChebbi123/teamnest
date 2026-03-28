@@ -324,7 +324,8 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
         can_delete_messages=data.can_delete_messages,
         can_manage_roles=data.can_manage_roles,
         can_kick_members=data.can_kick_members,
-        can_make_announcement=data.can_make_announcement
+        can_make_announcement=data.can_make_announcement,
+        can_manage_tasks=data.can_manage_tasks
     )
     db.add(new_role)
     
@@ -414,7 +415,8 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
                     "can_delete_messages": role.can_delete_messages if role else False,
                     "can_manage_roles": role.can_manage_roles if role else False,
                     "can_kick_members": role.can_kick_members if role else False,
-                    "can_make_announcement": role.can_make_announcement if role else False
+                    "can_make_announcement": role.can_make_announcement if role else False,
+                    "can_manage_tasks": role.can_manage_tasks if role else False
                 } if role else None
             }
             members_list.append(member_data)
@@ -497,7 +499,8 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
     member_role.can_manage_roles = data.can_manage_roles
     member_role.can_kick_members = data.can_kick_members
     member_role.can_make_announcement=data.can_make_announcement
-    
+    member_role.can_manage_tasks=data.can_manage_tasks
+
     db.commit()
     db.refresh(member_role)
     
@@ -512,7 +515,8 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
             "can_delete_messages": member_role.can_delete_messages,
             "can_manage_roles": member_role.can_manage_roles,
             "can_kick_members": member_role.can_kick_members,
-            "can_make_announcement": member_role.can_make_announcement
+            "can_make_announcement": member_role.can_make_announcement,
+            "can_manage_tasks": member_role.can_manage_tasks
         }
     }
 

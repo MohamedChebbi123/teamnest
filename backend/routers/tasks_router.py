@@ -9,6 +9,7 @@ from services.task_service import (
     delete_task_service,
     fetch_my_tasks_service,
     update_my_task_status_service,
+    review_tasks,
 )
 
 router = APIRouter()
@@ -78,3 +79,15 @@ async def update_my_task_status_endpoint(
     db: Session = Depends(connect_databse)
 ):
     return update_my_task_status_service(task_id, team_id, org_id, status_data, authorization, db)
+
+
+@router.patch("/organization/{org_id}/team/{team_id}/tasks/{task_id}/review")
+async def review_task_endpoint(
+    org_id: int,
+    team_id: int,
+    task_id: int,
+    action: str,
+    authorization: str = Header(...),
+    db: Session = Depends(connect_databse)
+):
+    return review_tasks(task_id, action, team_id, org_id, authorization, db)
