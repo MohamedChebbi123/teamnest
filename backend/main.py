@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, org_router, channels_router, team_router, direct_messages_router, tasks_router
 from models import Users,Organization,Organization_members,Channels,Messages,Teams,Team_association,Team_roles,Files,Direct_messages,Notifications,Tasks,Task_assignees
+from models.Task_attachments import Task_attachments
 
 
 app = FastAPI()

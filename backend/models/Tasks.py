@@ -25,3 +25,4 @@ class Tasks(Base):
     creator = relationship("Users", foreign_keys=[created_by], back_populates="tasks_created")
     subtasks = relationship("Tasks", backref='parent_task', remote_side=[id])
     assignees = relationship("Task_assignees", back_populates="task", cascade="all, delete-orphan")
+    attachments = relationship("Task_attachments", back_populates="task", cascade="all, delete-orphan")

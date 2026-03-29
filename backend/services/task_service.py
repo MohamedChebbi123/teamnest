@@ -1,12 +1,15 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from utils.jwt_handler import verify_token
+from utils.cloudinary_handler import upload_chat_file_from_base64
 from models.Tasks import Tasks
 from models.Task_assignees import Task_assignees
+from models.Task_attachments import Task_attachments
 from models.Organization import Organization
 from models.Team_association import Team_association
 from models.Team_roles import Team_roles
 from schemas.Task_input import Task_input, Task_update, Task_status_update
+from schemas.Task_attachment_input import Task_attachment_input
 
 
 def task_to_dict(task):
@@ -31,6 +34,16 @@ def task_to_dict(task):
                 "avatar_url": a.user.avatar_url,
             }
             for a in task.assignees
+        ],
+        "attachments": [
+            {
+                "id": att.id,
+                "file_url": att.file_url,
+                "file_name": att.file_name,
+                "uploaded_by": att.uploaded_by,
+                "uploaded_at": att.uploaded_at,
+            }
+            for att in task.attachments
         ],
     }
 
@@ -188,6 +201,8 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
     if task_data.priority is not None:
         task.priotrity = task_data.priority
     if task_data.status is not None:
+        if task_data.status == "done" and task.status != "review":
+            raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
         task.status = task_data.status
     if task_data.parent_task_id is not None:
         task.parent_task_id = task_data.parent_task_id
@@ -367,6 +382,10 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
     if not is_assigned:
         raise HTTPException(status_code=403, detail="You are not assigned to this task")
 
+    # Enforce review before done
+    if status_data.status == "done" and task.status != "review":
+        raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
+
     task.status = status_data.status
     db.commit()
     db.refresh(task)
@@ -435,3 +454,80 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authoriza
     db.refresh(task)
 
     return task_to_dict(task)
+
+
+def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachment_input, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    if not is_team_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this team")
+
+    task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.team_id == team_id, Tasks.is_deleted == False).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    file_url = upload_chat_file_from_base64(data.file_name, data.file_base64)
+
+    attachment = Task_attachments(
+        task_id=task_id,
+        file_url=file_url,
+        file_name=data.file_name,
+        uploaded_by=user_id,
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+
+    return {
+        "id": attachment.id,
+        "file_url": attachment.file_url,
+        "file_name": attachment.file_name,
+        "uploaded_by": attachment.uploaded_by,
+        "uploaded_at": attachment.uploaded_at,
+    }
+
+
+def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    if not is_team_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this team")
+
+    attachment = db.query(Task_attachments).filter(
+        Task_attachments.id == attachment_id,
+        Task_attachments.task_id == task_id
+    ).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    if attachment.uploaded_by != user_id:
+        raise HTTPException(status_code=403, detail="You can only delete your own attachments")
+
+    db.delete(attachment)
+    db.commit()
+
+    return {"message": "Attachment deleted"}
