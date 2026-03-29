@@ -14,6 +14,7 @@ import {
   Bell,
   Mail,
   FileText,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -218,6 +219,21 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           >
             <Link href="/welcome" title="Home">
               <Home className="h-5 w-5 flex-shrink-0" />
+            </Link>
+          </Button>
+
+          {/* Friends Button */}
+          <Button
+            asChild
+            variant={pathname === '/friends' ? 'secondary' : 'ghost'}
+            className={cn(
+              'w-full h-12 transition-all',
+              'justify-center px-2',
+              pathname === '/friends' && 'bg-primary/10 text-primary hover:bg-primary/20'
+            )}
+          >
+            <Link href="/friends" title="Friends">
+              <Users className="h-5 w-5 flex-shrink-0" />
             </Link>
           </Button>
 

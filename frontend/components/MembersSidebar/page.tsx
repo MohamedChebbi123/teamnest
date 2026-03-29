@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Users, ChevronLeft, ChevronRight, Loader2, Mail, Phone, Globe, X } from "lucide-react"
+import { Users, ChevronLeft, ChevronRight, Loader2, Mail, Phone, Globe, X, UserPlus, Check } from "lucide-react"
 import { toast } from "sonner"
 
 interface Member {
@@ -73,6 +73,8 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
   const [loadingMemberDetails, setLoadingMemberDetails] = useState(false)
   const [revokingPermissionKey, setRevokingPermissionKey] = useState<string | null>(null)
   const [directMessageDraft, setDirectMessageDraft] = useState("")
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false)
+  const [friendRequestSent, setFriendRequestSent] = useState(false)
 
   const minWidth = 250;
   const maxWidth = 500;
@@ -348,6 +350,47 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
     setMemberTeamDetails([])
     setRevokingPermissionKey(null)
     setDirectMessageDraft("")
+    setSendingFriendRequest(false)
+    setFriendRequestSent(false)
+  }
+
+  const sendFriendRequest = async () => {
+    if (!memberDetails?.user.user_id) return
+
+    const token = localStorage.getItem("access_token")
+    if (!token) {
+      router.push("/auth/login")
+      return
+    }
+
+    setSendingFriendRequest(true)
+    try {
+      const response = await fetch("http://localhost:8000/friends/request", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ receiver_id: memberDetails.user.user_id }),
+      })
+
+      if (response.ok) {
+        setFriendRequestSent(true)
+        toast.success("Friend request sent!")
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error("Failed to send request", {
+          description: data?.detail || "Something went wrong"
+        })
+      }
+    } catch (error) {
+      console.error("Error sending friend request:", error)
+      toast.error("Error", {
+        description: "Failed to send friend request"
+      })
+    } finally {
+      setSendingFriendRequest(false)
+    }
   }
 
   const startDirectChat = () => {
@@ -595,6 +638,26 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
                     {selectedMember.role_user}
                   </Badge>
                 )}
+              </div>
+
+              {/* Send Friend Request */}
+              <div className="mt-4">
+                <Button
+                  onClick={sendFriendRequest}
+                  disabled={sendingFriendRequest || friendRequestSent}
+                  variant={friendRequestSent ? "secondary" : "outline"}
+                  className="w-full"
+                  size="sm"
+                >
+                  {sendingFriendRequest ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : friendRequestSent ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <UserPlus className="h-4 w-4 mr-2" />
+                  )}
+                  {friendRequestSent ? "Request Sent" : "Send Friend Request"}
+                </Button>
               </div>
 
               <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
