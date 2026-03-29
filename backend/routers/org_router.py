@@ -1,8 +1,9 @@
-from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members
+from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members,join_org_service,fetch_pending_org_requests_service,accept_or_reject_service
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.Add_members_org import Add_members_org
+from schemas.Join_org import Join_org
 
 router = APIRouter()
 
@@ -63,3 +64,40 @@ async def get_organization_members(
     db: Session = Depends(connect_databse)
 ):
     return fetch_org_members(org_id, authorization, db)
+
+
+@router.post("/organization/join")
+async def join_organization(
+    data: Join_org,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return join_org_service(data, authorization, db)
+
+
+@router.get("/organization/{org_id}/join-requests")
+async def get_organization_join_requests(
+    org_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_pending_org_requests_service(org_id, authorization, db)
+
+
+@router.post("/organization/{org_id}/join-requests/{request_id}")
+async def handle_organization_join_request(
+    org_id: int,
+    request_id: int,
+    action: str,
+    role_user: str = "MEMBER",
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return accept_or_reject_service(
+        org_id=org_id,
+        request_id=request_id,
+        action=action,
+        role_user=role_user,
+        authorization=authorization,
+        db=db
+    )

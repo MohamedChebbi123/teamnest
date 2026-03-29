@@ -8,6 +8,8 @@ from models.Organization_members import Organization_members
 from sqlalchemy.orm import Session
 from utils.cloudinary_handler import upload_organization_picture
 from schemas.Add_members_org import Add_members_org
+from schemas.Join_org import Join_org
+from models.Pending_members_org import Pending_members_org
 def create_organization_service(
     organization_name:str,
     organization_description:str,
@@ -314,3 +316,186 @@ def fetch_org_members(org_id: int,authorization: str,db: Session):
         }
         for member in org_members
     ]
+    
+    
+def join_org_service(data:Join_org,authorization: str,db: Session):
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    payload = verify_token(token, "access")
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload["sub"])
+    
+    found_org = db.query(Organization).filter(
+        Organization.organization_name == data.org_name,
+        Organization.organaization_tag == str(data.org_tag)
+    ).first()
+
+    if not found_org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    existing_member = db.query(Organization_members).filter(
+        Organization_members.memmber_id == user_id,
+        Organization_members.org_id == found_org.organization_id
+    ).first()
+
+    if existing_member:
+        raise HTTPException(status_code=409, detail="You are already a member of this organization")
+
+    existing_request = db.query(Pending_members_org).filter(
+        Pending_members_org.user_id == user_id,
+        Pending_members_org.org_id == found_org.organization_id
+    ).first()
+
+    if existing_request:
+        raise HTTPException(status_code=409, detail="Join request already sent")
+
+    new_invite = Pending_members_org(
+        user_id=user_id,
+        org_id=found_org.organization_id
+    )
+
+    db.add(new_invite)
+    db.commit()
+    db.refresh(new_invite)
+
+    return {
+        "msg": "Join request sent successfully",
+        "request_id": new_invite.id,
+        "organization_id": found_org.organization_id
+    }
+
+
+def fetch_pending_org_requests_service(org_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    requester_membership = db.query(Organization_members).filter(
+        Organization_members.memmber_id == user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
+    if not requester_membership or requester_membership.role_user not in ["OWNER", "ADMIN"]:
+        raise HTTPException(status_code=403, detail="Only organization owners and admins can view join requests")
+
+    pending_requests = db.query(Pending_members_org).join(
+        Users, Pending_members_org.user_id == Users.user_id
+    ).filter(Pending_members_org.org_id == org_id).all()
+
+    return [
+        {
+            "request_id": request.id,
+            "user_id": request.user_id,
+            "org_id": request.org_id,
+            "sent_at": request.sent_at.isoformat() if request.sent_at else None,
+            "first_name": request.user.first_name if request.user else None,
+            "last_name": request.user.last_name if request.user else None,
+            "email": request.user.email if request.user else None,
+            "user_tag": request.user.user_tag if request.user else None,
+            "profile_picture": request.user.avatar_url if request.user else None,
+        }
+        for request in pending_requests
+    ]
+
+
+
+def accept_or_reject_service(
+    org_id: int,
+    request_id: int,
+    action: str,
+    role_user: str,
+    authorization: str,
+    db: Session
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    requester_user_id = int(payload["sub"])
+
+    organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    requester_membership = db.query(Organization_members).filter(
+        Organization_members.memmber_id == requester_user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
+    if not requester_membership or requester_membership.role_user not in ["OWNER", "ADMIN"]:
+        raise HTTPException(status_code=403, detail="Only organization owners and admins can handle join requests")
+
+    pending_request = db.query(Pending_members_org).filter(
+        Pending_members_org.id == request_id,
+        Pending_members_org.org_id == org_id
+    ).first()
+
+    if not pending_request:
+        raise HTTPException(status_code=404, detail="Join request not found")
+
+    if action == "reject":
+        db.delete(pending_request)
+        db.commit()
+        return {
+            "msg": "Join request rejected successfully",
+            "request_id": request_id,
+            "organization_id": org_id
+        }
+
+    if action != "accept":
+        raise HTTPException(status_code=400, detail="Action must be either 'accept' or 'reject'")
+
+    if role_user not in ["ADMIN", "MEMBER"]:
+        raise HTTPException(status_code=400, detail="Role must be either ADMIN or MEMBER")
+
+    existing_member = db.query(Organization_members).filter(
+        Organization_members.memmber_id == pending_request.user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
+    if existing_member:
+        db.delete(pending_request)
+        db.commit()
+        raise HTTPException(status_code=409, detail="User is already a member of this organization")
+
+    new_member = Organization_members(
+        memmber_id=pending_request.user_id,
+        org_id=org_id,
+        role_user=role_user
+    )
+
+    db.add(new_member)
+    db.delete(pending_request)
+    db.commit()
+    db.refresh(new_member)
+
+    return {
+        "msg": "Join request accepted successfully",
+        "request_id": request_id,
+        "organization_id": org_id,
+        "user_id": new_member.memmber_id,
+        "role_user": new_member.role_user
+    }

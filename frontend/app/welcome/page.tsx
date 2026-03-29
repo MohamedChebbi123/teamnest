@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Sidebar from "@/components/Sidebar/page"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 
 interface UserData {
@@ -17,6 +18,9 @@ interface UserData {
 export default function WelcomePage() {
     const [user, setUser] = useState<UserData | null>(null)
     const [loading, setLoading] = useState(true)
+    const [orgSearch, setOrgSearch] = useState("")
+    const [orgTag, setOrgTag] = useState("")
+    const [sendingInvite, setSendingInvite] = useState(false)
     const router = useRouter()
 
     const handleUserFetched = (userData: UserData | null) => {
@@ -50,7 +54,76 @@ export default function WelcomePage() {
             })
             return
         }
-        router.push("/join-organization")
+    }
+
+    const handleSendJoinInvite = async () => {
+        if (!user?.is_verified) {
+            toast.error("Email Verification Required", {
+                description: "You need to verify your email before joining an organization.",
+                action: {
+                    label: "Verify Email",
+                    onClick: () => router.push("/auth/verify-email")
+                }
+            })
+            return
+        }
+
+        const token = localStorage.getItem("access_token") || localStorage.getItem("token")
+        if (!token) {
+            toast.error("Authentication Required", {
+                description: "Please login again to continue."
+            })
+            router.push("/auth/login")
+            return
+        }
+
+        const trimmedName = orgSearch.trim()
+        const parsedTag = Number(orgTag)
+
+        if (!trimmedName) {
+            toast.error("Organization name is required")
+            return
+        }
+
+        if (!orgTag || Number.isNaN(parsedTag) || parsedTag <= 0) {
+            toast.error("Organization tag must be a valid number")
+            return
+        }
+
+        try {
+            setSendingInvite(true)
+            const response = await fetch("http://localhost:8000/organization/join", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    org_name: trimmedName,
+                    org_tag: parsedTag
+                })
+            })
+
+            const payload = await response.json().catch(() => null)
+
+            if (!response.ok) {
+                const detail = payload?.detail || "Failed to send join request"
+                toast.error("Invite Failed", { description: detail })
+                return
+            }
+
+            toast.success("Invite Sent", {
+                description: "Your join request has been sent successfully."
+            })
+            setOrgSearch("")
+            setOrgTag("")
+        } catch {
+            toast.error("Network Error", {
+                description: "Could not connect to server. Please try again."
+            })
+        } finally {
+            setSendingInvite(false)
+        }
     }
 
     return (
@@ -98,6 +171,33 @@ export default function WelcomePage() {
                                 Join Organization
                             </Button>
                         </div>
+
+                        <div className="w-full max-w-md mt-6 rounded-lg border p-4">
+                            <h2 className="text-lg font-semibold mb-3">Join an Organization</h2>
+                            <div className="space-y-3">
+                                <Input
+                                    placeholder="Search organization name"
+                                    value={orgSearch}
+                                    onChange={(e) => setOrgSearch(e.target.value)}
+                                    disabled={loading || sendingInvite}
+                                />
+                                <Input
+                                    placeholder="Organization tag (example: 123456)"
+                                    type="number"
+                                    value={orgTag}
+                                    onChange={(e) => setOrgTag(e.target.value)}
+                                    disabled={loading || sendingInvite}
+                                />
+                                <Button
+                                    onClick={handleSendJoinInvite}
+                                    className="w-full"
+                                    disabled={loading || sendingInvite}
+                                >
+                                    {sendingInvite ? "Sending..." : "Send Invite"}
+                                </Button>
+                            </div>
+                        </div>
+
                     </div>
 
                     {loading ? (

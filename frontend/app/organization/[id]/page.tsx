@@ -38,6 +38,18 @@ interface Team {
   created_at: string
 }
 
+interface PendingJoinRequest {
+  request_id: number
+  user_id: number
+  org_id: number
+  sent_at?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  email?: string | null
+  user_tag?: string | null
+  profile_picture?: string | null
+}
+
 
 export default function OrganizationPage() {
   const params = useParams()
@@ -51,6 +63,9 @@ export default function OrganizationPage() {
   const [roleUser, setRoleUser] = useState<"ADMIN" | "MEMBER">("MEMBER")
   const [addingMember, setAddingMember] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string>("MEMBER")
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<PendingJoinRequest[]>([])
+  const [loadingPendingJoinRequests, setLoadingPendingJoinRequests] = useState(false)
   
   // Edit organization states
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -108,6 +123,20 @@ export default function OrganizationPage() {
         if (userResponse.ok) {
           const userData = await userResponse.json()
           setCurrentUserId(userData.user_id)
+
+          const roleResponse = await fetch(`http://localhost:8000/organization/${organizationId}/members`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+
+          if (roleResponse.ok) {
+            const membersData = await roleResponse.json()
+            const me = membersData.find((member: any) => member.user_id === userData.user_id)
+            if (me?.role_user) {
+              setCurrentUserRole(me.role_user)
+            }
+          }
         }
 
         const response = await fetch("http://localhost:8000/get_org_for_admin_org", {
@@ -157,6 +186,47 @@ export default function OrganizationPage() {
       fetchOrganizationDetails()
     }
   }, [organizationId, router])
+
+  useEffect(() => {
+    const fetchPendingJoinRequests = async () => {
+      if (!organizationId) return
+      if (!["OWNER", "ADMIN"].includes(currentUserRole)) {
+        setPendingJoinRequests([])
+        return
+      }
+
+      setLoadingPendingJoinRequests(true)
+      try {
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+
+        const response = await fetch(`http://localhost:8000/organization/${organizationId}/join-requests`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const sorted = (Array.isArray(data) ? data : []).sort((a: PendingJoinRequest, b: PendingJoinRequest) => {
+            const aDate = a.sent_at ? new Date(a.sent_at).getTime() : 0
+            const bDate = b.sent_at ? new Date(b.sent_at).getTime() : 0
+            return bDate - aDate
+          })
+          setPendingJoinRequests(sorted)
+        } else {
+          setPendingJoinRequests([])
+        }
+      } catch (error) {
+        console.error('Error fetching pending join requests:', error)
+        setPendingJoinRequests([])
+      } finally {
+        setLoadingPendingJoinRequests(false)
+      }
+    }
+
+    fetchPendingJoinRequests()
+  }, [organizationId, currentUserRole])
 
   // Fetch teams
   useEffect(() => {
@@ -590,6 +660,50 @@ export default function OrganizationPage() {
     }
   }
 
+  const handleJoinRequestAction = async (
+    requestId: number,
+    action: "accept" | "reject",
+    roleUser: "ADMIN" | "MEMBER" = "MEMBER"
+  ) => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error("Authentication required")
+        router.push('/auth/login')
+        return
+      }
+
+      const url = `http://localhost:8000/organization/${organizationId}/join-requests/${requestId}?action=${action}&role_user=${roleUser}`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error("Request failed", {
+          description: data?.detail || "Could not process join request"
+        })
+        return
+      }
+
+      toast.success(action === "accept" ? "Request accepted" : "Request rejected", {
+        description: action === "accept"
+          ? `Member added as ${roleUser}`
+          : "Join request has been rejected"
+      })
+
+      setPendingJoinRequests(prev => prev.filter(req => req.request_id !== requestId))
+    } catch (error) {
+      console.error('Error handling join request:', error)
+      toast.error("Error", {
+        description: "Failed to handle join request"
+      })
+    }
+  }
+
   const isOwner = organization?.owner_id === currentUserId
 
   if (loading) {
@@ -894,51 +1008,110 @@ export default function OrganizationPage() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions — 1 col */}
-            <Card className="col-span-1 rounded-xl h-fit">
-              <CardHeader className="px-6 py-5 border-b">
-                <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 space-y-0.5">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
-                  onClick={() => setAddMemberDialogOpen(true)}
-                >
-                  <UserPlus className="h-4 w-4 shrink-0" />
-                  Invite Members
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
-                  onClick={() => setCreateTeamDialogOpen(true)}
-                >
-                  <FolderKanban className="h-4 w-4 shrink-0" />
-                  Create a Team
-                </Button>
-                {isOwner && (
-                  <>
-                    <Separator className="my-1" />
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
-                      onClick={() => setEditDialogOpen(true)}
-                    >
-                      <Edit className="h-4 w-4 shrink-0" />
-                      Edit Organization
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start gap-3 h-9 text-sm font-normal text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setDeleteDialogOpen(true)}
-                    >
-                      <Trash2 className="h-4 w-4 shrink-0" />
-                      Delete Organization
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            {/* Right Column */}
+            <div className="col-span-1 space-y-6">
+              <Card className="rounded-xl h-fit">
+                <CardHeader className="px-6 py-5 border-b">
+                  <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 space-y-0.5">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
+                    onClick={() => setAddMemberDialogOpen(true)}
+                  >
+                    <UserPlus className="h-4 w-4 shrink-0" />
+                    Invite Members
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
+                    onClick={() => setCreateTeamDialogOpen(true)}
+                  >
+                    <FolderKanban className="h-4 w-4 shrink-0" />
+                    Create a Team
+                  </Button>
+                  {isOwner && (
+                    <>
+                      <Separator className="my-1" />
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
+                        onClick={() => setEditDialogOpen(true)}
+                      >
+                        <Edit className="h-4 w-4 shrink-0" />
+                        Edit Organization
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 h-9 text-sm font-normal text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteDialogOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4 shrink-0" />
+                        Delete Organization
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {["OWNER", "ADMIN"].includes(currentUserRole) && (
+                <Card className="rounded-xl h-fit">
+                  <CardHeader className="px-6 py-5 border-b">
+                    <CardTitle className="text-base font-semibold">Pending Join Requests</CardTitle>
+                    <CardDescription>
+                      Users waiting to join this organization
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-3">
+                    {loadingPendingJoinRequests ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading requests...
+                      </div>
+                    ) : pendingJoinRequests.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No pending requests.</p>
+                    ) : (
+                      pendingJoinRequests.map((request) => {
+                        const fullName = `${request.first_name || ""} ${request.last_name || ""}`.trim() || "Unknown User"
+                        return (
+                          <div key={request.request_id} className="rounded-md border p-3">
+                            <p className="text-sm font-medium">{fullName}</p>
+                            <p className="text-xs text-muted-foreground">{request.email || "No email"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Sent: {request.sent_at ? new Date(request.sent_at).toLocaleString() : "N/A"}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleJoinRequestAction(request.request_id, "accept", "ADMIN")}
+                              >
+                                Accept as Admin
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleJoinRequestAction(request.request_id, "accept", "MEMBER")}
+                              >
+                                Accept as Member
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleJoinRequestAction(request.request_id, "reject", "MEMBER")}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
       </div>
