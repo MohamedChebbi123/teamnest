@@ -99,7 +99,7 @@ export default function Login() {
       }
       
       setTimeout(() => {
-        window.location.replace("/auth/profile")
+        window.location.replace("/")
       }, 1000)
       
       console.log("User logged in:", data)

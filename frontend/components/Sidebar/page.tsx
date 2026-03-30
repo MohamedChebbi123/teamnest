@@ -15,11 +15,22 @@ import {
   Mail,
   FileText,
   Users,
+  MessageCircle,
+  Plus,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +39,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface UserData {
   first_name?: string;
@@ -58,6 +75,10 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const [orgSearch, setOrgSearch] = useState('');
+  const [orgTag, setOrgTag] = useState('');
+  const [sendingJoin, setSendingJoin] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -133,6 +154,80 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
     router.push('/auth/login');
   };
 
+  const handleCreateOrganization = () => {
+    if (!user?.is_verified) {
+      toast.error("Email Verification Required", {
+        description: "You need to verify your email before creating an organization.",
+        action: {
+          label: "Verify Email",
+          onClick: () => router.push("/auth/verify-email"),
+        },
+      });
+      return;
+    }
+    router.push("/organization/create_organizattion");
+  };
+
+  const handleSendJoinRequest = async () => {
+    if (!user?.is_verified) {
+      toast.error("Email Verification Required", {
+        description: "You need to verify your email before joining an organization.",
+        action: {
+          label: "Verify Email",
+          onClick: () => router.push("/auth/verify-email"),
+        },
+      });
+      return;
+    }
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      toast.error("Authentication Required", { description: "Please login again." });
+      router.push('/auth/login');
+      return;
+    }
+
+    const trimmedName = orgSearch.trim();
+    const parsedTag = Number(orgTag);
+
+    if (!trimmedName) {
+      toast.error("Organization name is required");
+      return;
+    }
+    if (!orgTag || Number.isNaN(parsedTag) || parsedTag <= 0) {
+      toast.error("Organization tag must be a valid number");
+      return;
+    }
+
+    try {
+      setSendingJoin(true);
+      const response = await fetch("http://localhost:8000/organization/join", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ org_name: trimmedName, org_tag: parsedTag }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        toast.error("Join Failed", { description: payload?.detail || "Failed to send join request" });
+        return;
+      }
+
+      toast.success("Request Sent", { description: "Your join request has been sent successfully." });
+      setOrgSearch('');
+      setOrgTag('');
+      setShowJoinDialog(false);
+    } catch {
+      toast.error("Network Error", { description: "Could not connect to server." });
+    } finally {
+      setSendingJoin(false);
+    }
+  };
+
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) || '';
     const last = lastName?.charAt(0) || '';
@@ -198,7 +293,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       >
         {/* Sidebar Header */}
         <div className="flex items-center justify-center p-4 border-b">
-          <Link href="/welcome">
+          <Link href="/">
             <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">TN</span>
             </div>
@@ -210,14 +305,14 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           {/* Home Button */}
           <Button
             asChild
-            variant={pathname === '/welcome' ? 'secondary' : 'ghost'}
+            variant={pathname === '/welcome' || pathname === '/' ? 'secondary' : 'ghost'}
             className={cn(
               'w-full h-12 transition-all',
               'justify-center px-2',
-              pathname === '/welcome' && 'bg-primary/10 text-primary hover:bg-primary/20'
+              (pathname === '/welcome' || pathname === '/') && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
           >
-            <Link href="/welcome" title="Home">
+            <Link href="/" title="Home">
               <Home className="h-5 w-5 flex-shrink-0" />
             </Link>
           </Button>
@@ -234,6 +329,21 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           >
             <Link href="/friends" title="Friends">
               <Users className="h-5 w-5 flex-shrink-0" />
+            </Link>
+          </Button>
+
+          {/* Direct Messages Button */}
+          <Button
+            asChild
+            variant={pathname === '/direct-messages' ? 'secondary' : 'ghost'}
+            className={cn(
+              'w-full h-12 transition-all',
+              'justify-center px-2',
+              pathname === '/direct-messages' && 'bg-primary/10 text-primary hover:bg-primary/20'
+            )}
+          >
+            <Link href="/direct-messages" title="Direct Messages">
+              <MessageCircle className="h-5 w-5 flex-shrink-0" />
             </Link>
           </Button>
 
@@ -326,6 +436,43 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               ))}
             </div>
           )}
+
+          {/* Create / Join Organization Button */}
+          <TooltipProvider>
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        'w-full h-12 transition-all',
+                        'justify-center px-2',
+                        'border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-accent/60'
+                      )}
+                    >
+                      <Plus className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Add Organization</p>
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="start" side="right" className="w-56 ml-2">
+                <DropdownMenuLabel>Organization</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleCreateOrganization} className="cursor-pointer">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Organization
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowJoinDialog(true)} className="cursor-pointer">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Join Organization
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TooltipProvider>
         </nav>
 
         {/* User Section */}
@@ -387,6 +534,43 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
       {/* Spacer for content */}
       <div className="hidden lg:block" style={{ width: `${SIDEBAR_WIDTH}px` }} />
+
+      {/* Join Organization Dialog */}
+      <Dialog open={showJoinDialog} onOpenChange={setShowJoinDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Join an Organization</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Organization Name</label>
+              <Input
+                placeholder="Enter organization name"
+                value={orgSearch}
+                onChange={(e) => setOrgSearch(e.target.value)}
+                disabled={sendingJoin}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Organization Tag</label>
+              <Input
+                placeholder="e.g. 123456"
+                type="number"
+                value={orgTag}
+                onChange={(e) => setOrgTag(e.target.value)}
+                disabled={sendingJoin}
+              />
+            </div>
+            <Button
+              onClick={handleSendJoinRequest}
+              className="w-full"
+              disabled={sendingJoin}
+            >
+              {sendingJoin ? "Sending..." : "Send Join Request"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -483,7 +483,8 @@ async def send_direct_messages_realtime(
     db: Session
 ):
     if not authorization:
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+        await websocket.close(code=1008, reason="Invalid authorization header")
+        return
 
     if authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -493,7 +494,8 @@ async def send_direct_messages_realtime(
     payload = verify_token(token, "access")
 
     if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        await websocket.close(code=1008, reason="Invalid or expired token")
+        return
 
     user_id = int(payload["sub"])
 

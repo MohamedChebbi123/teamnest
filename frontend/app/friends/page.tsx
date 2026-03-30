@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Search,
 } from "lucide-react"
+
 import { toast } from "sonner"
 
 interface Friend {
@@ -47,6 +48,7 @@ export default function FriendsPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [addTag, setAddTag] = useState("")
   const [sendingByTag, setSendingByTag] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const getToken = () => {
     const token = localStorage.getItem("access_token")
@@ -203,6 +205,12 @@ export default function FriendsPage() {
     return ((firstName?.[0] || "") + (lastName?.[0] || "")).toUpperCase() || "??"
   }
 
+  const filteredFriends = friends.filter((f) => {
+    const q = searchQuery.toLowerCase().trim()
+    if (!q) return true
+    return `${f.first_name} ${f.last_name}`.toLowerCase().includes(q) || f.user_tag?.toLowerCase().includes(q)
+  })
+
   const tabs = [
     { key: "friends" as const, label: "Friends", count: friends.length, icon: Users },
     { key: "requests" as const, label: "Requests", count: requests.length, icon: UserPlus },
@@ -264,58 +272,75 @@ export default function FriendsPage() {
                       </p>
                     </div>
                   ) : (
-                    friends.map((friend) => (
-                      <div
-                        key={friend.friendship_id}
-                        className="flex items-center gap-4 p-4 rounded-xl border bg-card shadow-sm"
-                      >
-                        <Avatar className="h-12 w-12 border-2 border-background">
-                          <AvatarImage src={friend.avatar_url || undefined} />
-                          <AvatarFallback className="bg-primary/10 text-primary">
-                            {getInitials(friend.first_name, friend.last_name)}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">
-                            {friend.first_name} {friend.last_name}
-                          </p>
-                          {friend.user_tag && (
-                            <p className="text-xs text-muted-foreground">@{friend.user_tag}</p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Send message"
-                            onClick={() =>
-                              router.push(
-                                `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(
-                                  `${friend.first_name} ${friend.last_name}`
-                                )}`
-                              )
-                            }
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Remove friend"
-                            disabled={actionLoading === friend.user_id}
-                            onClick={() => handleRemoveFriend(friend.user_id)}
-                          >
-                            {actionLoading === friend.user_id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <X className="h-4 w-4 text-destructive" />
-                            )}
-                          </Button>
-                        </div>
+                    <>
+                      <div className="relative mb-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search friends..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9"
+                        />
                       </div>
-                    ))
+                      {filteredFriends.length === 0 ? (
+                        <p className="text-center text-sm text-muted-foreground py-8">
+                          No friends matching &quot;{searchQuery}&quot;
+                        </p>
+                      ) : (
+                        filteredFriends.map((friend) => (
+                          <div
+                            key={friend.friendship_id}
+                            className="flex items-center gap-4 p-4 rounded-xl border bg-card shadow-sm"
+                          >
+                            <Avatar className="h-12 w-12 border-2 border-background">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {getInitials(friend.first_name, friend.last_name)}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">
+                                {friend.first_name} {friend.last_name}
+                              </p>
+                              {friend.user_tag && (
+                                <p className="text-xs text-muted-foreground">@{friend.user_tag}</p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Send message"
+                                onClick={() =>
+                                  router.push(
+                                    `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(
+                                      `${friend.first_name} ${friend.last_name}`
+                                    )}`
+                                  )
+                                }
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Remove friend"
+                                disabled={actionLoading === friend.user_id}
+                                onClick={() => handleRemoveFriend(friend.user_id)}
+                              >
+                                {actionLoading === friend.user_id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <X className="h-4 w-4 text-destructive" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </>
                   )}
                 </div>
               )}

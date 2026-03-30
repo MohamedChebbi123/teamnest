@@ -501,11 +501,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       icon: FolderKanban 
     },
     {
-      name: "Direct Messages",
-      path: "/direct-messages",
-      icon: MessageCircle
-    },
-    { 
       name: "Settings", 
       path: `/organization/${organizationId}/settings`, 
       icon: Settings,
@@ -525,9 +520,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   const unreadNotificationsCount = liveNotifications.filter((item) => !item.read).length
-  const unreadDirectMessagesCount = liveNotifications.filter(
-    (item) => !item.read && item.type === "direct_message"
-  ).length
   const unreadMentionChannelIds = new Set(
     liveNotifications
       .filter((item) => !item.read && item.type === "channel_mention" && typeof item.channel_id === "number")
@@ -941,19 +933,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           />
           {isExpanded ? (
             <div className="space-y-1.5">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/direct-messages')}
-                className="relative w-full justify-start gap-2.5 h-9 px-3 text-sm font-medium hover:bg-accent"
-              >
-                <MessageCircle className="h-4 w-4 flex-shrink-0" />
-                <span>Direct Messages</span>
-                {unreadDirectMessagesCount > 0 && (
-                  <Badge variant="destructive" className="ml-auto h-5 min-w-5 rounded-full px-1 text-[10px]">
-                    {unreadDirectMessagesCount > 99 ? "99+" : unreadDirectMessagesCount}
-                  </Badge>
-                )}
-              </Button>
               <div className="flex items-center gap-1 px-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -986,17 +965,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => router.push('/direct-messages')} className="relative h-9 w-9">
-                    <MessageCircle className="h-4 w-4" />
-                    {unreadDirectMessagesCount > 0 && (
-                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-1 ring-sidebar" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Direct Messages</TooltipContent>
-              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button type="button" variant="ghost" size="icon" onClick={() => setSoundEnabled((prev) => !prev)} className="h-9 w-9">
@@ -1032,12 +1000,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                         : "text-foreground/70 hover:text-foreground hover:bg-accent"
                     )}
                   >
-                    <span className="relative inline-flex">
-                      <Icon className="h-4 w-4" />
-                      {tab.name === "Direct Messages" && unreadDirectMessagesCount > 0 && (
-                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
-                      )}
-                    </span>
+                    <Icon className="h-4 w-4" />
                     <span>{tab.name}</span>
                     {active && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
                   </Button>
@@ -1054,12 +1017,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                             : "text-foreground/70 hover:text-foreground hover:bg-accent"
                         )}
                       >
-                        <span className="relative inline-flex">
-                          <Icon className="h-4 w-4" />
-                          {tab.name === "Direct Messages" && unreadDirectMessagesCount > 0 && (
-                            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
-                          )}
-                        </span>
+                        <Icon className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">{tab.name}</TooltipContent>

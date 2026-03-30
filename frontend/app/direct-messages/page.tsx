@@ -11,7 +11,8 @@ import { Separator } from "@/components/ui/separator"
 import {
   Loader2, MessageCircle, SendHorizontal, Smile, Paperclip,
   Pencil, Trash2, Search, Reply, X, Download, FileIcon,
-  UserRound, MapPin, Calendar, CheckCircle2, ChevronRight,
+  UserRound, MapPin, Calendar, CheckCircle2, ChevronRight, Users,
+  UserPlus, UserMinus,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -97,6 +98,16 @@ type ConversationItem = {
   }
 }
 
+type FriendItem = {
+  friendship_id: number
+  user_id: number
+  first_name: string
+  last_name: string
+  user_tag: string | null
+  avatar_url: string | null
+  added_at: string
+}
+
 const EMOJI_LIST = ["😀", "😂", "😍", "🤔", "😎", "😭", "🔥", "👍", "❤️", "🎉", "🙏", "✅"]
 
 const formatTime = (dateStr: string) => {
@@ -142,6 +153,9 @@ export default function ChannelsPage() {
   const [showProfilePanel, setShowProfilePanel] = useState(false)
   const [receiverInfo, setReceiverInfo] = useState<ReceiverInfo | null>(null)
   const [loadingReceiverInfo, setLoadingReceiverInfo] = useState(false)
+  const [friends, setFriends] = useState<FriendItem[]>([])
+  const [loadingFriends, setLoadingFriends] = useState(false)
+  const [friendActionLoading, setFriendActionLoading] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -191,6 +205,79 @@ export default function ChannelsPage() {
     }
   }
 
+  const fetchFriends = async () => {
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+
+    setLoadingFriends(true)
+    try {
+      const response = await fetch("http://localhost:8000/friends", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setFriends(data)
+      }
+    } catch (error) {
+      console.error("Error fetching friends:", error)
+    } finally {
+      setLoadingFriends(false)
+    }
+  }
+
+  const handleRemoveFriend = async (friendUserId: number) => {
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+
+    setFriendActionLoading(true)
+    try {
+      const response = await fetch(`http://localhost:8000/friends/${friendUserId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        toast.success("Friend removed")
+        setFriends((prev) => prev.filter((f) => f.user_id !== friendUserId))
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+      }
+    } catch {
+      toast.error("Error", { description: "Failed to remove friend" })
+    } finally {
+      setFriendActionLoading(false)
+    }
+  }
+
+  const handleSendFriendRequest = async (userTag: string) => {
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+
+    setFriendActionLoading(true)
+    try {
+      const response = await fetch("http://localhost:8000/friends/request", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ user_tag: userTag }),
+      })
+
+      if (response.ok) {
+        toast.success("Friend request sent!")
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error("Failed", { description: data?.detail || "Could not send request" })
+      }
+    } catch {
+      toast.error("Error", { description: "Failed to send friend request" })
+    } finally {
+      setFriendActionLoading(false)
+    }
+  }
+
   useEffect(() => {
     const token = localStorage.getItem("access_token")
     if (!token) {
@@ -213,6 +300,7 @@ export default function ChannelsPage() {
 
     fetchCurrentUser()
     fetchConversations()
+    fetchFriends()
   }, [router])
 
   useEffect(() => {
@@ -474,7 +562,17 @@ export default function ChannelsPage() {
     return fullName.includes(searchQuery.toLowerCase())
   })
 
+  // Friends who don't have an existing conversation yet
+  const conversationUserIds = new Set(conversations.map((c) => c.user.user_id))
+  const friendsWithoutConversation = friends.filter((f) => {
+    if (conversationUserIds.has(f.user_id)) return false
+    if (!searchQuery) return true
+    const fullName = `${f.first_name} ${f.last_name}`.toLowerCase()
+    return fullName.includes(searchQuery.toLowerCase())
+  })
+
   const activeReceiverId = receiverId ? Number(receiverId) : null
+  const isReceiverFriend = activeReceiverId !== null && friends.some((f) => f.user_id === activeReceiverId)
   const activeConversation = activeReceiverId !== null
     ? conversations.find((item) => item.user.user_id === activeReceiverId)
     : null
@@ -527,13 +625,14 @@ export default function ChannelsPage() {
         </div>
 
         <ScrollArea className="flex-1 px-2 pb-2">
+          {/* Conversations */}
           <div className="space-y-0.5">
             {loadingConversations ? (
               <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Loading...
               </div>
-            ) : filteredConversations.length === 0 ? (
+            ) : filteredConversations.length === 0 && friendsWithoutConversation.length === 0 ? (
               <p className="px-3 py-4 text-xs text-muted-foreground">No conversations yet.</p>
             ) : (
               filteredConversations.map((item) => {
@@ -570,6 +669,50 @@ export default function ChannelsPage() {
               })
             )}
           </div>
+
+          {/* Friends Section */}
+          {friendsWithoutConversation.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <div className="flex items-center gap-2 px-3 py-2">
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground tracking-wide">Friends</span>
+              </div>
+              <div className="space-y-0.5">
+                {friendsWithoutConversation.map((friend) => {
+                  const isActive = activeReceiverId === friend.user_id
+                  const initials = `${friend.first_name[0] || ""}${friend.last_name[0] || ""}`.toUpperCase()
+
+                  return (
+                    <button
+                      key={friend.user_id}
+                      onClick={() => router.push(
+                        `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(`${friend.first_name} ${friend.last_name}`)}`
+                      )}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
+                        isActive
+                          ? "bg-muted"
+                          : "hover:bg-muted/70"
+                      )}
+                    >
+                      <Avatar className="h-9 w-9 flex-shrink-0">
+                        <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {friend.first_name} {friend.last_name}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {friend.user_tag ? `@${friend.user_tag}` : "Start a conversation"}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </ScrollArea>
       </div>
 
@@ -983,6 +1126,43 @@ export default function ChannelsPage() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                <Separator />
+
+                {/* Friend Actions */}
+                <div className="w-full space-y-2">
+                  {isReceiverFriend ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      disabled={friendActionLoading}
+                      onClick={() => handleRemoveFriend(activeReceiverId!)}
+                    >
+                      {friendActionLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <UserMinus className="h-4 w-4 mr-2" />
+                      )}
+                      Unfriend
+                    </Button>
+                  ) : receiverInfo.user_tag ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={friendActionLoading}
+                      onClick={() => handleSendFriendRequest(receiverInfo.user_tag!)}
+                    >
+                      {friendActionLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <UserPlus className="h-4 w-4 mr-2" />
+                      )}
+                      Add Friend
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </ScrollArea>
