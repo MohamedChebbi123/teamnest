@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useOnlineStatus } from '@/context/OnlineStatusContext'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { 
@@ -28,6 +29,7 @@ interface NavBarProps {
 
 export default function NavBar({ user }: NavBarProps) {
   const router = useRouter()
+  const { disconnect } = useOnlineStatus()
   const [showNotifications, setShowNotifications] = useState(false)
 
   if (!user) {
@@ -57,6 +59,7 @@ export default function NavBar({ user }: NavBarProps) {
   const unreadCount = activeNotifications.length
 
   const handleLogout = () => {
+    disconnect()
     localStorage.removeItem("access_token")
     router.push('/auth/login')
   }

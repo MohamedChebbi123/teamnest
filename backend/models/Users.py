@@ -15,7 +15,7 @@ class Users(Base):
     country=Column(String(50),nullable=True)
     password_hashed=Column(String(100),nullable=False)
     avatar_url=Column(String(200),nullable=True)
-    joined_at = Column(DateTime, default=datetime.utcnow)
+    joined_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     last_login_at = Column(DateTime, nullable=True)
     user_tag=Column(String(7),nullable=True)
     is_verified=Column(Boolean,default=False)

@@ -1,6 +1,7 @@
 'use client';
 
 import{ useState, useEffect } from 'react';
+import { useOnlineStatus } from '@/context/OnlineStatusContext';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -82,6 +83,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const pathname = usePathname();
   const router = useRouter();
 
+  const { disconnect } = useOnlineStatus()
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
 
   useEffect(() => {
@@ -150,6 +152,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   }, [router]);
 
   const handleLogout = () => {
+    disconnect()
     localStorage.removeItem("access_token");
     router.push('/auth/login');
   };

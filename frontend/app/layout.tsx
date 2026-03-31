@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         <AntdRegistry>
-          {children}
+          <OnlineStatusProvider>
+            {children}
+          </OnlineStatusProvider>
         </AntdRegistry>
         <Toaster />
       </body>

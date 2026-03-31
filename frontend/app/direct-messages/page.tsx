@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useOnlineStatus } from "@/context/OnlineStatusContext"
 import Sidebar from "@/components/Sidebar/page"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -108,7 +109,11 @@ type FriendItem = {
   added_at: string
 }
 
-const EMOJI_LIST = ["😀", "😂", "😍", "🤔", "😎", "😭", "🔥", "👍", "❤️", "🎉", "🙏", "✅"]
+type EmojiClickEvent = Event & {
+  detail?: {
+    unicode?: string
+  }
+}
 
 const formatTime = (dateStr: string) => {
   const date = new Date(dateStr)
@@ -130,6 +135,7 @@ const isImageAttachment = (fileName: string, fileUrl: string) => {
 
 export default function ChannelsPage() {
   const router = useRouter()
+  const { isUserOnline } = useOnlineStatus()
   const searchParams = useSearchParams()
 
   const receiverId = searchParams.get("dm_user_id")
@@ -163,6 +169,8 @@ export default function ChannelsPage() {
   const selectedReceiverRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const emojiPickerContainerRef = useRef<HTMLDivElement | null>(null)
+  const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     selectedReceiverRef.current = receiverId ? Number(receiverId) : null
@@ -171,6 +179,59 @@ export default function ChannelsPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  useEffect(() => {
+    if (!showEmojiPicker || !emojiPickerContainerRef.current) return
+
+    let pickerElement: HTMLElement | null = null
+    let onEmojiClick: ((event: Event) => void) | null = null
+
+    const initializePicker = async () => {
+      await import("emoji-picker-element")
+      if (!emojiPickerContainerRef.current) return
+
+      pickerElement = document.createElement("emoji-picker")
+      pickerElement.setAttribute("style", "height: 320px;")
+
+      onEmojiClick = (event: Event) => {
+        const emoji = (event as EmojiClickEvent).detail?.unicode
+        if (!emoji) return
+        setMessageInput((prev) => `${prev}${emoji}`)
+        setShowEmojiPicker(false)
+      }
+
+      pickerElement.addEventListener("emoji-click", onEmojiClick as EventListener)
+      emojiPickerContainerRef.current.innerHTML = ""
+      emojiPickerContainerRef.current.appendChild(pickerElement)
+    }
+
+    initializePicker()
+
+    return () => {
+      if (pickerElement && onEmojiClick) {
+        pickerElement.removeEventListener("emoji-click", onEmojiClick as EventListener)
+      }
+      if (emojiPickerContainerRef.current) {
+        emojiPickerContainerRef.current.innerHTML = ""
+      }
+    }
+  }, [showEmojiPicker])
+
+  useEffect(() => {
+    if (!showEmojiPicker) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (emojiPickerContainerRef.current?.contains(target)) return
+      if (emojiButtonRef.current?.contains(target)) return
+      setShowEmojiPicker(false)
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick)
+    }
+  }, [showEmojiPicker])
 
   useEffect(() => {
     if (!receiverId) { setReceiverInfo(null); setShowProfilePanel(false); return }
@@ -735,10 +796,10 @@ export default function ChannelsPage() {
               <div className="flex items-center gap-1.5">
                 <span className={cn(
                   "h-1.5 w-1.5 rounded-full",
-                  isConnected ? "bg-emerald-500" : "bg-muted-foreground"
+                  activeReceiverId && isUserOnline(activeReceiverId) ? "bg-emerald-500" : "bg-muted-foreground"
                 )} />
                 <span className="text-xs text-muted-foreground">
-                  {isConnected ? "Online" : "Connecting..."}
+                  {activeReceiverId && isUserOnline(activeReceiverId) ? "Online" : "Offline"}
                 </span>
               </div>
             </div>
@@ -944,7 +1005,7 @@ export default function ChannelsPage() {
         </ScrollArea>
 
         {/* Input Area — always rendered */}
-        <div className="flex-shrink-0 px-4 pb-4 pt-2">
+        <div className="relative flex-shrink-0 px-4 pb-4 pt-2">
           {replyingTo && (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border bg-muted/50 px-3 py-2">
               <div className="min-w-0">
@@ -971,16 +1032,8 @@ export default function ChannelsPage() {
           )}
 
           {showEmojiPicker && (
-            <div className="mb-2 flex flex-wrap gap-1 rounded-xl border bg-card p-2 shadow-sm">
-              {EMOJI_LIST.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => setMessageInput((prev) => prev + emoji)}
-                  className="rounded-lg px-2 py-1 text-lg transition-colors hover:bg-muted"
-                >
-                  {emoji}
-                </button>
-              ))}
+            <div className="absolute bottom-full mb-2 z-50 rounded-lg border bg-background shadow-xl overflow-hidden">
+              <div ref={emojiPickerContainerRef} />
             </div>
           )}
 
@@ -1001,6 +1054,7 @@ export default function ChannelsPage() {
           )}>
             <button
               type="button"
+              ref={emojiButtonRef}
               onClick={() => setShowEmojiPicker((prev) => !prev)}
               disabled={isComposerDisabled}
               className="flex-shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:opacity-40"

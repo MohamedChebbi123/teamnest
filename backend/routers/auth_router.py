@@ -1,19 +1,21 @@
 from schemas.Logininput import Logininput
 from services.auth_service import (
-    register_user_service, 
-    verify_email_service, 
-    resend_verification_service, 
-    login_user_service, 
-    view_profile_service, 
-    complete_profile_service, 
-    edit_avatar_username, 
+    register_user_service,
+    verify_email_service,
+    resend_verification_service,
+    login_user_service,
+    view_profile_service,
+    complete_profile_service,
+    edit_avatar_username,
     edit_email_country_phone,
     send_password_reset_code_service,
     verify_reset_code_service,
     reset_password_service,
-    get_user_info_by_id_service
+    get_user_info_by_id_service,
+    check_connectivity,
+    get_online_status
 )
-from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
+from fastapi import APIRouter, Form, File, Depends, UploadFile, Header, WebSocket, Query
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 
@@ -151,3 +153,21 @@ async def reset_password(
 @router.get("/get_user_info")
 async def get_user_info_service(user_id:int,authorization: str = Header(None),db: Session = Depends(connect_databse)):
     return await get_user_info_by_id_service(user_id,authorization,db)
+
+
+@router.websocket("/ws/connectivity")
+async def connectivity_websocket(
+    websocket: WebSocket,
+    token: str = Query(...),
+    db: Session = Depends(connect_databse)
+):
+    await check_connectivity(websocket, f"Bearer {token}", db)
+
+
+@router.get("/online-status")
+async def online_status(
+    user_ids: str = Query(..., description="Comma-separated user IDs"),
+    authorization: str = Header(None)
+):
+    ids = [int(uid) for uid in user_ids.split(",") if uid.strip().isdigit()]
+    return get_online_status(ids)

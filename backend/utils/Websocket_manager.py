@@ -1,5 +1,8 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import WebSocket
 from typing import Any, Dict, List, Optional
+import asyncio
 
 class Text_Websocket_manager():
     def __init__(self):
@@ -16,7 +19,7 @@ class Text_Websocket_manager():
     async def broadcast(self, channel_id: int, message: dict):
         for ws in self.channels.get(channel_id, []):
             await ws.send_json(message)
-            
+
 
 
 class VoiceWebsocketManager:
@@ -104,7 +107,7 @@ class DMWebSocketManager:
 
 class NotificationManager:
     def __init__(self):
-        self.connections = {}  
+        self.connections = {}
 
     async def connect(self, user_id, websocket):
         await websocket.accept()
@@ -119,3 +122,85 @@ class NotificationManager:
 
 
 notification_manager = NotificationManager()
+
+
+class ConnectivityManager:
+    def __init__(self):
+        self.connections: Dict[int, List[WebSocket]] = {}
+        self.last_seen: Dict[int, datetime] = {}
+
+    async def connect(self, user_id: int, websocket: WebSocket):
+        await websocket.accept()
+        user_connections = self.connections.setdefault(user_id, [])
+        if websocket not in user_connections:
+            user_connections.append(websocket)
+        self.last_seen[user_id] = datetime.now(timezone.utc)
+
+    def disconnect(self, user_id: int, websocket: WebSocket):
+        if user_id in self.connections:
+            if websocket in self.connections[user_id]:
+                self.connections[user_id].remove(websocket)
+            if not self.connections[user_id]:
+                self.connections.pop(user_id, None)
+
+    def is_online(self, user_id: int) -> bool:
+        return user_id in self.connections and len(self.connections[user_id]) > 0
+
+    async def send(self, user_id: int, data: dict):
+        for ws in list(self.connections.get(user_id, [])):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                self.disconnect(user_id, ws)
+
+    async def broadcast(self, user_ids: List[int], data: dict):
+        for user_id in user_ids:
+            await self.send(user_id, data)
+
+
+connectivity_manager = ConnectivityManager()
+
+
+
+
+
+
+
+
+
+async def cleanup_task(db_factory):
+    while True:
+        now = datetime.now(timezone.utc)
+        timeout = timedelta(seconds=60)
+
+        for user_id in list(connectivity_manager.last_seen.keys()):
+            last = connectivity_manager.last_seen[user_id]
+            if now - last > timeout:
+                dead_sockets = connectivity_manager.connections.pop(user_id, [])
+                connectivity_manager.last_seen.pop(user_id, None)
+
+                for ws in dead_sockets:
+                    try:
+                        await ws.close()
+                    except Exception:
+                        pass
+
+                db = next(db_factory())
+                try:
+                    from models.Friends import Friends
+                    from sqlalchemy import or_
+                    rows = db.query(Friends).filter(
+                        or_(Friends.user_id == user_id, Friends.friend_id == user_id)
+                    ).all()
+                    friend_ids = [
+                        r.friend_id if r.user_id == user_id else r.user_id
+                        for r in rows
+                    ]
+                finally:
+                    db.close()
+
+                await connectivity_manager.broadcast(
+                    friend_ids, {"type": "user_offline", "user_id": user_id}
+                )
+
+        await asyncio.sleep(10)

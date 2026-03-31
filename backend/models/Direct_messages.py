@@ -17,3 +17,4 @@ class Direct_messages(Base):
     parent_id=Column(Integer,nullable=True)
     sender = relationship("Users", foreign_keys=[sender_id])
     receiver = relationship("Users", foreign_keys=[receiver_id])
+    notifications = relationship("Notifications", back_populates="dm_message", cascade="all, delete-orphan")
