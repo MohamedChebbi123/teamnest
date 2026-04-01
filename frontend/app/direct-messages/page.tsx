@@ -7,7 +7,7 @@ import Sidebar from "@/components/Sidebar/page"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import {
   Loader2, MessageCircle, SendHorizontal, Smile, Paperclip,
@@ -667,8 +667,8 @@ export default function ChannelsPage() {
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
 
-      {/* DM List Sidebar — pl-20 offsets the fixed 80px Sidebar */}
-      <div className="flex h-full w-[300px] flex-shrink-0 flex-col border-r bg-muted/40 pl-20">
+      {/* DM List Sidebar */}
+      <div className="flex h-full w-[300px] flex-shrink-0 flex-col border-r bg-muted/40">
         <div className="px-4 pb-3 pt-5">
           <div className="mb-3 flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-muted-foreground" />
@@ -702,6 +702,7 @@ export default function ChannelsPage() {
                 const preview = item.last_message.is_file
                   ? `[File] ${item.last_message.file_attachment?.file_name || "Attachment"}`
                   : (item.last_message.content || "")
+                const online = isUserOnline(item.user.user_id)
 
                 return (
                   <button
@@ -711,14 +712,19 @@ export default function ChannelsPage() {
                     )}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
-                      isActive
-                        ? "bg-muted"
-                        : "hover:bg-muted/70"
+                      isActive ? "bg-muted" : "hover:bg-muted/70"
                     )}
                   >
-                    <Avatar className="h-9 w-9 flex-shrink-0">
-                      <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative flex-shrink-0">
+                      <Avatar className="h-9 w-9">
+                        {item.user.avatar_url && <AvatarImage src={item.user.avatar_url} alt={`${item.user.first_name} ${item.user.last_name}`} />}
+                        <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+                      </Avatar>
+                      <span className={cn(
+                        "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                        online ? "bg-emerald-500" : "bg-muted-foreground/40"
+                      )} />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
                         {item.user.first_name} {item.user.last_name}
@@ -731,49 +737,65 @@ export default function ChannelsPage() {
             )}
           </div>
 
-          {/* Friends Section */}
-          {friendsWithoutConversation.length > 0 && (
-            <>
-              <Separator className="my-2" />
-              <div className="flex items-center gap-2 px-3 py-2">
-                <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground tracking-wide">Friends</span>
+          {/* Friends Section — always visible */}
+          <Separator className="my-2" />
+          <div className="flex items-center gap-2 px-3 py-2">
+            <Users className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground tracking-wide">Friends</span>
+            {friends.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">{friends.length}</span>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            {loadingFriends ? (
+              <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading...
               </div>
-              <div className="space-y-0.5">
-                {friendsWithoutConversation.map((friend) => {
-                  const isActive = activeReceiverId === friend.user_id
-                  const initials = `${friend.first_name[0] || ""}${friend.last_name[0] || ""}`.toUpperCase()
+            ) : friendsWithoutConversation.length === 0 && !searchQuery ? (
+              <p className="px-3 py-3 text-xs text-muted-foreground">
+                {friends.length === 0 ? "No friends yet." : "All friends have open conversations."}
+              </p>
+            ) : (
+              friendsWithoutConversation.map((friend) => {
+                const isActive = activeReceiverId === friend.user_id
+                const initials = `${friend.first_name[0] || ""}${friend.last_name[0] || ""}`.toUpperCase()
+                const online = isUserOnline(friend.user_id)
 
-                  return (
-                    <button
-                      key={friend.user_id}
-                      onClick={() => router.push(
-                        `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(`${friend.first_name} ${friend.last_name}`)}`
-                      )}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
-                        isActive
-                          ? "bg-muted"
-                          : "hover:bg-muted/70"
-                      )}
-                    >
-                      <Avatar className="h-9 w-9 flex-shrink-0">
+                return (
+                  <button
+                    key={friend.user_id}
+                    onClick={() => router.push(
+                      `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(`${friend.first_name} ${friend.last_name}`)}`
+                    )}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
+                      isActive ? "bg-muted" : "hover:bg-muted/70"
+                    )}
+                  >
+                    <div className="relative flex-shrink-0">
+                      <Avatar className="h-9 w-9">
+                        {friend.avatar_url && <AvatarImage src={friend.avatar_url} alt={`${friend.first_name} ${friend.last_name}`} />}
                         <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
                       </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {friend.first_name} {friend.last_name}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {friend.user_tag ? `@${friend.user_tag}` : "Start a conversation"}
-                        </p>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
+                      <span className={cn(
+                        "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                        online ? "bg-emerald-500" : "bg-muted-foreground/40"
+                      )} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {friend.first_name} {friend.last_name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {online ? "Active now" : (friend.user_tag ? `#${friend.user_tag}` : "Offline")}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
         </ScrollArea>
       </div>
 
