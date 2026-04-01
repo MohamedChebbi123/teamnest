@@ -11,13 +11,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
-import { Building2, FileText, CreditCard, Image as ImageIcon, Loader2, Upload, Check, Info } from "lucide-react"
+import { Building2, FileText, Image as ImageIcon, Loader2, Upload, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { toast } from "sonner"
 import Image from "next/image"
 import ImageCropDialog from "@/components/ImageCropDialog"
@@ -27,7 +22,6 @@ export default function CreateOrganization() {
   const [formData, setFormData] = useState({
     organizationName: "",
     organizationDescription: "",
-    organizationPlan: "free"
   })
   const [isLoading, setIsLoading] = useState(false)
   const [nameError, setNameError] = useState("")
@@ -35,41 +29,6 @@ export default function CreateOrganization() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [cropDialogOpen, setCropDialogOpen] = useState(false)
   const [tempImageSrc, setTempImageSrc] = useState<string>("")
-
-  const plans = [
-    { 
-      value: "free", 
-      label: "Free", 
-      description: "Perfect for small teams",
-      details: {
-        price: "$0/month",
-        features: [
-          "Up to 5 team members",
-          "Basic task management",
-          "5GB storage",
-          "Email support",
-          "Basic analytics"
-        ]
-      }
-    },
-    { 
-      value: "pro", 
-      label: "Pro", 
-      description: "Advanced features for growing teams",
-      details: {
-        price: "$29/month",
-        features: [
-          "Unlimited team members",
-          "Advanced task management",
-          "100GB storage",
-          "Priority 24/7 support",
-          "Advanced analytics & reporting",
-          "Custom integrations",
-          "API access"
-        ]
-      }
-    }
-  ]
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
@@ -157,7 +116,6 @@ export default function CreateOrganization() {
       const formDataToSend = new FormData()
       formDataToSend.append("organization_name", formData.organizationName)
       formDataToSend.append("organization_description", formData.organizationDescription)
-      formDataToSend.append("organization_plan", formData.organizationPlan)
       formDataToSend.append("image", imageFile)
 
       const response = await fetch("http://localhost:8000/create_organization", {
@@ -279,73 +237,6 @@ export default function CreateOrganization() {
                 <p className="text-xs text-muted-foreground">
                   {formData.organizationDescription.length}/500 characters
                 </p>
-              </div>
-
-              {/* Organization Plan Selection */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-primary" />
-                  Select Plan
-                </Label>
-                <div className="grid grid-cols-1 gap-3">
-                  {plans.map((plan) => (
-                    <div
-                      key={plan.value}
-                      className={cn(
-                        "relative flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all hover:bg-accent/50",
-                        formData.organizationPlan === plan.value
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : "border-muted"
-                      )}
-                      onClick={() => setFormData(prev => ({ ...prev, organizationPlan: plan.value }))}
-                    >
-                      <div className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                        formData.organizationPlan === plan.value
-                          ? "border-primary bg-primary"
-                          : "border-muted-foreground"
-                      )}>
-                        {formData.organizationPlan === plan.value && (
-                          <Check className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{plan.label}</p>
-                        <p className="text-sm text-muted-foreground">{plan.description}</p>
-                      </div>
-                      <Popover>
-                        <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="p-1 hover:bg-accent rounded-full transition-colors"
-                            aria-label={`More info about ${plan.label} plan`}
-                          >
-                            <Info className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80" align="end">
-                          <div className="space-y-3">
-                            <div className="space-y-1">
-                              <h4 className="font-semibold text-lg">{plan.label} Plan</h4>
-                              <p className="text-2xl font-bold text-primary">{plan.details.price}</p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-muted-foreground">Features included:</p>
-                              <ul className="space-y-1.5">
-                                {plan.details.features.map((feature, index) => (
-                                  <li key={index} className="flex items-start gap-2 text-sm">
-                                    <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                                    <span>{feature}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  ))}
-                </div>
               </div>
 
               {/* Image Upload */}

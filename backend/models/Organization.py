@@ -10,7 +10,7 @@ class Organization(Base):
     organaization_picture=Column(String(200),nullable=True)
     organization_description=Column(Text,nullable=True)
     organaization_tag=Column(String,nullable=False)
-    organization_plan=Column(String,nullable=False)
+    organization_plan=Column(String,nullable=True)
     owner_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     
@@ -18,3 +18,4 @@ class Organization(Base):
     owner = relationship("Users", back_populates="owned_organizations")
     teams = relationship("Teams", back_populates="organization", cascade="all, delete-orphan")
     channels = relationship("Channels", back_populates="organization", cascade="all, delete-orphan")
+    payments = relationship("Organization_payments", back_populates="organization", cascade="all, delete-orphan")

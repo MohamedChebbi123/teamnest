@@ -1,4 +1,4 @@
-from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members,join_org_service,fetch_pending_org_requests_service,accept_or_reject_service
+from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members,join_org_service,fetch_pending_org_requests_service,accept_or_reject_service,create_subscritpion_service,confirm_upgrade_service
 from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -12,12 +12,11 @@ router = APIRouter()
 async def create_organization(
     organization_name: str = Form(...),
     organization_description: str = Form(None),
-    organization_plan: str = Form(...),
     image: UploadFile = File(...),
     authorization: str = Header(None),
     db: Session = Depends(connect_databse)):
     
-    return create_organization_service(organization_name,organization_description,organization_plan,image,authorization,db)
+    return create_organization_service(organization_name,organization_description,image,authorization,db)
 
 
 @router.get("/get_org_for_admin_org")
@@ -82,6 +81,24 @@ async def get_organization_join_requests(
     db: Session = Depends(connect_databse)
 ):
     return fetch_pending_org_requests_service(org_id, authorization, db)
+
+
+@router.post("/organization/{org_id}/subscribe")
+async def subscribe_organization(
+    org_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return create_subscritpion_service(org_id, authorization, db)
+
+
+@router.post("/organization/{org_id}/confirm-upgrade")
+async def confirm_upgrade(
+    org_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return confirm_upgrade_service(org_id, authorization, db)
 
 
 @router.post("/organization/{org_id}/join-requests/{request_id}")

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight } from "lucide-react"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap } from "lucide-react"
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -71,13 +71,15 @@ export default function OrganizationPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editName, setEditName] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editPlan, setEditPlan] = useState("")
   const [editImage, setEditImage] = useState<File | null>(null)
   const [updating, setUpdating] = useState(false)
   
   // Delete organization states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Upgrade states
+  const [upgrading, setUpgrading] = useState(false)
   
   // Create team states
   const [createTeamDialogOpen, setCreateTeamDialogOpen] = useState(false)
@@ -157,7 +159,6 @@ export default function OrganizationPage() {
             // Initialize edit form with current values
             setEditName(foundOrg.organization_name)
             setEditDescription(foundOrg.organization_description || "")
-            setEditPlan(foundOrg.organization_plan || "free")
           } else {
             toast.error("Organization not found", {
               description: "The requested organization does not exist or you don't have access to it"
@@ -353,7 +354,7 @@ export default function OrganizationPage() {
       const formData = new FormData()
       formData.append('organization_name', editName)
       formData.append('organization_description', editDescription)
-      formData.append('organization_plan', editPlan)
+      formData.append('organization_plan', organization.organization_plan || "FREE")
       if (editImage) {
         formData.append('image', editImage)
       }
@@ -480,7 +481,7 @@ export default function OrganizationPage() {
       })
 
       if (response.ok) {
-        const data = await response.json()
+        await response.json()
         toast.success("Team created successfully", {
           description: `${teamName} has been created`
         })
@@ -701,6 +702,40 @@ export default function OrganizationPage() {
       toast.error("Error", {
         description: "Failed to handle join request"
       })
+    }
+  }
+
+  const handleUpgrade = async () => {
+    setUpgrading(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        toast.error("Authentication required")
+        router.push('/auth/login')
+        return
+      }
+
+      const response = await fetch(`http://localhost:8000/organization/${organizationId}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const url = await response.json()
+        window.location.href = url
+      } else {
+        const data = await response.json()
+        toast.error("Failed to start upgrade", {
+          description: data.detail || "Please try again"
+        })
+      }
+    } catch (error) {
+      console.error('Error starting upgrade:', error)
+      toast.error("Error", { description: "Failed to initiate upgrade" })
+    } finally {
+      setUpgrading(false)
     }
   }
 
@@ -1034,6 +1069,17 @@ export default function OrganizationPage() {
                   {isOwner && (
                     <>
                       <Separator className="my-1" />
+                      {organization.organization_plan?.toUpperCase() !== "PRO" && (
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-3 h-9 text-sm font-normal text-amber-600 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                          onClick={handleUpgrade}
+                          disabled={upgrading}
+                        >
+                          {upgrading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Zap className="h-4 w-4 shrink-0" />}
+                          Upgrade to Pro
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         className="w-full justify-start gap-3 h-9 text-sm font-normal hover:bg-muted"
@@ -1135,19 +1181,6 @@ export default function OrganizationPage() {
               <Input id="editDescription" placeholder="Enter organization description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editPlan">Plan</Label>
-              <select
-                id="editPlan"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={editPlan}
-                onChange={(e) => setEditPlan(e.target.value)}
-              >
-                <option value="free">Free</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="editImage">Organization Image</Label>
               <Input id="editImage" type="file" accept="image/*" onChange={(e) => setEditImage(e.target.files?.[0] || null)} />
             </div>
@@ -1159,7 +1192,6 @@ export default function OrganizationPage() {
                 setEditDialogOpen(false)
                 setEditName(organization.organization_name)
                 setEditDescription(organization.organization_description || "")
-                setEditPlan(organization.organization_plan || "free")
                 setEditImage(null)
               }}
               disabled={updating}

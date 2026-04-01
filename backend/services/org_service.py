@@ -1,6 +1,9 @@
 import random
 import re
+import os
 from fastapi import HTTPException
+import stripe
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 from models.Users import Users
 from utils.jwt_handler import verify_token
 from models.Organization import Organization
@@ -13,7 +16,6 @@ from models.Pending_members_org import Pending_members_org
 def create_organization_service(
     organization_name:str,
     organization_description:str,
-    organization_plan:str,
     image,
     authorization: str,
     db: Session
@@ -59,7 +61,6 @@ def create_organization_service(
         organaization_picture=upload_organization_picture(image),
         organization_description=organization_description,
         organaization_tag=organaization_tag,
-        organization_plan=organization_plan,
         owner_id=user_id
     )
     
@@ -78,6 +79,64 @@ def create_organization_service(
         
     return new_organization
 
+
+def create_subscritpion_service(org_id:int,authorization: str,db:Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+    
+    if not user_id:
+        raise HTTPException(status_code=404,detail="user not found")
+    
+    found_organization=db.query(Organization).filter(Organization.owner_id==user_id).first()
+    
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="subscription",
+        line_items=[{
+            "price": "price_1THLoIRaAIW7J24MHlivlWuy",
+            "quantity": 1,
+        }],
+        success_url=f"http://localhost:3000/success?org_id={org_id}",
+        cancel_url="http://localhost:3000/cancel",
+    )
+
+    return session.url
+
+def confirm_upgrade_service(org_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    org = db.query(Organization).filter(
+        Organization.organization_id == org_id,
+        Organization.owner_id == user_id
+    ).first()
+
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    org.organization_plan = "PRO"
+    db.commit()
+
+    return {"message": "Upgraded"}
 
 def fetch_organization_service(authorization: str,db: Session):
     
@@ -499,3 +558,5 @@ def accept_or_reject_service(
         "user_id": new_member.memmber_id,
         "role_user": new_member.role_user
     }
+    
+

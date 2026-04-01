@@ -501,8 +501,8 @@ async def check_connectivity(websocket, authorization: str, db: Session):
     ).all()
 
     friend_ids = [
-        f.friend_id if f.user_id == user_id else f.user_id
-        for f in user_friends
+        found_friend.friend_id if found_friend.user_id == user_id else found_friend.user_id
+        for found_friend in user_friends
     ]
 
     await ConnectivityManager.connect(user_id, websocket)
