@@ -38,6 +38,7 @@ import {
   Pin,
   PinOff,
   X,
+  Search,
 } from "lucide-react"
 import { toast } from "sonner"
 import Sidebar from "@/components/Sidebar/page"
@@ -242,6 +243,14 @@ export default function ChannelPage() {
   const [deleteMessageDialogOpen, setDeleteMessageDialogOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<number | null>(null)
   const [isDeletingMessage, setIsDeletingMessage] = useState(false)
+
+  // Search states
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<ChatMessage[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // Pinned messages states
   const [showPinnedMessages, setShowPinnedMessages] = useState(false)
@@ -571,6 +580,57 @@ export default function ChannelPage() {
       setOrgMembers(members)
     } catch {
       // Keep chat usable even if member list fetch fails.
+    }
+  }
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query)
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+
+    if (!query.trim()) {
+      setSearchResults([])
+      setIsSearching(false)
+      return
+    }
+
+    setIsSearching(true)
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('access_token')
+        if (!token || !channel) return
+
+        const response = await fetch(
+          `http://localhost:8000/organization/${channel.org_id}/channel/${channel.channel_id}/messages/search?q=${encodeURIComponent(query.trim())}`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          setSearchResults(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        console.error('Search failed:', error)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+  }
+
+  const closeSearch = () => {
+    setShowSearch(false)
+    setSearchQuery("")
+    setSearchResults([])
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+  }
+
+  const scrollToMessage = (messageId: number) => {
+    const el = document.getElementById(`msg-${messageId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-primary', 'bg-primary/10')
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-primary', 'bg-primary/10')
+      }, 2000)
     }
   }
 
@@ -1117,6 +1177,22 @@ export default function ChannelPage() {
               
               {!isVoiceChannel && (
                 <Button
+                  variant={showSearch ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={() => {
+                    setShowSearch(!showSearch)
+                    if (showSearch) closeSearch()
+                    else setTimeout(() => searchInputRef.current?.focus(), 100)
+                  }}
+                  className="h-9 w-9"
+                  title="Search messages"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              )}
+
+              {!isVoiceChannel && (
+                <Button
                   variant={showPinnedMessages ? "secondary" : "ghost"}
                   size="icon"
                   onClick={togglePinnedMessages}
@@ -1139,7 +1215,66 @@ export default function ChannelPage() {
           </div>
         </header>
 
-        <div className="flex h-[calc(100vh-88px)]">
+        {/* Search Bar */}
+        {showSearch && (
+          <div className="border-b bg-background/95 backdrop-blur px-6 py-3">
+            <div className="flex items-center gap-3 max-w-2xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  placeholder="Search messages in this channel..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-9 pr-4 h-9"
+                  onKeyDown={(e) => { if (e.key === 'Escape') closeSearch() }}
+                />
+              </div>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={closeSearch}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            {searchQuery.trim() && (
+              <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border bg-background shadow-md">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
+                    <span className="text-sm text-muted-foreground">Searching...</span>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="py-4 text-center text-sm text-muted-foreground">
+                    No messages found for &quot;{searchQuery}&quot;
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {searchResults.map((result) => (
+                      <button
+                        key={result.message_id}
+                        className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          scrollToMessage(result.message_id)
+                          closeSearch()
+                        }}
+                      >
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-medium">
+                            {result.sender.first_name} {result.sender.last_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(result.sent_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{result.message_content}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={`flex ${showSearch ? 'h-[calc(100vh-88px-52px)]' : 'h-[calc(100vh-88px)]'}`}>
           {/* Messages Area */}
           <div className="flex-1 flex flex-col">
             {isVoiceChannel ? (
@@ -1198,7 +1333,8 @@ export default function ChannelPage() {
                       return (
                       <div
                         key={msg.message_id}
-                        className={`group flex gap-3 -mx-2 px-2 py-2 rounded-xl transition-colors ${isOwnMessage ? 'flex-row-reverse hover:bg-primary/5' : 'hover:bg-muted/40'}`}
+                        id={`msg-${msg.message_id}`}
+                        className={`group flex gap-3 -mx-2 px-2 py-2 rounded-xl transition-all duration-300 ${isOwnMessage ? 'flex-row-reverse hover:bg-primary/5' : 'hover:bg-muted/40'}`}
                       >
                         <Avatar className="h-9 w-9 border border-background shadow-sm mt-1">
                           <AvatarImage src={msg.sender.avatar_url || undefined} alt={msg.sender.first_name} />

@@ -5,7 +5,7 @@ from services.channel_service import (
     update_channel_service,
     delete_channel_service
 )
-from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime, notifications_ws_endpoint, pin_message_service, unpin_message_service, fetch_pinned_messages_service
+from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime, notifications_ws_endpoint, pin_message_service, unpin_message_service, fetch_pinned_messages_service, search_messages_service
 from fastapi import APIRouter, Depends, Header, Query, WebSocket
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -137,6 +137,17 @@ async def get_pinned_messages(
     db: Session = Depends(connect_databse)
 ):
     return fetch_pinned_messages_service(channel_id, org_id, authorization, db)
+
+
+@router.get("/organization/{org_id}/channel/{channel_id}/messages/search")
+async def search_messages(
+    channel_id: int,
+    org_id: int,
+    q: str = Query(""),
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return search_messages_service(channel_id, org_id, q, authorization, db)
 
 
 @router.websocket("/mesages/{channel_id}")

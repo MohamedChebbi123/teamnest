@@ -848,6 +848,65 @@ async def voice_websocket_endpoint(
             )
             
             
+def search_messages_service(channel_id: int, org_id: int, query: str, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    member = db.query(Organization_members).filter(
+        Organization_members.memmber_id == user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
+    if not member:
+        raise HTTPException(status_code=403, detail="User is not a member of this organization")
+
+    channel = db.query(Channels).filter(
+        Channels.channel_id == channel_id,
+        Channels.org_id == org_id
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="Search query cannot be empty")
+
+    search_term = f"%{query.strip()}%"
+
+    results = db.query(Messages, Users).join(
+        Users, Messages.sender_id == Users.user_id
+    ).filter(
+        Messages.channel_id == channel_id,
+        Messages.is_deleted == False,
+        Messages.message_content.ilike(search_term)
+    ).order_by(Messages.sent_at.desc()).limit(50).all()
+
+    return [
+        {
+            "message_id": message.message_id,
+            "message_content": message.message_content,
+            "sent_at": message.sent_at,
+            "edited_at": message.edited_at,
+            "sender": {
+                "user_id": user.user_id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "avatar_url": user.avatar_url,
+                "user_tag": user.user_tag
+            }
+        }
+        for message, user in results
+    ]
+
+
 def pin_message_service(message_id: int, org_id: int, authorization: str, db: Session):
 
     if not authorization or not authorization.startswith("Bearer "):
