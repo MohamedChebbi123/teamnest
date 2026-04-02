@@ -8,6 +8,7 @@ from services.direct_messages_service import (
     messages_users_service,
     fetch_direct_messages_service,
     fetch_direct_conversations_service,
+    search_direct_messages_service,
     edit_direct_message_service,
     delete_direct_message_service,
     send_direct_file_service,
@@ -33,6 +34,16 @@ async def get_direct_messages(
     db: Session = Depends(connect_databse)
 ):
     return fetch_direct_messages_service(receiver_id, authorization, db)
+
+
+@router.get("/direct-messages/{receiver_id}/search")
+async def search_direct_messages(
+    receiver_id: int,
+    q: str = Query(""),
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return search_direct_messages_service(receiver_id, q, authorization, db)
 
 
 @router.get("/direct-messages")

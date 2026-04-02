@@ -64,7 +64,8 @@ export default function FriendsPage() {
   const [searchQuery, setSearchQuery] = useState("")
 
   const getToken = () => {
-    const token = localStorage.getItem("access_token")
+    const rawToken = localStorage.getItem("access_token") || localStorage.getItem("token")
+    const token = rawToken?.replace(/^Bearer\s+/i, "")
     if (!token) {
       router.push("/auth/login")
       return null
@@ -81,13 +82,20 @@ export default function FriendsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
-        const data = await response.json()
-        setFriends(data)
+        const data = await response.json().catch(() => [])
+        const normalized = Array.isArray(data) ? data : Array.isArray(data?.friends) ? data.friends : []
+        setFriends(normalized)
       } else if (response.status === 401) {
         router.push("/auth/login")
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error("Failed to load friends", {
+          description: data?.detail || "Unable to fetch friends list",
+        })
       }
     } catch (error) {
       console.error("Error fetching friends:", error)
+      toast.error("Network error", { description: "Could not reach server for friends list" })
     }
   }
 
@@ -100,8 +108,9 @@ export default function FriendsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
-        const data = await response.json()
-        setRequests(data)
+        const data = await response.json().catch(() => [])
+        const normalized = Array.isArray(data) ? data : Array.isArray(data?.requests) ? data.requests : []
+        setRequests(normalized)
       } else if (response.status === 401) {
         router.push("/auth/login")
       }
@@ -119,8 +128,9 @@ export default function FriendsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
-        const data = await response.json()
-        setBlockedUsers(data)
+        const data = await response.json().catch(() => [])
+        const normalized = Array.isArray(data) ? data : Array.isArray(data?.blocked) ? data.blocked : []
+        setBlockedUsers(normalized)
       } else if (response.status === 401) {
         router.push("/auth/login")
       }

@@ -145,6 +145,9 @@ export default function ChannelsPage() {
   const [messages, setMessages] = useState<DmMessage[]>([])
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [messageSearchQuery, setMessageSearchQuery] = useState("")
+  const [messageSearchResults, setMessageSearchResults] = useState<DmMessage[] | null>(null)
+  const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [loadingConversations, setLoadingConversations] = useState(false)
@@ -175,6 +178,7 @@ export default function ChannelsPage() {
   const localTypingStopRef = useRef<NodeJS.Timeout | null>(null)
   const remoteTypingStopRef = useRef<NodeJS.Timeout | null>(null)
   const isTypingRef = useRef(false)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     selectedReceiverRef.current = receiverId ? Number(receiverId) : null
@@ -738,9 +742,59 @@ export default function ChannelsPage() {
     router.replace(`/direct-messages?${params.toString()}`)
   }, [receiverId, initialMessage, currentUserId, searchParams, router])
 
+  useEffect(() => {
+    const query = messageSearchQuery.trim()
+    if (!receiverId || !query) {
+      setMessageSearchResults(null)
+      return
+    }
+
+    setMessageSearchResults(null)
+
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+
+    const controller = new AbortController()
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8000/direct-messages/${receiverId}/search?q=${encodeURIComponent(query)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error("Failed to search direct messages")
+        }
+
+        const data = await response.json()
+        setMessageSearchResults(Array.isArray(data.messages) ? data.messages : [])
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return
+        console.error("Error searching direct messages:", error)
+        setMessageSearchResults([])
+      }
+    }, 250)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeout)
+    }
+  }, [receiverId, messageSearchQuery])
+
   const filteredConversations = conversations.filter((item) => {
+    const query = searchQuery.toLowerCase().trim()
+    if (!query) return true
+
     const fullName = `${item.user.first_name} ${item.user.last_name}`.toLowerCase()
-    return fullName.includes(searchQuery.toLowerCase())
+    const tag = item.user.user_tag?.toLowerCase() || ""
+    const preview = item.last_message.is_file
+      ? `[file] ${item.last_message.file_attachment?.file_name || "attachment"}`
+      : (item.last_message.content || "").toLowerCase()
+
+    return fullName.includes(query) || tag.includes(query) || preview.includes(query)
   })
 
   // Friends who don't have an existing conversation yet
@@ -774,14 +828,39 @@ export default function ChannelsPage() {
     return messages.find((item) => item.message_id === message.parent_id) || null
   }
 
-  const isGroupedWithPrev = (index: number) => {
+  const isGroupedWithPrev = (index: number, list: DmMessage[] = messages) => {
     if (index === 0) return false
-    const prev = messages[index - 1]
-    const curr = messages[index]
+    const prev = list[index - 1]
+    const curr = list[index]
     if (prev.sender_id !== curr.sender_id) return false
     const diff = new Date(curr.sent_at).getTime() - new Date(prev.sent_at).getTime()
     return diff < 5 * 60 * 1000
   }
+
+  const scrollToMessage = (messageId: number) => {
+    const target = document.getElementById(`dm-message-${messageId}`)
+    if (!target) return
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" })
+    setHighlightedMessageId(messageId)
+
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current)
+    }
+
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedMessageId((current) => (current === messageId ? null : current))
+      highlightTimeoutRef.current = null
+    }, 2000)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -799,7 +878,7 @@ export default function ChannelsPage() {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
+              placeholder="Search chats and messages..."
               className="h-8 rounded-lg bg-background pl-9 text-sm"
             />
           </div>
@@ -927,14 +1006,14 @@ export default function ChannelsPage() {
           "flex flex-shrink-0 items-center justify-between px-5 py-3 transition-opacity duration-150",
           activeReceiverId === null && "pointer-events-none opacity-0"
         )}>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Avatar className="h-9 w-9">
               <AvatarFallback className="text-xs font-medium">
                 {activeReceiverName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <p className="text-sm font-semibold">{activeReceiverName}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{activeReceiverName}</p>
               <div className="flex items-center gap-1.5">
                 <span className={cn(
                   "h-1.5 w-1.5 rounded-full",
@@ -946,17 +1025,95 @@ export default function ChannelsPage() {
               </div>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("h-8 w-8 rounded-lg text-muted-foreground", showProfilePanel && "bg-muted text-foreground")}
-            onClick={() => setShowProfilePanel((p) => !p)}
-            aria-label="Toggle profile"
-          >
-            <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", showProfilePanel && "rotate-180")} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="relative hidden w-72 md:block">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={messageSearchQuery}
+                onChange={(e) => setMessageSearchQuery(e.target.value)}
+                placeholder="Search sent messages..."
+                className="h-8 rounded-lg bg-background pl-9 text-sm"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-8 w-8 rounded-lg text-muted-foreground", showProfilePanel && "bg-muted text-foreground")}
+              onClick={() => setShowProfilePanel((p) => !p)}
+              aria-label="Toggle profile"
+            >
+              <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", showProfilePanel && "rotate-180")} />
+            </Button>
+          </div>
         </div>
         <Separator className={cn(activeReceiverId === null && "opacity-0")} />
+
+        {activeReceiverId !== null && messageSearchQuery.trim() && (
+          <div className="px-4 pt-3">
+            <div className="rounded-2xl border bg-background/95 shadow-sm">
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Search Results
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {messageSearchResults === null
+                      ? "Searching messages..."
+                      : `${messageSearchResults.length} result${messageSearchResults.length === 1 ? "" : "s"}`}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-lg px-3 text-xs"
+                  onClick={() => setMessageSearchQuery("")}
+                >
+                  Clear
+                </Button>
+              </div>
+              <ScrollArea className="max-h-56">
+                <div className="p-2">
+                  {messageSearchResults === null ? (
+                    <div className="flex items-center gap-2 px-2 py-4 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Searching...
+                    </div>
+                  ) : messageSearchResults.length === 0 ? (
+                    <div className="px-2 py-4 text-sm text-muted-foreground">
+                      No messages match &quot;{messageSearchQuery}&quot;
+                    </div>
+                  ) : (
+                    messageSearchResults.map((result) => {
+                      const preview = result.is_file
+                        ? `[File] ${result.file_attachment?.file_name || "Attachment"}`
+                        : (result.content || "")
+                      return (
+                        <button
+                          key={result.message_id}
+                          type="button"
+                          onClick={() => scrollToMessage(result.message_id)}
+                          className="w-full rounded-xl border border-transparent px-3 py-2 text-left transition-colors hover:border-border hover:bg-muted/60"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="truncate text-sm font-medium">
+                              {result.sender.first_name} {result.sender.last_name}
+                            </p>
+                            <p className="flex-shrink-0 text-[11px] text-muted-foreground">
+                              {result.sent_at ? formatTime(result.sent_at) : ""}
+                            </p>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {preview || "Attachment"}
+                          </p>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <ScrollArea className="flex-1 min-h-0">
@@ -981,16 +1138,18 @@ export default function ChannelsPage() {
                 {messages.map((msg, index) => {
                   const isMine = currentUserId !== null && msg.sender_id === currentUserId
                   const isEditing = editingMessageId === msg.message_id
-                  const grouped = isGroupedWithPrev(index)
+                  const grouped = isGroupedWithPrev(index, messages)
                   const replyTarget = resolveReplyTarget(msg)
 
                   return (
                     <div
+                      id={`dm-message-${msg.message_id}`}
                       key={msg.message_id}
                       className={cn(
-                        "group flex items-end gap-2 px-2",
+                        "group flex items-end gap-2 px-2 scroll-mt-24",
                         isMine ? "flex-row-reverse" : "flex-row",
-                        grouped ? "mt-0.5" : "mt-3"
+                        grouped ? "mt-0.5" : "mt-3",
+                        highlightedMessageId === msg.message_id && "rounded-2xl bg-primary/10 ring-2 ring-primary/40"
                       )}
                     >
                       {/* Avatar column */}

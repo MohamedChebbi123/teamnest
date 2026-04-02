@@ -16,6 +16,37 @@ dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
 
 
+def _serialize_direct_message(message: Direct_messages, sender: Users) -> dict:
+    is_file = bool(message.content and message.content.startswith(DM_FILE_PREFIX))
+    file_attachment = None
+
+    if is_file:
+        try:
+            file_attachment = json.loads(message.content[len(DM_FILE_PREFIX):])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            file_attachment = None
+
+    return {
+        "message_id": message.id,
+        "sender_id": message.sender_id,
+        "receiver_id": message.receiver_id,
+        "parent_id": message.parent_id,
+        "content": "" if is_file else (message.content or ""),
+        "is_file": is_file,
+        "file_attachment": file_attachment,
+        "is_deleted": message.is_deleted,
+        "sent_at": message.sent_at.isoformat() if message.sent_at else None,
+        "edited_at": message.edited_at.isoformat() if message.edited_at else None,
+        "sender": {
+            "user_id": sender.user_id,
+            "first_name": sender.first_name,
+            "last_name": sender.last_name,
+            "avatar_url": sender.avatar_url,
+            "user_tag": sender.user_tag,
+        },
+    }
+
+
 def create_direct_message_notification(db: Session, receiver_id: int, message_id: int):
     notif_kwargs = {
         "user_id": receiver_id,
@@ -279,33 +310,78 @@ def fetch_direct_messages_service(receiver_id: int, authorization: str, db: Sess
             "user_tag": receiver.user_tag,
         },
         "messages": [
-            {
-                "message_id": message.id,
-                "sender_id": message.sender_id,
-                "receiver_id": message.receiver_id,
-                "parent_id": message.parent_id,
-                "content": (
-                    "" if (message.content and message.content.startswith(DM_FILE_PREFIX)) else message.content
-                ),
-                "is_file": bool(message.content and message.content.startswith(DM_FILE_PREFIX)),
-                "file_attachment": (
-                    json.loads(message.content[len(DM_FILE_PREFIX):])
-                    if (message.content and message.content.startswith(DM_FILE_PREFIX))
-                    else None
-                ),
-                "is_deleted": message.is_deleted,
-                "sent_at": message.sent_at.isoformat() if message.sent_at else None,
-                "edited_at": message.edited_at.isoformat() if message.edited_at else None,
-                "sender": {
-                    "user_id": sender.user_id,
-                    "first_name": sender.first_name,
-                    "last_name": sender.last_name,
-                    "avatar_url": sender.avatar_url,
-                    "user_tag": sender.user_tag,
-                }
-            }
+            _serialize_direct_message(message, sender)
             for message, sender in rows
         ]
+    }
+
+
+def search_direct_messages_service(receiver_id: int, q: str, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    requester = db.query(Users).filter(Users.user_id == user_id).first()
+    if not requester:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    receiver = db.query(Users).filter(Users.user_id == receiver_id).first()
+    if not receiver:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+
+    query = str(q or "").strip().lower()
+    if not query:
+        return fetch_direct_messages_service(receiver_id, authorization, db)
+
+    rows = db.query(Direct_messages, Users).join(
+        Users,
+        Direct_messages.sender_id == Users.user_id
+    ).filter(
+        or_(
+            and_(Direct_messages.sender_id == user_id, Direct_messages.receiver_id == receiver_id),
+            and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id),
+        ),
+        Direct_messages.is_deleted == False
+    ).order_by(Direct_messages.sent_at.asc()).all()
+
+    filtered_messages = []
+    for message, sender in rows:
+        serialized = _serialize_direct_message(message, sender)
+        sender_name = f"{sender.first_name} {sender.last_name}".lower()
+        sender_tag = (sender.user_tag or "").lower()
+        content = (serialized["content"] or "").lower()
+        file_name = ""
+        file_url = ""
+
+        if serialized["file_attachment"]:
+            file_name = str(serialized["file_attachment"].get("file_name") or "").lower()
+            file_url = str(serialized["file_attachment"].get("file_url") or "").lower()
+
+        if (
+            query in sender_name
+            or query in sender_tag
+            or query in content
+            or query in file_name
+            or query in file_url
+        ):
+            filtered_messages.append(serialized)
+
+    return {
+        "conversation": {
+            "user_id": receiver.user_id,
+            "first_name": receiver.first_name,
+            "last_name": receiver.last_name,
+            "avatar_url": receiver.avatar_url,
+            "user_tag": receiver.user_tag,
+        },
+        "messages": filtered_messages,
     }
 
 
