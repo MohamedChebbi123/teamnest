@@ -627,8 +627,7 @@ async def send_direct_messages_realtime(
                     }
                 }
 
-                await dm_manager.send_to_user(user_id, message_data)
-                await dm_manager.send_to_user(receiver_id, message_data)
+                await dm_manager.send_to_users([user_id, receiver_id], message_data)
                 continue
 
             if message_type == "typing":
@@ -644,14 +643,6 @@ async def send_direct_messages_realtime(
                     continue
 
                 if receiver_id == user_id:
-                    continue
-
-                receiver = db.query(Users).filter(Users.user_id == receiver_id).first()
-                if not receiver:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Receiver not found"
-                    })
                     continue
 
                 typing_payload = {
@@ -812,8 +803,7 @@ async def send_direct_messages_realtime(
                     }
                 }
 
-                await dm_manager.send_to_user(user_id, message_data)
-                await dm_manager.send_to_user(receiver_id, message_data)
+                await dm_manager.send_to_users([user_id, receiver_id], message_data)
                 continue
 
             if message_type == "edit_message":
@@ -892,8 +882,7 @@ async def send_direct_messages_realtime(
                 }
 
                 other_user_id = message.receiver_id if message.sender_id == user_id else message.sender_id
-                await dm_manager.send_to_user(user_id, edited_payload)
-                await dm_manager.send_to_user(other_user_id, edited_payload)
+                await dm_manager.send_to_users([user_id, other_user_id], edited_payload)
                 continue
 
             if message_type == "delete_message":
@@ -936,8 +925,7 @@ async def send_direct_messages_realtime(
                 }
 
                 other_user_id = message.receiver_id if message.sender_id == user_id else message.sender_id
-                await dm_manager.send_to_user(user_id, deleted_payload)
-                await dm_manager.send_to_user(other_user_id, deleted_payload)
+                await dm_manager.send_to_users([user_id, other_user_id], deleted_payload)
                 continue
 
             await websocket.send_json({

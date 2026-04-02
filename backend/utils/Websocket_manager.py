@@ -118,6 +118,13 @@ class DMWebSocketManager:
             except Exception:
                 self.disconnect(user_id, ws)
 
+    async def send_to_users(self, user_ids: List[int], message: dict):
+        unique_user_ids = list(dict.fromkeys(user_ids))
+        if not unique_user_ids:
+            return
+
+        await asyncio.gather(*(self.send_to_user(user_id, message) for user_id in unique_user_ids))
+
 
 class NotificationManager:
     def __init__(self):
