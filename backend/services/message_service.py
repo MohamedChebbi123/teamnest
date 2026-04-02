@@ -576,6 +576,11 @@ async def send_messages_realtime(
         await websocket.close(code=1008)
         return
 
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+    if not user:
+        await websocket.close(code=1008, reason="User not found")
+        return
+
     channel = db.query(Channels).filter(
         Channels.channel_id == channel_id,
         Channels.org_id == org_id
@@ -703,6 +708,20 @@ async def send_messages_realtime(
                     }
                 }
                 await manager.broadcast(channel_id, message_data)
+            elif data.get("type") == "typing":
+                typing_data = {
+                    "type": "typing",
+                    "channel_id": channel_id,
+                    "user": {
+                        "user_id": user.user_id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "avatar_url": user.avatar_url,
+                        "user_tag": user.user_tag,
+                    },
+                    "is_typing": bool(data.get("is_typing", False)),
+                }
+                await manager.broadcast(channel_id, typing_data, exclude=websocket)
             elif data.get("type") == "send_file":
                 await send_file_realtime_service(
                     data=data,

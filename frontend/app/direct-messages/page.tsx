@@ -162,6 +162,7 @@ export default function ChannelsPage() {
   const [friends, setFriends] = useState<FriendItem[]>([])
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [friendActionLoading, setFriendActionLoading] = useState(false)
+  const [isReceiverTyping, setIsReceiverTyping] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -171,6 +172,9 @@ export default function ChannelsPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const emojiPickerContainerRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
+  const localTypingStopRef = useRef<NodeJS.Timeout | null>(null)
+  const remoteTypingStopRef = useRef<NodeJS.Timeout | null>(null)
+  const isTypingRef = useRef(false)
 
   useEffect(() => {
     selectedReceiverRef.current = receiverId ? Number(receiverId) : null
@@ -232,6 +236,70 @@ export default function ChannelsPage() {
       document.removeEventListener("mousedown", handleOutsideClick)
     }
   }, [showEmojiPicker])
+
+  const sendTypingEvent = (isTyping: boolean, explicitReceiverId?: number) => {
+    const targetReceiver = explicitReceiverId ?? (receiverId ? Number(receiverId) : null)
+    if (!targetReceiver || !(wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
+      return
+    }
+
+    wsRef.current.send(JSON.stringify({
+      type: "typing",
+      receiver_id: targetReceiver,
+      is_typing: isTyping,
+    }))
+  }
+
+  const stopLocalTyping = (explicitReceiverId?: number) => {
+    if (localTypingStopRef.current) {
+      clearTimeout(localTypingStopRef.current)
+      localTypingStopRef.current = null
+    }
+
+    if (!isTypingRef.current) {
+      return
+    }
+
+    isTypingRef.current = false
+    sendTypingEvent(false, explicitReceiverId)
+  }
+
+  const handleComposerChange = (value: string) => {
+    setMessageInput(value)
+
+    const activeReceiver = receiverId ? Number(receiverId) : null
+    if (!activeReceiver) {
+      return
+    }
+
+    if (!value.trim()) {
+      stopLocalTyping(activeReceiver)
+      return
+    }
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      sendTypingEvent(true, activeReceiver)
+    }
+
+    if (localTypingStopRef.current) {
+      clearTimeout(localTypingStopRef.current)
+    }
+
+    localTypingStopRef.current = setTimeout(() => {
+      stopLocalTyping(activeReceiver)
+    }, 1800)
+  }
+
+  useEffect(() => {
+    const previousReceiver = receiverId ? Number(receiverId) : null
+
+    return () => {
+      if (previousReceiver) {
+        stopLocalTyping(previousReceiver)
+      }
+    }
+  }, [receiverId])
 
   useEffect(() => {
     if (!receiverId) { setReceiverInfo(null); setShowProfilePanel(false); return }
@@ -408,6 +476,11 @@ export default function ChannelsPage() {
 
           if (data.type === "new_direct_message" && data.message) {
             const message = data.message as DmMessage
+            if (remoteTypingStopRef.current) {
+              clearTimeout(remoteTypingStopRef.current)
+              remoteTypingStopRef.current = null
+            }
+            setIsReceiverTyping(false)
             const selectedReceiver = selectedReceiverRef.current
             if (selectedReceiver !== null) {
               const inCurrentConversation =
@@ -438,6 +511,34 @@ export default function ChannelsPage() {
             return
           }
 
+          if (data.type === "direct_typing") {
+            const selectedReceiver = selectedReceiverRef.current
+            const senderId = Number(data.sender_id)
+
+            if (Number.isNaN(senderId)) {
+              return
+            }
+
+            if (selectedReceiver !== null && senderId === selectedReceiver) {
+              const typing = Boolean(data.is_typing)
+              setIsReceiverTyping(typing)
+
+              if (remoteTypingStopRef.current) {
+                clearTimeout(remoteTypingStopRef.current)
+                remoteTypingStopRef.current = null
+              }
+
+              if (typing) {
+                remoteTypingStopRef.current = setTimeout(() => {
+                  setIsReceiverTyping(false)
+                  remoteTypingStopRef.current = null
+                }, 3500)
+              }
+            }
+
+            return
+          }
+
           if (data.type === "error") {
             toast.error("Error", { description: data.detail || "Realtime error" })
           }
@@ -459,9 +560,26 @@ export default function ChannelsPage() {
 
     return () => {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      if (localTypingStopRef.current) {
+        clearTimeout(localTypingStopRef.current)
+        localTypingStopRef.current = null
+      }
+      if (remoteTypingStopRef.current) {
+        clearTimeout(remoteTypingStopRef.current)
+        remoteTypingStopRef.current = null
+      }
       if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
     }
   }, [])
+
+  useEffect(() => {
+    setIsReceiverTyping(false)
+    if (remoteTypingStopRef.current) {
+      clearTimeout(remoteTypingStopRef.current)
+      remoteTypingStopRef.current = null
+    }
+    isTypingRef.current = false
+  }, [receiverId])
 
   const sendMessage = async (customMessage?: string) => {
     const content = (customMessage ?? messageInput).trim()
@@ -502,6 +620,7 @@ export default function ChannelsPage() {
         fetchConversations()
       }
 
+      stopLocalTyping(Number(receiverId))
       if (!customMessage) setMessageInput("")
       setReplyingTo(null)
     } catch (error) {
@@ -598,6 +717,7 @@ export default function ChannelsPage() {
         mime_type: file.type || null,
         parent_id: replyingTo?.message_id ?? null,
       }))
+      stopLocalTyping(Number(receiverId))
       setReplyingTo(null)
       toast.success("File sent", { description: `${file.name} is being delivered in realtime` })
     } catch (error) {
@@ -1053,6 +1173,12 @@ export default function ChannelsPage() {
             </div>
           )}
 
+          {isReceiverTyping && activeReceiverId !== null && (
+            <div className="mb-2 text-xs text-primary">
+              {activeReceiverName} is typing...
+            </div>
+          )}
+
           {showEmojiPicker && (
             <div className="absolute bottom-full mb-2 z-50 rounded-lg border bg-background shadow-xl overflow-hidden">
               <div ref={emojiPickerContainerRef} />
@@ -1096,7 +1222,12 @@ export default function ChannelsPage() {
             </button>
             <input
               value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
+              onChange={(e) => handleComposerChange(e.target.value)}
+              onBlur={() => {
+                if (activeReceiverId !== null) {
+                  stopLocalTyping(activeReceiverId)
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { e.preventDefault(); sendMessage() }
               }}

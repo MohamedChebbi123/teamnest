@@ -631,6 +631,46 @@ async def send_direct_messages_realtime(
                 await dm_manager.send_to_user(receiver_id, message_data)
                 continue
 
+            if message_type == "typing":
+                receiver_id = data.get("receiver_id")
+
+                try:
+                    receiver_id = int(receiver_id)
+                except (TypeError, ValueError):
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": "receiver_id must be a valid integer"
+                    })
+                    continue
+
+                if receiver_id == user_id:
+                    continue
+
+                receiver = db.query(Users).filter(Users.user_id == receiver_id).first()
+                if not receiver:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": "Receiver not found"
+                    })
+                    continue
+
+                typing_payload = {
+                    "type": "direct_typing",
+                    "sender_id": user.user_id,
+                    "receiver_id": receiver_id,
+                    "is_typing": bool(data.get("is_typing", False)),
+                    "sender": {
+                        "user_id": user.user_id,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "avatar_url": user.avatar_url,
+                        "user_tag": user.user_tag,
+                    }
+                }
+
+                await dm_manager.send_to_user(receiver_id, typing_payload)
+                continue
+
             if message_type == "send_file":
                 receiver_id = data.get("receiver_id")
                 file_name = data.get("file_name")

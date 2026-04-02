@@ -10,15 +10,29 @@ class Text_Websocket_manager():
 
     async def connect(self, channel_id: int, websocket: WebSocket):
         await websocket.accept()
-        self.channels.setdefault(channel_id, []).append(websocket)
+        channel_connections = self.channels.setdefault(channel_id, [])
+        if websocket not in channel_connections:
+            channel_connections.append(websocket)
 
     def disconnect(self, channel_id: int, websocket: WebSocket):
-        if channel_id in self.channels and websocket in self.channels[channel_id]:
-            self.channels[channel_id].remove(websocket)
+        channel_connections = self.channels.get(channel_id)
+        if not channel_connections:
+            return
 
-    async def broadcast(self, channel_id: int, message: dict):
-        for ws in self.channels.get(channel_id, []):
-            await ws.send_json(message)
+        if websocket in channel_connections:
+            channel_connections.remove(websocket)
+
+        if not channel_connections:
+            self.channels.pop(channel_id, None)
+
+    async def broadcast(self, channel_id: int, message: dict, exclude: Optional[WebSocket] = None):
+        for ws in list(self.channels.get(channel_id, [])):
+            if exclude is not None and ws is exclude:
+                continue
+            try:
+                await ws.send_json(message)
+            except Exception:
+                self.disconnect(channel_id, ws)
 
 
 

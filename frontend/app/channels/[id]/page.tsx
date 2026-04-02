@@ -111,6 +111,12 @@ type OrgMember = {
   user_tag?: string | null
 }
 
+type TypingUser = {
+  user_id: number
+  first_name: string
+  last_name: string
+}
+
 type PinnedMessage = {
   id: number
   message_id: number
@@ -218,6 +224,7 @@ export default function ChannelPage() {
   const [showInfo, setShowInfo] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -233,6 +240,9 @@ export default function ChannelPage() {
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const isConnectingRef = useRef(false) // Prevent multiple simultaneous connections
+  const typingTimersRef = useRef<Record<number, NodeJS.Timeout>>({})
+  const localTypingStopRef = useRef<NodeJS.Timeout | null>(null)
+  const isTypingRef = useRef(false)
 
   // Edit message states
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
@@ -365,6 +375,13 @@ export default function ChannelPage() {
 
             // Handle different message types
             if (data.type === 'new_message') {
+              if (data.message?.sender) {
+                updateTypingUser({
+                  user_id: data.message.sender.user_id,
+                  first_name: data.message.sender.first_name,
+                  last_name: data.message.sender.last_name,
+                }, false)
+              }
               // Add new message to the list (check for duplicates)
               setMessages(prev => {
                 // Avoid duplicates by checking if message already exists
@@ -375,6 +392,13 @@ export default function ChannelPage() {
                 return [...prev, data.message]
               })
             } else if (data.type === 'new_file' && data.file) {
+              if (data.file?.sender) {
+                updateTypingUser({
+                  user_id: data.file.sender.user_id,
+                  first_name: data.file.sender.first_name,
+                  last_name: data.file.sender.last_name,
+                }, false)
+              }
               setMessages(prev => {
                 const syntheticId = data.file.id + 1000000000
                 const exists = prev.some(msg => msg.message_id === syntheticId)
@@ -406,6 +430,12 @@ export default function ChannelPage() {
             } else if (data.type === 'message_deleted') {
               // Remove deleted message
               setMessages(prev => prev.filter(msg => msg.message_id !== data.message_id))
+            } else if (data.type === 'typing' && data.user) {
+              updateTypingUser({
+                user_id: data.user.user_id,
+                first_name: data.user.first_name,
+                last_name: data.user.last_name,
+              }, Boolean(data.is_typing))
             } else if (data.message) {
               // Fallback: treat as new message (check for duplicates)
               setMessages(prev => {
@@ -452,12 +482,22 @@ export default function ChannelPage() {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
+      if (localTypingStopRef.current) {
+        clearTimeout(localTypingStopRef.current)
+        localTypingStopRef.current = null
+      }
+      Object.values(typingTimersRef.current).forEach((timer) => clearTimeout(timer))
+      typingTimersRef.current = {}
       if (wsRef.current) {
         wsRef.current.close()
         wsRef.current = null
       }
     }
   }, [channel, channelId])
+
+  useEffect(() => {
+    setTypingUsers([])
+  }, [channelId])
 
   useEffect(() => {
     if (!showEmojiPicker || !emojiPickerContainerRef.current) return
@@ -654,6 +694,100 @@ export default function ChannelPage() {
     : []
   const showMentionSuggestions = Boolean(mentionContext && mentionCandidates.length > 0)
 
+  const clearTypingTimer = (userId: number) => {
+    const existing = typingTimersRef.current[userId]
+    if (!existing) return
+    clearTimeout(existing)
+    delete typingTimersRef.current[userId]
+  }
+
+  const updateTypingUser = (user: TypingUser, isTyping: boolean) => {
+    if (currentUserId !== null && user.user_id === currentUserId) {
+      return
+    }
+
+    clearTypingTimer(user.user_id)
+
+    if (!isTyping) {
+      setTypingUsers((prev) => prev.filter((item) => item.user_id !== user.user_id))
+      return
+    }
+
+    setTypingUsers((prev) => {
+      const exists = prev.some((item) => item.user_id === user.user_id)
+      if (exists) {
+        return prev.map((item) => item.user_id === user.user_id ? user : item)
+      }
+      return [...prev, user]
+    })
+
+    typingTimersRef.current[user.user_id] = setTimeout(() => {
+      setTypingUsers((prev) => prev.filter((item) => item.user_id !== user.user_id))
+      delete typingTimersRef.current[user.user_id]
+    }, 3500)
+  }
+
+  const sendTypingEvent = (isTyping: boolean) => {
+    if (!channel || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    wsRef.current.send(JSON.stringify({
+      type: 'typing',
+      channel_id: channel.channel_id,
+      org_id: channel.org_id,
+      is_typing: isTyping,
+    }))
+  }
+
+  const stopLocalTyping = () => {
+    if (localTypingStopRef.current) {
+      clearTimeout(localTypingStopRef.current)
+      localTypingStopRef.current = null
+    }
+
+    if (!isTypingRef.current) {
+      return
+    }
+
+    isTypingRef.current = false
+    sendTypingEvent(false)
+  }
+
+  const handleMessageInputChange = (value: string) => {
+    setMessage(value)
+    setActiveMentionIndex(0)
+
+    if (!value.trim()) {
+      stopLocalTyping()
+      return
+    }
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      sendTypingEvent(true)
+    }
+
+    if (localTypingStopRef.current) {
+      clearTimeout(localTypingStopRef.current)
+    }
+
+    localTypingStopRef.current = setTimeout(() => {
+      stopLocalTyping()
+    }, 1800)
+  }
+
+  const typingIndicatorText = (() => {
+    if (typingUsers.length === 0) return ''
+    if (typingUsers.length === 1) {
+      return `${typingUsers[0].first_name} ${typingUsers[0].last_name} is typing...`
+    }
+    if (typingUsers.length === 2) {
+      return `${typingUsers[0].first_name} and ${typingUsers[1].first_name} are typing...`
+    }
+    return `${typingUsers[0].first_name}, ${typingUsers[1].first_name} and ${typingUsers.length - 2} others are typing...`
+  })()
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!message.trim() || !channel || isSendingMessage) return
@@ -672,6 +806,7 @@ export default function ChannelPage() {
         }
         
         wsRef.current.send(JSON.stringify(messageData))
+        stopLocalTyping()
         setMessage("")
         setReplyToMessage(null)
         
@@ -1007,6 +1142,7 @@ export default function ChannelPage() {
         mime_type: selectedFile.type || 'application/octet-stream',
         file_base64: fileBase64,
       }))
+      stopLocalTyping()
     } catch (error) {
       console.error('Error preparing file upload:', error)
       toast.error("Upload failed", {
@@ -1545,10 +1681,8 @@ export default function ChannelPage() {
                               ref={messageInputRef}
                               placeholder={`Message #${channel.channel_name}`}
                               value={message}
-                              onChange={(e) => {
-                                setMessage(e.target.value)
-                                setActiveMentionIndex(0)
-                              }}
+                              onChange={(e) => handleMessageInputChange(e.target.value)}
+                              onBlur={stopLocalTyping}
                               onKeyDown={handleKeyDown}
                               className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pr-32 h-[50px] bg-transparent text-sm"
                             />
@@ -1635,6 +1769,9 @@ export default function ChannelPage() {
                             <p className="text-xs text-muted-foreground">
                               Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Enter</kbd> to send
                             </p>
+                            {typingIndicatorText && (
+                              <p className="text-xs text-primary">{typingIndicatorText}</p>
+                            )}
                           </div>
                         </div>
                         
