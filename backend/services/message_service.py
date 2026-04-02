@@ -17,6 +17,7 @@ from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
 from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
 from utils.cloudinary_handler import upload_chat_file_from_base64
+from utils.plan_limits import get_file_size_limit
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
@@ -147,6 +148,15 @@ async def send_file_realtime_service(
         await websocket.send_json({
             "type": "error",
             "detail": "file_size must be greater than 0"
+        })
+        return
+
+    org = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()
+    file_size_limit = get_file_size_limit(org.organization_plan if org else None)
+    if file_size_limit is not None and file_size > file_size_limit:
+        await websocket.send_json({
+            "type": "error",
+            "detail": f"Free plan allows a maximum file size of {file_size_limit // (1024 * 1024)} MB. Upgrade to Pro for larger uploads."
         })
         return
 

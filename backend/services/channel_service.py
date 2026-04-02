@@ -8,6 +8,7 @@ from models.Organization_members import Organization_members
 from models.Teams import Teams
 from models.Team_roles import Team_roles
 from sqlalchemy.orm import Session
+from utils.plan_limits import get_channel_limit
 
 
 def create_channel_service(data:Channels_input,org_id: int,authorization: str,db: Session):
@@ -53,11 +54,20 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
     if not is_owner and not is_member:
         raise HTTPException(status_code=403, detail="You must be a member of this organization to create channels")
     
+    channel_limit = get_channel_limit(found_organization.organization_plan)
+    if channel_limit is not None:
+        current_count = db.query(Channels).filter(Channels.org_id == org_id).count()
+        if current_count >= channel_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Free plan allows a maximum of {channel_limit} channels. Upgrade to Pro for unlimited channels."
+            )
+
     existing_channel = db.query(Channels).filter(
         Channels.org_id == org_id,
         Channels.channel_name == data.channel_name
     ).first()
-    
+
     if existing_channel:
         raise HTTPException(status_code=400, detail="A channel with this name already exists in this organization")
     

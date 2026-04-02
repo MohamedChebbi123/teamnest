@@ -14,6 +14,7 @@ from schemas.Add_members_org import Add_members_org
 from schemas.Join_org import Join_org
 from models.Pending_members_org import Pending_members_org
 from models.Organization_payments import Organization_payments
+from utils.plan_limits import get_member_limit
 def create_organization_service(
     organization_name:str,
     organization_description:str,
@@ -308,7 +309,16 @@ def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization:
     
     if existing_member:
         raise HTTPException(status_code=409, detail="User already in organization")
-    
+
+    member_limit = get_member_limit(organization.organization_plan)
+    if member_limit is not None:
+        current_count = db.query(Organization_members).filter(Organization_members.org_id == org_id).count()
+        if current_count >= member_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Free plan allows a maximum of {member_limit} members. Upgrade to Pro for unlimited members."
+            )
+
     new_member=Organization_members(
         memmber_id=member_to_add.user_id,
         org_id=org_id,
@@ -633,6 +643,15 @@ def accept_or_reject_service(
         db.delete(pending_request)
         db.commit()
         raise HTTPException(status_code=409, detail="User is already a member of this organization")
+
+    member_limit = get_member_limit(organization.organization_plan)
+    if member_limit is not None:
+        current_count = db.query(Organization_members).filter(Organization_members.org_id == org_id).count()
+        if current_count >= member_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Free plan allows a maximum of {member_limit} members. Upgrade to Pro for unlimited members."
+            )
 
     new_member = Organization_members(
         memmber_id=pending_request.user_id,
