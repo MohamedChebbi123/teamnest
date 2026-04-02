@@ -15,6 +15,8 @@ import {
   Loader2,
   MessageCircle,
   Search,
+  Ban,
+  ShieldOff,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -39,11 +41,22 @@ interface FriendRequest {
   sent_at: string
 }
 
+interface BlockedUser {
+  block_id: number
+  user_id: number
+  first_name: string
+  last_name: string
+  user_tag: string | null
+  avatar_url: string | null
+  blocked_at: string
+}
+
 export default function FriendsPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"friends" | "requests" | "add">("friends")
+  const [activeTab, setActiveTab] = useState<"friends" | "requests" | "add" | "blocked">("friends")
   const [friends, setFriends] = useState<Friend[]>([])
   const [requests, setRequests] = useState<FriendRequest[]>([])
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [addTag, setAddTag] = useState("")
@@ -97,10 +110,29 @@ export default function FriendsPage() {
     }
   }
 
+  const fetchBlockedUsers = async () => {
+    const token = getToken()
+    if (!token) return
+
+    try {
+      const response = await fetch("http://localhost:8000/friends/blocked", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setBlockedUsers(data)
+      } else if (response.status === 401) {
+        router.push("/auth/login")
+      }
+    } catch (error) {
+      console.error("Error fetching blocked users:", error)
+    }
+  }
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      await Promise.all([fetchFriends(), fetchRequests()])
+      await Promise.all([fetchFriends(), fetchRequests(), fetchBlockedUsers()])
       setLoading(false)
     }
     loadData()
@@ -165,6 +197,59 @@ export default function FriendsPage() {
     }
   }
 
+  const handleBlockUser = async (userId: number) => {
+    const token = getToken()
+    if (!token) return
+
+    setActionLoading(userId)
+    try {
+      const response = await fetch(`http://localhost:8000/friends/block/${userId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        toast.success("User blocked")
+        setFriends((prev) => prev.filter((f) => f.user_id !== userId))
+        await fetchBlockedUsers()
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+      }
+    } catch (error) {
+      console.error("Error blocking user:", error)
+      toast.error("Error", { description: "Failed to block user" })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleUnblockUser = async (userId: number) => {
+    const token = getToken()
+    if (!token) return
+
+    setActionLoading(userId)
+    try {
+      const response = await fetch(`http://localhost:8000/friends/unblock/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        toast.success("User unblocked")
+        setBlockedUsers((prev) => prev.filter((b) => b.user_id !== userId))
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+      }
+    } catch (error) {
+      console.error("Error unblocking user:", error)
+      toast.error("Error", { description: "Failed to unblock user" })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleSendByTag = async () => {
     const trimmed = addTag.trim()
     if (!trimmed) {
@@ -215,6 +300,7 @@ export default function FriendsPage() {
     { key: "friends" as const, label: "Friends", count: friends.length, icon: Users },
     { key: "requests" as const, label: "Requests", count: requests.length, icon: UserPlus },
     { key: "add" as const, label: "Add Friend", count: null, icon: Search },
+    { key: "blocked" as const, label: "Blocked", count: blockedUsers.length, icon: Ban },
   ]
 
   return (
@@ -322,6 +408,15 @@ export default function FriendsPage() {
                                 }
                               >
                                 <MessageCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Block user"
+                                disabled={actionLoading === friend.user_id}
+                                onClick={() => handleBlockUser(friend.user_id)}
+                              >
+                                <Ban className="h-4 w-4 text-destructive" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -438,6 +533,61 @@ export default function FriendsPage() {
                       Send Friend Request
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {/* Blocked Users */}
+              {activeTab === "blocked" && (
+                <div className="space-y-3">
+                  {blockedUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                      <ShieldOff className="h-12 w-12 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">No blocked users</p>
+                      <p className="text-sm text-muted-foreground/70">
+                        Users you block won&apos;t be able to send you friend requests
+                      </p>
+                    </div>
+                  ) : (
+                    blockedUsers.map((blocked) => (
+                      <div
+                        key={blocked.block_id}
+                        className="flex items-center gap-4 p-4 rounded-xl border bg-card shadow-sm"
+                      >
+                        <Avatar className="h-12 w-12 border-2 border-background">
+                          <AvatarImage src={blocked.avatar_url || undefined} />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(blocked.first_name, blocked.last_name)}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {blocked.first_name} {blocked.last_name}
+                          </p>
+                          {blocked.user_tag && (
+                            <p className="text-xs text-muted-foreground">@{blocked.user_tag}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground/70">
+                            Blocked {new Date(blocked.blocked_at).toLocaleDateString()}
+                          </p>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={actionLoading === blocked.user_id}
+                          onClick={() => handleUnblockUser(blocked.user_id)}
+                        >
+                          {actionLoading === blocked.user_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <ShieldOff className="h-4 w-4 mr-1" />
+                          )}
+                          Unblock
+                        </Button>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </>

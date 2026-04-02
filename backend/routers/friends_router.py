@@ -8,6 +8,9 @@ from services.friends_service import (
     remove_friend_service,
     get_friends_service,
     get_pending_requests_service,
+    block_user_service,
+    unblock_user_service,
+    get_blocked_users_service,
 )
 
 router = APIRouter()
@@ -55,3 +58,29 @@ async def get_pending_requests(
     db: Session = Depends(connect_databse),
 ):
     return get_pending_requests_service(authorization, db)
+
+
+@router.post("/friends/block/{user_id}")
+async def block_user(
+    user_id: int,
+    authorization: str = Header(...),
+    db: Session = Depends(connect_databse),
+):
+    return block_user_service(user_id, authorization, db)
+
+
+@router.delete("/friends/unblock/{user_id}")
+async def unblock_user(
+    user_id: int,
+    authorization: str = Header(...),
+    db: Session = Depends(connect_databse),
+):
+    return unblock_user_service(user_id, authorization, db)
+
+
+@router.get("/friends/blocked")
+async def get_blocked_users(
+    authorization: str = Header(...),
+    db: Session = Depends(connect_databse),
+):
+    return get_blocked_users_service(authorization, db)
