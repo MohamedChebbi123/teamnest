@@ -10,6 +10,9 @@ from models.Organization_members import Organization_members
 from models.Channels import Channels
 from models.Users import Users
 from models.Notifications import Notifications
+from models.PInned_messages import Pinned_messages
+from models.Organization import Organization
+from models.Team_association import Team_association
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
 from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
@@ -843,3 +846,205 @@ async def voice_websocket_endpoint(
                     "participant": disconnected_participant,
                 },
             )
+            
+            
+def pin_message_service(message_id: int, org_id: int, authorization: str, db: Session):
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    message = db.query(Messages).filter(
+        Messages.message_id == message_id,
+        Messages.is_deleted == False
+    ).first()
+
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    channel = db.query(Channels).filter(
+        Channels.channel_id == message.channel_id,
+        Channels.org_id == org_id
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    org = db.query(Organization).filter(
+        Organization.organization_id == org_id
+    ).first()
+
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_owner = org.owner_id == user_id
+
+    if not is_owner:
+        member = db.query(Organization_members).filter(
+            Organization_members.memmber_id == user_id,
+            Organization_members.org_id == org_id
+        ).first()
+
+        if not member:
+            raise HTTPException(status_code=403, detail="User is not a member of this organization")
+
+        if channel.team_id is not None:
+            team_member = db.query(Team_association).filter(
+                Team_association.team_id == channel.team_id,
+                Team_association.user_id == user_id
+            ).first()
+
+            if not team_member:
+                raise HTTPException(status_code=403, detail="You must be a member of this team to pin messages in this channel")
+
+    already_pinned = db.query(Pinned_messages).filter(
+        Pinned_messages.message_id == message_id,
+        Pinned_messages.channel_id == channel.channel_id
+    ).first()
+
+    if already_pinned:
+        raise HTTPException(status_code=400, detail="Message is already pinned")
+
+    pinned = Pinned_messages(
+        message_id=message_id,
+        channel_id=channel.channel_id,
+        pinned_by=user_id
+    )
+
+    db.add(pinned)
+    db.commit()
+    db.refresh(pinned)
+
+    return {
+        "id": pinned.id,
+        "message_id": pinned.message_id,
+        "channel_id": pinned.channel_id,
+        "pinned_by": pinned.pinned_by,
+        "pinned_at": pinned.pinned_at
+    }
+
+
+def unpin_message_service(message_id: int, org_id: int, authorization: str, db: Session):
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    pinned = db.query(Pinned_messages).filter(
+        Pinned_messages.message_id == message_id
+    ).first()
+
+    if not pinned:
+        raise HTTPException(status_code=404, detail="Pinned message not found")
+
+    channel = db.query(Channels).filter(
+        Channels.channel_id == pinned.channel_id,
+        Channels.org_id == org_id
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    org = db.query(Organization).filter(
+        Organization.organization_id == org_id
+    ).first()
+
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_owner = org.owner_id == user_id
+
+    if not is_owner:
+        member = db.query(Organization_members).filter(
+            Organization_members.memmber_id == user_id,
+            Organization_members.org_id == org_id
+        ).first()
+
+        if not member:
+            raise HTTPException(status_code=403, detail="User is not a member of this organization")
+
+        if channel.team_id is not None:
+            team_member = db.query(Team_association).filter(
+                Team_association.team_id == channel.team_id,
+                Team_association.user_id == user_id
+            ).first()
+
+            if not team_member:
+                raise HTTPException(status_code=403, detail="You must be a member of this team to unpin messages in this channel")
+
+    db.delete(pinned)
+    db.commit()
+
+    return {"detail": "Message unpinned successfully"}
+
+
+def fetch_pinned_messages_service(channel_id: int, org_id: int, authorization: str, db: Session):
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    member = db.query(Organization_members).filter(
+        Organization_members.memmber_id == user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
+    if not member:
+        raise HTTPException(status_code=403, detail="User is not a member of this organization")
+
+    channel = db.query(Channels).filter(
+        Channels.channel_id == channel_id,
+        Channels.org_id == org_id
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    pinned_messages = db.query(Pinned_messages, Messages, Users).join(
+        Messages, Pinned_messages.message_id == Messages.message_id
+    ).join(
+        Users, Messages.sender_id == Users.user_id
+    ).filter(
+        Pinned_messages.channel_id == channel_id,
+        Messages.is_deleted == False
+    ).all()
+
+    result = []
+    for pinned, message, sender in pinned_messages:
+        result.append({
+            "id": pinned.id,
+            "message_id": message.message_id,
+            "message_content": message.message_content,
+            "pinned_by": pinned.pinned_by,
+            "pinned_at": pinned.pinned_at,
+            "sender": {
+                "user_id": sender.user_id,
+                "first_name": sender.first_name,
+                "last_name": sender.last_name,
+                "avatar_url": sender.avatar_url,
+                "user_tag": sender.user_tag
+            }
+        })
+
+    return result

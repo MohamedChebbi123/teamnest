@@ -1,5 +1,5 @@
-from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members,join_org_service,fetch_pending_org_requests_service,accept_or_reject_service,create_subscritpion_service,confirm_upgrade_service
-from fastapi import APIRouter, Form, File, Depends, UploadFile, Header
+from services.org_service import create_organization_service,fetch_organization_service,add_members_to_org_service,update_organization_service,delete_organization_service,fetch_org_members,join_org_service,fetch_pending_org_requests_service,accept_or_reject_service,create_subscritpion_service,confirm_upgrade_service,cancel_subscription_service
+from fastapi import APIRouter, Form, File, Depends, UploadFile, Header, Query
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.Add_members_org import Add_members_org
@@ -95,10 +95,20 @@ async def subscribe_organization(
 @router.post("/organization/{org_id}/confirm-upgrade")
 async def confirm_upgrade(
     org_id: int,
+    session_id: str | None = Query(default=None),
     authorization: str = Header(None),
     db: Session = Depends(connect_databse)
 ):
-    return confirm_upgrade_service(org_id, authorization, db)
+    return confirm_upgrade_service(org_id, session_id, authorization, db)
+
+
+@router.post("/organization/{org_id}/cancel-subscription")
+async def cancel_subscription(
+    org_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return cancel_subscription_service(org_id, authorization, db)
 
 
 @router.post("/organization/{org_id}/join-requests/{request_id}")

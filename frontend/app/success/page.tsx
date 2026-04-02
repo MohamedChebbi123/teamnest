@@ -11,6 +11,7 @@ function SuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const orgId = searchParams.get("org_id")
+  const sessionId = searchParams.get("session_id")
   const [confirming, setConfirming] = useState(true)
 
   useEffect(() => {
@@ -28,19 +29,24 @@ function SuccessContent() {
       }
 
       try {
-        const response = await fetch(`http://localhost:8000/organization/${orgId}/confirm-upgrade`, {
+        const url = `http://localhost:8000/organization/${orgId}/confirm-upgrade${sessionId ? `?session_id=${sessionId}` : ""}`
+        console.log("[SuccessPage] calling confirm-upgrade:", url)
+
+        const response = await fetch(url, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
           },
         })
 
+        const data = await response.json()
+        console.log("[SuccessPage] response:", response.status, data)
+
         if (!response.ok) {
-          const data = await response.json()
           toast.error("Upgrade failed", { description: data.detail || "Could not confirm upgrade" })
         }
       } catch (error) {
-        console.error("Error confirming upgrade:", error)
+        console.error("[SuccessPage] fetch error:", error)
         toast.error("Error", { description: "Failed to confirm upgrade" })
       } finally {
         setConfirming(false)
@@ -48,7 +54,7 @@ function SuccessContent() {
     }
 
     confirmUpgrade()
-  }, [orgId, router])
+  }, [orgId, sessionId, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">

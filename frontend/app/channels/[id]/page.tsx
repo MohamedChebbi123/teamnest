@@ -21,10 +21,10 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { 
-  Hash, 
+import {
+  Hash,
   Volume2,
-  Loader2, 
+  Loader2,
   Send,
   Info,
   Users,
@@ -35,6 +35,9 @@ import {
   Edit,
   Trash2,
   Reply,
+  Pin,
+  PinOff,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import Sidebar from "@/components/Sidebar/page"
@@ -105,6 +108,21 @@ type OrgMember = {
   first_name: string
   last_name: string
   user_tag?: string | null
+}
+
+type PinnedMessage = {
+  id: number
+  message_id: number
+  message_content: string
+  pinned_by: number
+  pinned_at: string
+  sender: {
+    user_id: number
+    first_name: string
+    last_name: string
+    avatar_url: string | null
+    user_tag: string
+  }
 }
 
 type EmojiClickEvent = Event & {
@@ -225,6 +243,12 @@ export default function ChannelPage() {
   const [messageToDelete, setMessageToDelete] = useState<number | null>(null)
   const [isDeletingMessage, setIsDeletingMessage] = useState(false)
 
+  // Pinned messages states
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false)
+  const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([])
+  const [loadingPinnedMessages, setLoadingPinnedMessages] = useState(false)
+  const [pinningMessageId, setPinningMessageId] = useState<number | null>(null)
+
   useEffect(() => {
     const fetchChannelData = async () => {
       try {
@@ -258,9 +282,19 @@ export default function ChannelPage() {
         if (response.ok) {
           const data = await response.json()
           setChannel(data)
-          // Fetch messages after channel is loaded
+          // Fetch messages and pinned messages after channel is loaded
           await fetchMessages(data.org_id, token)
           await fetchOrgMembers(data.org_id, token)
+
+          // Fetch pinned messages for pin/unpin detection
+          const pinnedResponse = await fetch(
+            `http://localhost:8000/organization/${data.org_id}/channel/${data.channel_id}/pinned`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+          )
+          if (pinnedResponse.ok) {
+            const pinnedData = await pinnedResponse.json()
+            setPinnedMessages(pinnedData)
+          }
         } else {
           const errorData = await response.json()
           toast.error("Error", {
@@ -765,6 +799,109 @@ export default function ChannelPage() {
     }
   }
 
+  const fetchPinnedMessages = async () => {
+    if (!channel) return
+    setLoadingPinnedMessages(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(
+        `http://localhost:8000/organization/${channel.org_id}/channel/${channel.channel_id}/pinned`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setPinnedMessages(data)
+      } else {
+        const data = await response.json()
+        toast.error("Error", { description: data.detail || "Failed to load pinned messages" })
+      }
+    } catch (error) {
+      console.error('Error fetching pinned messages:', error)
+    } finally {
+      setLoadingPinnedMessages(false)
+    }
+  }
+
+  const handlePinMessage = async (messageId: number) => {
+    if (!channel) return
+    setPinningMessageId(messageId)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(
+        `http://localhost:8000/organization/${channel.org_id}/message/${messageId}/pin`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Message pinned")
+        if (showPinnedMessages) {
+          await fetchPinnedMessages()
+        }
+      } else {
+        toast.error("Error", { description: data.detail || "Failed to pin message" })
+      }
+    } catch (error) {
+      console.error('Error pinning message:', error)
+      toast.error("Error", { description: "An error occurred while pinning the message" })
+    } finally {
+      setPinningMessageId(null)
+    }
+  }
+
+  const handleUnpinMessage = async (messageId: number) => {
+    if (!channel) return
+    setPinningMessageId(messageId)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(
+        `http://localhost:8000/organization/${channel.org_id}/message/${messageId}/unpin`,
+        {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Message unpinned")
+        setPinnedMessages(prev => prev.filter(p => p.message_id !== messageId))
+      } else {
+        toast.error("Error", { description: data.detail || "Failed to unpin message" })
+      }
+    } catch (error) {
+      console.error('Error unpinning message:', error)
+      toast.error("Error", { description: "An error occurred while unpinning the message" })
+    } finally {
+      setPinningMessageId(null)
+    }
+  }
+
+  const togglePinnedMessages = () => {
+    const next = !showPinnedMessages
+    setShowPinnedMessages(next)
+    if (next) {
+      setShowInfo(false)
+      fetchPinnedMessages()
+    }
+  }
+
+  const isMessagePinned = (messageId: number) => {
+    return pinnedMessages.some(p => p.message_id === messageId)
+  }
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -948,7 +1085,7 @@ export default function ChannelPage() {
       <OrganizationNavBar organizationId={channel.organization.organization_id} />
       <MembersSidebar organizationId={channel.organization.organization_id} />
       
-      <main className={`ml-[368px] min-h-screen bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.08),_transparent_55%),linear-gradient(to_bottom,_hsl(var(--background)),_hsl(var(--muted)/0.25))] transition-all duration-300 ${showInfo ? 'mr-[640px]' : 'mr-80'}`}>
+      <main className={`ml-[368px] min-h-screen bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.08),_transparent_55%),linear-gradient(to_bottom,_hsl(var(--background)),_hsl(var(--muted)/0.25))] transition-all duration-300 ${showInfo || showPinnedMessages ? 'mr-[640px]' : 'mr-80'}`}>
         {/* Channel Header */}
         <header className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
           <div className="flex items-center justify-between px-6 py-4">
@@ -978,10 +1115,22 @@ export default function ChannelPage() {
                 </span>
               </div>
               
+              {!isVoiceChannel && (
+                <Button
+                  variant={showPinnedMessages ? "secondary" : "ghost"}
+                  size="icon"
+                  onClick={togglePinnedMessages}
+                  className="h-9 w-9"
+                  title="Pinned messages"
+                >
+                  <Pin className="h-4 w-4" />
+                </Button>
+              )}
+
               <Button
                 variant={showInfo ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => setShowInfo(!showInfo)}
+                onClick={() => { setShowInfo(!showInfo); if (!showInfo) setShowPinnedMessages(false) }}
                 className="h-9 w-9"
               >
                 <Info className="h-4 w-4" />
@@ -1193,6 +1342,24 @@ export default function ChannelPage() {
                                   <Reply className="mr-2 h-4 w-4" />
                                   Reply
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {isMessagePinned(msg.message_id) ? (
+                                  <DropdownMenuItem
+                                    onClick={() => handleUnpinMessage(msg.message_id)}
+                                    disabled={pinningMessageId === msg.message_id}
+                                  >
+                                    <PinOff className="mr-2 h-4 w-4" />
+                                    {pinningMessageId === msg.message_id ? 'Unpinning...' : 'Unpin Message'}
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() => handlePinMessage(msg.message_id)}
+                                    disabled={pinningMessageId === msg.message_id}
+                                  >
+                                    <Pin className="mr-2 h-4 w-4" />
+                                    {pinningMessageId === msg.message_id ? 'Pinning...' : 'Pin Message'}
+                                  </DropdownMenuItem>
+                                )}
                                 {isOwnMessage && (
                                   <>
                                     <DropdownMenuSeparator />
@@ -1453,6 +1620,93 @@ export default function ChannelPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </aside>
+      )}
+
+      {/* Pinned Messages Sidebar */}
+      {showPinnedMessages && (
+        <aside className="fixed top-0 right-80 h-screen w-80 border-l bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 overflow-y-auto z-30 shadow-xl">
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-primary/10 p-2 rounded-lg">
+                  <Pin className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold text-base">Pinned Messages</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowPinnedMessages(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {loadingPinnedMessages ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : pinnedMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="bg-muted/50 rounded-full p-4 mb-3">
+                  <Pin className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">No pinned messages yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pin important messages to find them later
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pinnedMessages.map((pinned) => (
+                  <div
+                    key={pinned.id}
+                    className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={pinned.sender.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs bg-primary/10">
+                            {pinned.sender.first_name[0]}{pinned.sender.last_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-medium">
+                          {pinned.sender.first_name} {pinned.sender.last_name}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleUnpinMessage(pinned.message_id)}
+                        disabled={pinningMessageId === pinned.message_id}
+                        title="Unpin message"
+                      >
+                        {pinningMessageId === pinned.message_id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <PinOff className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap break-words line-clamp-4">
+                      {pinned.message_content}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Pinned {new Date(pinned.pinned_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </aside>
       )}

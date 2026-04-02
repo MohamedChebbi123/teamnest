@@ -13,6 +13,7 @@ from utils.cloudinary_handler import upload_organization_picture
 from schemas.Add_members_org import Add_members_org
 from schemas.Join_org import Join_org
 from models.Pending_members_org import Pending_members_org
+from models.Organization_payments import Organization_payments
 def create_organization_service(
     organization_name:str,
     organization_description:str,
@@ -91,15 +92,21 @@ def create_subscritpion_service(org_id:int,authorization: str,db:Session):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user_id = int(payload["sub"])
-    
+
     if not user_id:
-        raise HTTPException(status_code=404,detail="user not found")
-    
-    found_organization=db.query(Organization).filter(Organization.owner_id==user_id).first()
-    
+        raise HTTPException(status_code=404, detail="user not found")
+
+    found_organization = db.query(Organization).filter(
+        Organization.organization_id == org_id,
+        Organization.owner_id == user_id
+    ).first()
+
     if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    
+        raise HTTPException(status_code=404, detail="Organization not found or you are not the owner")
+
+    if found_organization.organization_plan == "PRO":
+        raise HTTPException(status_code=400, detail="Organization is already on the Pro plan")
+
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="subscription",
@@ -107,13 +114,15 @@ def create_subscritpion_service(org_id:int,authorization: str,db:Session):
             "price": "price_1THLoIRaAIW7J24MHlivlWuy",
             "quantity": 1,
         }],
-        success_url=f"http://localhost:3000/success?org_id={org_id}",
+        success_url=f"http://localhost:3000/success?org_id={org_id}&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url="http://localhost:3000/cancel",
+        metadata={"org_id": str(org_id)},
     )
 
     return session.url
 
-def confirm_upgrade_service(org_id: int, authorization: str, db: Session):
+def confirm_upgrade_service(org_id: int, session_id: str | None, authorization: str, db: Session):
+    print(f"[confirm_upgrade] org_id={org_id} session_id={session_id}")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -133,10 +142,95 @@ def confirm_upgrade_service(org_id: int, authorization: str, db: Session):
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
+    # Get the subscription from Stripe
+    stripe_subscription_id = None
+    stripe_price_id = None
+
+    # Try session_id from URL first
+    if session_id:
+        try:
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+            stripe_subscription_id = checkout_session.get("subscription")
+        except Exception as e:
+            print(f"[confirm_upgrade] Session lookup failed: {e}")
+
+    # Fallback: find the most recent completed checkout for this org
+    if not stripe_subscription_id:
+        try:
+            sessions = stripe.checkout.Session.list(limit=10)
+            for s in sessions.data:
+                if s.get("metadata", {}).get("org_id") == str(org_id) and s.get("subscription"):
+                    stripe_subscription_id = s["subscription"]
+                    break
+        except Exception as e:
+            print(f"[confirm_upgrade] Session list fallback failed: {e}")
+
+    if stripe_subscription_id:
+        try:
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+            stripe_price_id = subscription["items"]["data"][0]["price"]["id"] if subscription["items"]["data"] else None
+        except Exception as e:
+            print(f"[confirm_upgrade] Subscription detail lookup failed: {e}")
+
+    db.query(Organization_payments).filter(
+        Organization_payments.organization_id == org_id
+    ).delete()
+
+    new_payment = Organization_payments(
+        organization_id=org_id,
+        stripe_subscription_id=stripe_subscription_id,
+        stripe_price_id=stripe_price_id,
+        status="active",
+    )
+    db.add(new_payment)
+
     org.organization_plan = "PRO"
     db.commit()
 
     return {"message": "Upgraded"}
+
+def cancel_subscription_service(org_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    org = db.query(Organization).filter(
+        Organization.organization_id == org_id,
+        Organization.owner_id == user_id
+    ).first()
+
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found or you are not the owner")
+
+    if org.organization_plan != "PRO":
+        raise HTTPException(status_code=400, detail="Organization does not have an active Pro plan")
+
+    payment = db.query(Organization_payments).filter(
+        Organization_payments.organization_id == org_id,
+        Organization_payments.status == "active"
+    ).first()
+
+    if not payment or not payment.stripe_subscription_id:
+        raise HTTPException(status_code=404, detail="No active subscription found for this organization")
+
+    try:
+        stripe.Subscription.cancel(payment.stripe_subscription_id)
+    except stripe.StripeError as e:
+        raise HTTPException(status_code=502, detail=f"Stripe error: {str(e)}")
+
+    payment.status = "cancelled"
+    org.organization_plan = "FREE"
+    db.commit()
+
+    return {"message": "Subscription cancelled. Your organization has been downgraded to the Free plan."}
+
 
 def fetch_organization_service(authorization: str,db: Session):
     

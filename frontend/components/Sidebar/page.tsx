@@ -2,6 +2,7 @@
 
 import{ useState, useEffect } from 'react';
 import { useOnlineStatus } from '@/context/OnlineStatusContext';
+import { useTheme } from '@/context/ThemeContext';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -19,6 +20,8 @@ import {
   MessageCircle,
   Plus,
   UserPlus,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +74,7 @@ interface SidebarProps {
 
 export default function Sidebar({ className, onUserFetched, onOrganizationFetched }: SidebarProps) {
   const SIDEBAR_WIDTH = 80;
+  const { theme, toggleTheme } = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
@@ -478,8 +482,20 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           </TooltipProvider>
         </nav>
 
+        {/* Theme Toggle */}
+        <div className="px-4 pb-2">
+          <Button
+            variant="ghost"
+            className="w-full h-10 justify-center px-2"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+        </div>
+
         {/* User Section */}
-        <div className="mt-auto p-4 border-t">
+        <div className="p-4 border-t">
           {loading || !user ? (
             <div className="flex items-center justify-center">
               <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />

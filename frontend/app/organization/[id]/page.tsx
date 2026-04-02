@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap } from "lucide-react"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -78,8 +78,10 @@ export default function OrganizationPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Upgrade states
+  // Upgrade / cancel states
   const [upgrading, setUpgrading] = useState(false)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   
   // Create team states
   const [createTeamDialogOpen, setCreateTeamDialogOpen] = useState(false)
@@ -354,7 +356,7 @@ export default function OrganizationPage() {
       const formData = new FormData()
       formData.append('organization_name', editName)
       formData.append('organization_description', editDescription)
-      formData.append('organization_plan', organization.organization_plan || "FREE")
+      formData.append('organization_plan', organization?.organization_plan || "FREE")
       if (editImage) {
         formData.append('image', editImage)
       }
@@ -739,6 +741,32 @@ export default function OrganizationPage() {
     }
   }
 
+  const handleCancelSubscription = async () => {
+    setCancelling(true)
+    try {
+      const token = localStorage.getItem("access_token")
+      if (!token) { router.push("/auth/login"); return }
+
+      const response = await fetch(`http://localhost:8000/organization/${organizationId}/cancel-subscription`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        toast.success("Subscription cancelled", { description: "Your plan has been downgraded to Free." })
+        setOrganization((prev) => prev ? { ...prev, organization_plan: "FREE" } : prev)
+        setCancelDialogOpen(false)
+      } else {
+        const data = await response.json()
+        toast.error("Failed to cancel", { description: data.detail || "Please try again" })
+      }
+    } catch {
+      toast.error("Error", { description: "Failed to cancel subscription" })
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   const isOwner = organization?.owner_id === currentUserId
 
   if (loading) {
@@ -1069,7 +1097,7 @@ export default function OrganizationPage() {
                   {isOwner && (
                     <>
                       <Separator className="my-1" />
-                      {organization.organization_plan?.toUpperCase() !== "PRO" && (
+                      {organization.organization_plan?.toUpperCase() !== "PRO" ? (
                         <Button
                           variant="ghost"
                           className="w-full justify-start gap-3 h-9 text-sm font-normal text-amber-600 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
@@ -1078,6 +1106,15 @@ export default function OrganizationPage() {
                         >
                           {upgrading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Zap className="h-4 w-4 shrink-0" />}
                           Upgrade to Pro
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-3 h-9 text-sm font-normal text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setCancelDialogOpen(true)}
+                        >
+                          <XCircle className="h-4 w-4 shrink-0" />
+                          Cancel Pro Plan
                         </Button>
                       )}
                       <Button
@@ -1304,6 +1341,26 @@ export default function OrganizationPage() {
             </Button>
             <Button onClick={handleEditTeam} disabled={isEditingTeam}>
               {isEditingTeam ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Updating...</> : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Cancel Subscription Dialog ── */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Pro Plan</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel your Pro subscription for <strong>{organization?.organization_name}</strong>? Your organization will be immediately downgraded to the Free plan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+              Keep Pro
+            </Button>
+            <Button variant="destructive" onClick={handleCancelSubscription} disabled={cancelling}>
+              {cancelling ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling...</> : "Cancel Subscription"}
             </Button>
           </DialogFooter>
         </DialogContent>
