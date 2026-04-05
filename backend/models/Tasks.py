@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime,Integer,String,Text,ForeignKey
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -20,9 +20,9 @@ class Tasks(Base):
     finished=Column(Boolean,default=False)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
-    # Relationships
     team = relationship("Teams", back_populates="tasks")
     creator = relationship("Users", foreign_keys=[created_by], back_populates="tasks_created")
     subtasks = relationship("Tasks", backref='parent_task', remote_side=[id])
     assignees = relationship("Task_assignees", back_populates="task", cascade="all, delete-orphan")
     attachments = relationship("Task_attachments", back_populates="task", cascade="all, delete-orphan")
+

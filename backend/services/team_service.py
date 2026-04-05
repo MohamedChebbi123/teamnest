@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+﻿from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from models.Users import Users
 from models.Organization import Organization
@@ -138,19 +138,16 @@ def delete_team_service(team_id: int, authorization: str, db: Session):
     
     user_id = int(payload["sub"])
     
-    # Find the team
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is owner or admin
     is_owner = found_organization.owner_id == user_id
     is_admin = db.query(Organization_members).filter(
         Organization_members.org_id == team.org_id,
@@ -164,7 +161,6 @@ def delete_team_service(team_id: int, authorization: str, db: Session):
             detail="Only organization owner or admin can delete teams"
         )
     
-    # Delete the team
     db.delete(team)
     db.commit()
     
@@ -186,13 +182,11 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
     
     user_id = int(payload["sub"])
     
-    # Find the team
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
     
     if not found_organization:
@@ -211,7 +205,6 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
             detail="Only organization owner or admin can update teams"
         )
     
-    # Check if new team name already exists (if name is being changed)
     if data.team_name != team.team_name:
         existing_team = db.query(Teams).filter(
             Teams.org_id == team.org_id,
@@ -222,7 +215,6 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
         if existing_team:
             raise HTTPException(status_code=400, detail="Team name already exists in this organization")
     
-    # Update team fields
     team.team_name = data.team_name
     team.team_size = data.team_size
     team.description = data.description
@@ -254,19 +246,16 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
     
     user_id = int(payload["sub"])
     
-    # Find the team
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check permissions
     is_owner = found_organization.owner_id == user_id
     is_admin = db.query(Organization_members).filter(
         Organization_members.org_id == team.org_id,
@@ -280,12 +269,10 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
             detail="Only organization owner or admin can add members to teams"
         )
     
-    # Check if user exists
     user = db.query(Users).filter(Users.user_id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check if user is a member of the organization
     is_org_owner = found_organization.owner_id == data.user_id
     is_org_member = db.query(Organization_members).filter(
         Organization_members.org_id == team.org_id,
@@ -298,7 +285,6 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
             detail="User must be a member of the organization first"
         )
     
-    # Check if already a team member
     existing_member = db.query(Team_association).filter(
         Team_association.team_id == team_id,
         Team_association.user_id == data.user_id
@@ -307,14 +293,12 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
     if existing_member:
         raise HTTPException(status_code=400, detail="User is already a member of this team")
     
-    # Add to team_association
     new_team_member = Team_association(
         team_id=team_id,
         user_id=data.user_id
     )
     db.add(new_team_member)
     
-    # Create team role with permissions
     new_role = Team_roles(
         user_id=data.user_id,
         team_id=team_id,
@@ -361,20 +345,16 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
     
     user_id = int(payload["sub"])
     
-    # Find the team
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user has access to view team members
-    # Any organization member can view team members
     is_owner = found_organization.owner_id == user_id
     is_org_member = db.query(Organization_members).filter(
         Organization_members.org_id == team.org_id,
@@ -384,7 +364,6 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
     if not is_owner and not is_org_member:
         raise HTTPException(status_code=403, detail="You must be a member of this organization to view team members")
     
-    # Fetch all team members with their roles
     team_associations = db.query(Team_association).filter(
         Team_association.team_id == team_id
     ).all()
@@ -440,19 +419,16 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
     
     user_id = int(payload["sub"])
     
-    # Find the team
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Check if organization exists
     found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if the requesting user has permission to manage roles
     is_owner = found_organization.owner_id == user_id
     is_admin = db.query(Organization_members).filter(
         Organization_members.org_id == team.org_id,
@@ -473,7 +449,6 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
             detail="You don't have permission to manage roles in this team"
         )
     
-    # Check if target member exists in team
     target_member = db.query(Team_association).filter(
         Team_association.team_id == team_id,
         Team_association.user_id == member_user_id
@@ -482,7 +457,6 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
     if not target_member:
         raise HTTPException(status_code=404, detail="User is not a member of this team")
     
-    # Find and update the member's role
     member_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
         Team_roles.user_id == member_user_id
@@ -491,7 +465,6 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
     if not member_role:
         raise HTTPException(status_code=404, detail="Member role not found")
     
-    # Update permissions
     member_role.role = data.role
     member_role.can_create_channels = data.can_create_channels
     member_role.can_send_messages = data.can_send_messages
@@ -640,32 +613,26 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
     
     user_id = int(payload["sub"])
     
-    # Find the team first
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Verify team belongs to the organization
     if team.org_id != org_id:
         raise HTTPException(status_code=400, detail="Team does not belong to this organization")
     
-    # Find the organization
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user is organization owner
     is_owner = found_organization.owner_id == user_id
     
-    # Get user's team role
     user_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
         Team_roles.user_id == user_id
     ).first()
     
-    # Check permissions - only owner or team members with can_create_channels permission
     has_permission = is_owner or (user_role and user_role.can_create_channels)
     
     if not has_permission:
@@ -674,7 +641,6 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
             detail="You don't have permission to create channels in this team"
         )
     
-    # Check if channel name already exists in this team
     existing_channel = db.query(Channels).filter(
         Channels.team_id == team_id,
         Channels.channel_name == data.channel_name
@@ -683,7 +649,6 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
     if existing_channel:
         raise HTTPException(status_code=400, detail="Channel name already exists in this team")
     
-    # Create new channel
     new_channel = Channels(
         channel_name=data.channel_name,
         channel_mode=data.channel_mode,
@@ -723,23 +688,19 @@ def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: s
     
     user_id = int(payload["sub"])
     
-    # Find the team first
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     
-    # Verify team belongs to the organization
     if team.org_id != org_id:
         raise HTTPException(status_code=400, detail="Team does not belong to this organization")
     
-    # Find the organization
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     
     if not found_organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    # Check if user has access to the team
     is_owner = found_organization.owner_id == user_id
     
     is_org_member = db.query(Organization_members).filter(
@@ -758,7 +719,6 @@ def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: s
             detail="You don't have access to view channels in this team"
         )
     
-    # Fetch all channels for this team
     channels = db.query(Channels).filter(Channels.team_id == team_id).all()
     
     return [
@@ -1015,8 +975,6 @@ def fetch_files_for_team_channel_service(
     if not is_owner and not is_org_admin and not is_team_member:
         raise HTTPException(status_code=403, detail="You don't have access to this team channel")
 
-    # Files model is team-scoped (no channel_id column), so this endpoint
-    # returns files posted under the team context for this team channel.
     files = db.query(Files, Users).join(
         Users, Files.sender_id == Users.user_id
     ).filter(

@@ -109,6 +109,15 @@ type FriendItem = {
   added_at: string
 }
 
+type GroupChatItem = {
+  id: number
+  group_name: string
+  group_description: string
+  group_image: string
+  owned_by: number
+  member_count: number
+}
+
 type EmojiClickEvent = Event & {
   detail?: {
     unicode?: string
@@ -164,6 +173,9 @@ export default function ChannelsPage() {
   const [loadingReceiverInfo, setLoadingReceiverInfo] = useState(false)
   const [friends, setFriends] = useState<FriendItem[]>([])
   const [loadingFriends, setLoadingFriends] = useState(false)
+  const [groupChats, setGroupChats] = useState<GroupChatItem[]>([])
+  const [loadingGroupChats, setLoadingGroupChats] = useState(false)
+  const [sidebarFilter, setSidebarFilter] = useState<"friends" | "groups">("friends")
   const [friendActionLoading, setFriendActionLoading] = useState(false)
   const [isReceiverTyping, setIsReceiverTyping] = useState(false)
 
@@ -358,6 +370,26 @@ export default function ChannelsPage() {
     }
   }
 
+  const fetchGroupChats = async () => {
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+
+    setLoadingGroupChats(true)
+    try {
+      const response = await fetch("http://localhost:8000/group_chats", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setGroupChats(data)
+      }
+    } catch (error) {
+      console.error("Error fetching group chats:", error)
+    } finally {
+      setLoadingGroupChats(false)
+    }
+  }
+
   const handleRemoveFriend = async (friendUserId: number) => {
     const token = localStorage.getItem("access_token")
     if (!token) return
@@ -434,6 +466,7 @@ export default function ChannelsPage() {
     fetchCurrentUser()
     fetchConversations()
     fetchFriends()
+    fetchGroupChats()
   }, [router])
 
   useEffect(() => {
@@ -871,130 +904,217 @@ export default function ChannelsPage() {
         <div className="px-4 pb-3 pt-5">
           <div className="mb-3 flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-sm font-semibold tracking-wide">Direct Messages</h2>
+            <h2 className="text-sm font-semibold tracking-wide">Messages</h2>
           </div>
+
+          {/* Filter Tabs */}
+          <div className="mb-3 flex rounded-lg bg-background p-0.5 border">
+            <button
+              onClick={() => setSidebarFilter("friends")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all",
+                sidebarFilter === "friends"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Friends
+            </button>
+            <button
+              onClick={() => setSidebarFilter("groups")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all",
+                sidebarFilter === "groups"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Groups
+            </button>
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search chats and messages..."
+              placeholder={sidebarFilter === "friends" ? "Search chats and messages..." : "Search groups..."}
               className="h-8 rounded-lg bg-background pl-9 text-sm"
             />
           </div>
         </div>
 
         <ScrollArea className="flex-1 px-2 pb-2">
-          {/* Conversations */}
-          <div className="space-y-0.5">
-            {loadingConversations ? (
-              <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Loading...
+          {sidebarFilter === "friends" ? (
+            <>
+              {/* Conversations */}
+              <div className="space-y-0.5">
+                {loadingConversations ? (
+                  <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading...
+                  </div>
+                ) : filteredConversations.length === 0 && friendsWithoutConversation.length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-muted-foreground">No conversations yet.</p>
+                ) : (
+                  filteredConversations.map((item) => {
+                    const isActive = activeReceiverId === item.user.user_id
+                    const initials = `${item.user.first_name[0] || ""}${item.user.last_name[0] || ""}`.toUpperCase()
+                    const preview = item.last_message.is_file
+                      ? `[File] ${item.last_message.file_attachment?.file_name || "Attachment"}`
+                      : (item.last_message.content || "")
+                    const online = isUserOnline(item.user.user_id)
+
+                    return (
+                      <button
+                        key={item.user.user_id}
+                        onClick={() => router.push(
+                          `/direct-messages?dm_user_id=${item.user.user_id}&dm_name=${encodeURIComponent(`${item.user.first_name} ${item.user.last_name}`)}`
+                        )}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
+                          isActive ? "bg-muted" : "hover:bg-muted/70"
+                        )}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <Avatar className="h-9 w-9">
+                            {item.user.avatar_url && <AvatarImage src={item.user.avatar_url} alt={`${item.user.first_name} ${item.user.last_name}`} />}
+                            <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+                          </Avatar>
+                          <span className={cn(
+                            "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                            online ? "bg-emerald-500" : "bg-muted-foreground/40"
+                          )} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {item.user.first_name} {item.user.last_name}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">{preview}</p>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
               </div>
-            ) : filteredConversations.length === 0 && friendsWithoutConversation.length === 0 ? (
-              <p className="px-3 py-4 text-xs text-muted-foreground">No conversations yet.</p>
-            ) : (
-              filteredConversations.map((item) => {
-                const isActive = activeReceiverId === item.user.user_id
-                const initials = `${item.user.first_name[0] || ""}${item.user.last_name[0] || ""}`.toUpperCase()
-                const preview = item.last_message.is_file
-                  ? `[File] ${item.last_message.file_attachment?.file_name || "Attachment"}`
-                  : (item.last_message.content || "")
-                const online = isUserOnline(item.user.user_id)
 
-                return (
-                  <button
-                    key={item.user.user_id}
-                    onClick={() => router.push(
-                      `/direct-messages?dm_user_id=${item.user.user_id}&dm_name=${encodeURIComponent(`${item.user.first_name} ${item.user.last_name}`)}`
-                    )}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
-                      isActive ? "bg-muted" : "hover:bg-muted/70"
-                    )}
-                  >
-                    <div className="relative flex-shrink-0">
-                      <Avatar className="h-9 w-9">
-                        {item.user.avatar_url && <AvatarImage src={item.user.avatar_url} alt={`${item.user.first_name} ${item.user.last_name}`} />}
-                        <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
-                      </Avatar>
-                      <span className={cn(
-                        "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
-                        online ? "bg-emerald-500" : "bg-muted-foreground/40"
-                      )} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
-                        {item.user.first_name} {item.user.last_name}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">{preview}</p>
-                    </div>
-                  </button>
-                )
-              })
-            )}
-          </div>
-
-          {/* Friends Section — always visible */}
-          <Separator className="my-2" />
-          <div className="flex items-center gap-2 px-3 py-2">
-            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-semibold text-muted-foreground tracking-wide">Friends</span>
-            {friends.length > 0 && (
-              <span className="ml-auto text-xs text-muted-foreground">{friends.length}</span>
-            )}
-          </div>
-          <div className="space-y-0.5">
-            {loadingFriends ? (
-              <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Loading...
+              {/* Friends Section — always visible */}
+              <Separator className="my-2" />
+              <div className="flex items-center gap-2 px-3 py-2">
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground tracking-wide">Friends</span>
+                {friends.length > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">{friends.length}</span>
+                )}
               </div>
-            ) : friendsWithoutConversation.length === 0 && !searchQuery ? (
-              <p className="px-3 py-3 text-xs text-muted-foreground">
-                {friends.length === 0 ? "No friends yet." : "All friends have open conversations."}
-              </p>
-            ) : (
-              friendsWithoutConversation.map((friend) => {
-                const isActive = activeReceiverId === friend.user_id
-                const initials = `${friend.first_name[0] || ""}${friend.last_name[0] || ""}`.toUpperCase()
-                const online = isUserOnline(friend.user_id)
+              <div className="space-y-0.5">
+                {loadingFriends ? (
+                  <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading...
+                  </div>
+                ) : friendsWithoutConversation.length === 0 && !searchQuery ? (
+                  <p className="px-3 py-3 text-xs text-muted-foreground">
+                    {friends.length === 0 ? "No friends yet." : "All friends have open conversations."}
+                  </p>
+                ) : (
+                  friendsWithoutConversation.map((friend) => {
+                    const isActive = activeReceiverId === friend.user_id
+                    const initials = `${friend.first_name[0] || ""}${friend.last_name[0] || ""}`.toUpperCase()
+                    const online = isUserOnline(friend.user_id)
 
-                return (
-                  <button
-                    key={friend.user_id}
-                    onClick={() => router.push(
-                      `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(`${friend.first_name} ${friend.last_name}`)}`
-                    )}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
-                      isActive ? "bg-muted" : "hover:bg-muted/70"
-                    )}
-                  >
-                    <div className="relative flex-shrink-0">
-                      <Avatar className="h-9 w-9">
-                        {friend.avatar_url && <AvatarImage src={friend.avatar_url} alt={`${friend.first_name} ${friend.last_name}`} />}
-                        <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
-                      </Avatar>
-                      <span className={cn(
-                        "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
-                        online ? "bg-emerald-500" : "bg-muted-foreground/40"
-                      )} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
-                        {friend.first_name} {friend.last_name}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {online ? "Active now" : (friend.user_tag ? `#${friend.user_tag}` : "Offline")}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })
-            )}
-          </div>
+                    return (
+                      <button
+                        key={friend.user_id}
+                        onClick={() => router.push(
+                          `/direct-messages?dm_user_id=${friend.user_id}&dm_name=${encodeURIComponent(`${friend.first_name} ${friend.last_name}`)}`
+                        )}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150",
+                          isActive ? "bg-muted" : "hover:bg-muted/70"
+                        )}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <Avatar className="h-9 w-9">
+                            {friend.avatar_url && <AvatarImage src={friend.avatar_url} alt={`${friend.first_name} ${friend.last_name}`} />}
+                            <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+                          </Avatar>
+                          <span className={cn(
+                            "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                            online ? "bg-emerald-500" : "bg-muted-foreground/40"
+                          )} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {friend.first_name} {friend.last_name}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {online ? "Active now" : (friend.user_tag ? `#${friend.user_tag}` : "Offline")}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Group Chats */}
+              <div className="space-y-0.5">
+                {loadingGroupChats ? (
+                  <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading...
+                  </div>
+                ) : groupChats.filter((g) =>
+                    !searchQuery || g.group_name.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).length === 0 ? (
+                  <div className="px-3 py-8 text-center">
+                    <MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
+                    <p className="text-xs text-muted-foreground">
+                      {groupChats.length === 0 ? "No group chats yet." : "No groups match your search."}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 text-xs"
+                      onClick={() => router.push("/group-chat/create")}
+                    >
+                      Create Group Chat
+                    </Button>
+                  </div>
+                ) : (
+                  groupChats
+                    .filter((g) =>
+                      !searchQuery || g.group_name.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((group) => (
+                      <button
+                        key={group.id}
+                        onClick={() => router.push(`/group-chat/${group.id}`)}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all duration-150 hover:bg-muted/70"
+                      >
+                        <Avatar className="h-9 w-9 flex-shrink-0">
+                          <AvatarImage src={group.group_image} alt={group.group_name} />
+                          <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                            {group.group_name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{group.group_name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {group.member_count} member{group.member_count !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                )}
+              </div>
+            </>
+          )}
         </ScrollArea>
       </div>
 

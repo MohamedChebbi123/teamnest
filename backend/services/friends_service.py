@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+﻿from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from utils.jwt_handler import verify_token
 from models.Users import Users
@@ -35,7 +35,6 @@ def send_friend_request_service(authorization: str, db: Session, user_tag: str =
     if receiver.user_id == user_id:
         raise HTTPException(status_code=400, detail="You cannot send a friend request to yourself")
 
-    # Check if either user has blocked the other
     block_exists = db.query(Blocked_users).filter(
         ((Blocked_users.blocker_id == user_id) & (Blocked_users.blocked_id == receiver.user_id)) |
         ((Blocked_users.blocker_id == receiver.user_id) & (Blocked_users.blocked_id == user_id))
@@ -43,7 +42,6 @@ def send_friend_request_service(authorization: str, db: Session, user_tag: str =
     if block_exists:
         raise HTTPException(status_code=400, detail="Cannot send friend request to this user")
 
-    # Check if already friends
     existing_friendship = db.query(Friends).filter(
         ((Friends.user_id == user_id) & (Friends.friend_id == receiver.user_id)) |
         ((Friends.user_id == receiver.user_id) & (Friends.friend_id == user_id))
@@ -51,7 +49,6 @@ def send_friend_request_service(authorization: str, db: Session, user_tag: str =
     if existing_friendship:
         raise HTTPException(status_code=400, detail="You are already friends with this user")
 
-    # Check if a pending request already exists (in either direction)
     existing_request = db.query(Pending_friends_request).filter(
         Pending_friends_request.status == "pending",
         ((Pending_friends_request.sender_id == user_id) & (Pending_friends_request.receiver_id == receiver.user_id)) |
@@ -241,7 +238,6 @@ def block_user_service(blocked_id: int, authorization: str, db: Session):
     if already_blocked:
         raise HTTPException(status_code=400, detail="User is already blocked")
 
-    # Remove friendship if it exists
     friendship = db.query(Friends).filter(
         ((Friends.user_id == user_id) & (Friends.friend_id == blocked_id)) |
         ((Friends.user_id == blocked_id) & (Friends.friend_id == user_id))
@@ -249,7 +245,6 @@ def block_user_service(blocked_id: int, authorization: str, db: Session):
     if friendship:
         db.delete(friendship)
 
-    # Remove any pending friend requests between the two users
     pending = db.query(Pending_friends_request).filter(
         Pending_friends_request.status == "pending",
         ((Pending_friends_request.sender_id == user_id) & (Pending_friends_request.receiver_id == blocked_id)) |
@@ -325,4 +320,5 @@ def get_blocked_users_service(authorization: str, db: Session):
             })
 
     return blocked_list
+
 

@@ -1,4 +1,4 @@
-from services.channel_service import (
+﻿from services.channel_service import (
     create_channel_service, 
     fetch_channels_service, 
     fetch_single_channel_service,
@@ -67,14 +67,7 @@ async def delete_channel(
     return delete_channel_service(channel_id, authorization, db)
 
 
-# @router.post("/channel/send_message")
-# async def send_message(
-#     data: Message_input,
-#     authorization: str = Header(None),
-#     db: Session = Depends(connect_databse)
-# ):
 
-#     return send_messages_channel_service(data, authorization, db)
 
 
 @router.get("/organization/{org_id}/channel/{channel_id}/messages")
@@ -171,22 +164,6 @@ async def notifications_websocket_handler(
     return await notifications_ws_endpoint(websocket, token, db)
 
 
-# @router.websocket("/voice/{channel_id}")
-# async def voice_websocket_handler(
-#     websocket: WebSocket,
-#     channel_id: int,
-#     authorization: str = Query(...),
-#     org_id: int = Query(...),
-#     db: Session = Depends(connect_databse)
-# ):
-#     return await voice_websocket_service(websocket, channel_id, authorization, org_id, db)
 
 
-# @router.get("/voice/{channel_id}/participants")
-# async def fetch_voice_participants(
-#     channel_id: int,
-#     org_id: int = Query(...),
-#     authorization: str = Header(None),
-#     db: Session = Depends(connect_databse)
-# ):
-#     return fetch_voice_participants_service(channel_id, org_id, authorization, db)
+

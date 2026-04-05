@@ -1,4 +1,4 @@
-import random
+﻿import random
 import re
 import os
 from fastapi import HTTPException
@@ -143,11 +143,9 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, authorization: 
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    # Get the subscription from Stripe
     stripe_subscription_id = None
     stripe_price_id = None
 
-    # Try session_id from URL first
     if session_id:
         try:
             checkout_session = stripe.checkout.Session.retrieve(session_id)
@@ -155,7 +153,6 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, authorization: 
         except Exception as e:
             print(f"[confirm_upgrade] Session lookup failed: {e}")
 
-    # Fallback: find the most recent completed checkout for this org
     if not stripe_subscription_id:
         try:
             sessions = stripe.checkout.Session.list(limit=10)
@@ -672,4 +669,5 @@ def accept_or_reject_service(
         "role_user": new_member.role_user
     }
     
+
 

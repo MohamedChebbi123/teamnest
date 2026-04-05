@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime,Integer,String,Text,ForeignKey
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -12,5 +12,4 @@ class Organization_members(Base):
     org_id=Column(Integer,ForeignKey("organization.organization_id",ondelete="CASCADE"),nullable=False)
     joined_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     
-    # Relationship to Users
     user = relationship("Users")

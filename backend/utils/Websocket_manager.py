@@ -62,7 +62,7 @@ class VoiceWebsocketManager:
         if websocket in channel_connections:
             channel_connections.remove(websocket)
 
-        # Keep the mapping clean when the last participant leaves.
+       
         if not channel_connections:
             self.voice_channels.pop(channel_id, None)
 
@@ -182,13 +182,6 @@ class ConnectivityManager:
 connectivity_manager = ConnectivityManager()
 
 
-
-
-
-
-
-
-
 async def cleanup_task(db_factory):
     while True:
         now = datetime.now(timezone.utc)
@@ -225,3 +218,36 @@ async def cleanup_task(db_factory):
                 )
 
         await asyncio.sleep(10)
+        
+        
+        
+class GroupChatWebSocketManager():
+    def __init__(self):
+        self.channels: Dict[int, List[WebSocket]] = {}
+
+    async def connect(self, group_chat_id: int, websocket: WebSocket):
+        await websocket.accept()
+        channel_connections = self.channels.setdefault(group_chat_id, [])
+        if websocket not in channel_connections:
+            channel_connections.append(websocket)
+
+    def disconnect(self, group_chat_id: int, websocket: WebSocket):
+        channel_connections = self.channels.get(group_chat_id)
+        if not channel_connections:
+            return
+        if websocket in channel_connections:
+            channel_connections.remove(websocket)
+        if not channel_connections:
+            self.channels.pop(group_chat_id, None)
+
+    async def broadcast(self, group_chat_id: int, message: dict, exclude: Optional[WebSocket] = None):
+        for ws in list(self.channels.get(group_chat_id, [])):
+            if exclude is not None and ws is exclude:
+                continue
+            try:
+                await ws.send_json(message)
+            except Exception:
+                self.disconnect(group_chat_id, ws)
+
+
+group_chat_ws_manager = GroupChatWebSocketManager()

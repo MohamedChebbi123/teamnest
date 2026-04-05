@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+﻿from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from utils.jwt_handler import verify_token
 from utils.cloudinary_handler import upload_chat_file_from_base64
@@ -82,7 +82,6 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, autho
         if not role or not role.can_manage_tasks:
             raise HTTPException(status_code=403, detail="You do not have permission to create tasks")
 
-    # Validate parent task belongs to same team
     if task_data.parent_task_id:
         parent = db.query(Tasks).filter(
             Tasks.id == task_data.parent_task_id,
@@ -92,7 +91,6 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, autho
         if not parent:
             raise HTTPException(status_code=404, detail="Parent task not found in this team")
 
-    # Validate all assignees are team members
     if task_data.assignee_ids:
         for assignee_id in task_data.assignee_ids:
             member = db.query(Team_association).filter(
@@ -210,7 +208,6 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
         task.subtask_group = task_data.subtask_group
 
     if task_data.assignee_ids is not None:
-        # Validate all assignees are team members
         for assignee_id in task_data.assignee_ids:
             member = db.query(Team_association).filter(
                 Team_association.team_id == team_id,
@@ -219,7 +216,6 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
             if not member:
                 raise HTTPException(status_code=400, detail=f"User {assignee_id} is not a member of this team")
 
-        # Remove old assignees and add new ones
         db.query(Task_assignees).filter(Task_assignees.task_id == task.id).delete()
         for assignee_id in task_data.assignee_ids:
             db.add(Task_assignees(task_id=task.id, user_id=assignee_id))
@@ -292,7 +288,6 @@ def get_my_tasks_service(task_id:int,authorization: str, db: Session):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # Check if user is assigned to this task
     is_assigned = db.query(Task_assignees).filter(
         Task_assignees.task_id == task_id,
         Task_assignees.user_id == user_id
@@ -382,7 +377,6 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
     if not is_assigned:
         raise HTTPException(status_code=403, detail="You are not assigned to this task")
 
-    # Enforce review before done
     if status_data.status == "done" and task.status != "review":
         raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
 
@@ -431,7 +425,6 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authoriza
     if task.status != "review":
         raise HTTPException(status_code=400, detail="Task is not in review status")
 
-    # Assignees cannot accept or reject their own task
     is_assignee = db.query(Task_assignees).filter(
         Task_assignees.task_id == task_id,
         Task_assignees.user_id == user_id
@@ -439,7 +432,6 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authoriza
     if is_assignee:
         raise HTTPException(status_code=403, detail="Assignees cannot accept or reject their own task")
 
-    # Only org owner or users with can_manage_tasks role can review
     is_owner = found_organization.owner_id == user_id
     if not is_owner:
         role = db.query(Team_roles).filter(
@@ -531,3 +523,4 @@ def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: in
     db.commit()
 
     return {"message": "Attachment deleted"}
+

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime,Integer,String,Text,ForeignKey
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -13,5 +13,5 @@ class Organization_payments(Base):
     status = Column(String)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
-    # Relationships
     organization = relationship("Organization", back_populates="payments")
+

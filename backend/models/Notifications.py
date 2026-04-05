@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Text,String
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -14,7 +14,6 @@ class Notifications(Base):
     is_seen=Column(Boolean,default=False)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
-    # Relationships
     user = relationship("Users", back_populates="notifications")
     message = relationship("Messages", back_populates="notifications")
     dm_message = relationship("Direct_messages", back_populates="notifications")

@@ -354,6 +354,21 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
             </Link>
           </Button>
 
+          {/* Create Group Chat Button */}
+          <Button
+            asChild
+            variant={pathname === '/group-chat/create' ? 'secondary' : 'ghost'}
+            className={cn(
+              'w-full h-12 transition-all',
+              'justify-center px-2',
+              pathname === '/group-chat/create' && 'bg-primary/10 text-primary hover:bg-primary/20'
+            )}
+          >
+            <Link href="/group-chat/create" title="Create Group Chat">
+              <UserPlus className="h-5 w-5 flex-shrink-0" />
+            </Link>
+          </Button>
+
           {/* Notifications Button */}
           <DropdownMenu open={showNotifications} onOpenChange={setShowNotifications}>
             <DropdownMenuTrigger asChild>

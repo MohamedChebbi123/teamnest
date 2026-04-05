@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime,Integer,String,Text,ForeignKey
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -14,6 +14,5 @@ class Channels(Base):
     team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=True)
     org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)
     
-    # Relationships
     team = relationship("Teams", back_populates="channels")
     organization = relationship("Organization", back_populates="channels")

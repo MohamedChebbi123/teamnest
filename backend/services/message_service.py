@@ -1,4 +1,4 @@
-from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+﻿from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime, UTC
 import os
 import re
@@ -259,63 +259,18 @@ def fetch_voice_participants_service(channel_id: int, org_id: int, authorization
     }
 
 
-# def send_messages_channel_service(data: Message_input, authorization: str, db: Session):
-#     if not authorization or not authorization.startswith("Bearer "):
-#         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
-#     token = authorization.split(" ")[1]
-#     payload = verify_token(token, "access")
 
-#     if not payload or "sub" not in payload:
-#         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-#     user_id = int(payload["sub"])
 
-#     channel = db.query(Channels).filter(
-#         Channels.channel_id == data.channel_id,
-#         Channels.org_id == data.org_id
-#     ).first()
 
-#     if not channel:
-#         raise HTTPException(status_code=404, detail="Channel not found in this organization")
 
-#     found_user_at_org = db.query(Organization_members).filter(
-#         Organization_members.memmber_id == user_id,
-#         Organization_members.org_id == data.org_id
-#     ).first()
 
-#     if not found_user_at_org:
-#         raise HTTPException(status_code=403, detail="User is not a member of this organization")
 
-#     parent_message = None
-#     if data.parent_id is not None:
-#         parent_message = db.query(Messages).filter(
-#             Messages.message_id == data.parent_id,
-#             Messages.channel_id == data.channel_id,
-#             Messages.is_deleted == False
-#         ).first()
 
-#         if not parent_message:
-#             raise HTTPException(status_code=404, detail="Reply target not found")
 
-#     new_message = Messages(
-#         message_content=data.message_content,
-#         sender_id=user_id,
-#         channel_id=data.channel_id,
-#         parent_id=parent_message.message_id if parent_message else None
-#     )
 
-#     db.add(new_message)
-#     db.commit()
-#     db.refresh(new_message)
 
-#     return {
-#         "message_id": new_message.message_id,
-#         "message_content": new_message.message_content,
-#         "parent_id": new_message.parent_id,
-#         "sent_at": new_message.sent_at,
-#         "edited_at": new_message.edited_at,
-#     }
 
 
 def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Session):
@@ -429,8 +384,6 @@ def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Sessi
             }
         })
 
-    # Files are linked to team_id (nullable). For org-level channels, include files
-    # with team_id=None sent by users who belong to this organization.
     if channel.team_id is not None:
         files = db.query(
             Files,
@@ -779,7 +732,6 @@ async def notifications_ws_endpoint(
 
     try:
         while True:
-            # Keep connection alive and reserve a path for future client actions.
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass

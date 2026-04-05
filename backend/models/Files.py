@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime, Integer, ForeignKey, String
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -15,6 +15,5 @@ class Files(Base):
     is_deleted=Column(Boolean,default=False)
     sent_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
-    # Relationships
     sender = relationship("Users", back_populates="files_sent")
     team = relationship("Teams", back_populates="files")

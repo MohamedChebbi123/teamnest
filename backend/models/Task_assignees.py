@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 from sqlalchemy import Column, DateTime, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from database.connection import Base
@@ -12,6 +12,6 @@ class Task_assignees(Base):
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     assigned_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
-    # Relationships
     task = relationship("Tasks", back_populates="assignees")
     user = relationship("Users", back_populates="task_assignments")
+

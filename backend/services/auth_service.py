@@ -1,4 +1,4 @@
-from models.Users import Users
+﻿from models.Users import Users
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from utils.hasher import hash_password
@@ -137,14 +137,11 @@ async def login_user_service(validator:Logininput,db: Session):
     if not verify_password(validator.password,found_user.password_hashed):
         raise HTTPException(status_code=401,detail="wrong password")
     
-    #refresh_token=create_refresh_token({"sub": str(found_user.user_id)}) dont remove comment 
     access_token=create_access_token({"sub": str(found_user.user_id)})
-    #print(refresh_token)
     print(access_token)
     
     return{
         "message":"user logged in successfully",
-        #"refresh token":refresh_token,
         "access_token":access_token
     }
 
@@ -528,3 +525,4 @@ async def check_connectivity(websocket, authorization: str, db: Session):
 
 def get_online_status(user_ids: list[int]) -> dict:
     return {uid: ConnectivityManager.is_online(uid) for uid in user_ids}
+
