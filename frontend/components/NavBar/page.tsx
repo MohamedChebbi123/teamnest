@@ -84,7 +84,7 @@ export default function NavBar({ user }: NavBarProps) {
           {/* Logo */}
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="TeamNest Logo" className="h-10 w-10 rounded-lg object-cover" />
-            <Link href="/" className="text-2xl font-bold text-primary">
+            <Link href="/home" className="text-2xl font-bold text-primary">
               TeamNest
             </Link>
           </div>

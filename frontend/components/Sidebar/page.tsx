@@ -300,7 +300,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       >
         {/* Sidebar Header */}
         <div className="flex items-center justify-center p-4 border-b">
-          <Link href="/">
+          <Link href="/home">
             <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">TN</span>
             </div>
@@ -312,14 +312,14 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           {/* Home Button */}
           <Button
             asChild
-            variant={pathname === '/welcome' || pathname === '/' ? 'secondary' : 'ghost'}
+            variant={pathname === '/welcome' || pathname === '/home' ? 'secondary' : 'ghost'}
             className={cn(
               'w-full h-12 transition-all',
               'justify-center px-2',
-              (pathname === '/welcome' || pathname === '/') && 'bg-primary/10 text-primary hover:bg-primary/20'
+              (pathname === '/welcome' || pathname === '/home') && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
           >
-            <Link href="/" title="Home">
+            <Link href="/home" title="Home">
               <Home className="h-5 w-5 flex-shrink-0" />
             </Link>
           </Button>
