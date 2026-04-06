@@ -1101,10 +1101,9 @@ export default function OrganizationPage() {
                         <Button
                           variant="ghost"
                           className="w-full justify-start gap-3 h-9 text-sm font-normal text-amber-600 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-                          onClick={handleUpgrade}
-                          disabled={upgrading}
+                          onClick={() => router.push(`/organization/${organizationId}/upgrade`)}
                         >
-                          {upgrading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Zap className="h-4 w-4 shrink-0" />}
+                          <Zap className="h-4 w-4 shrink-0" />
                           Upgrade to Pro
                         </Button>
                       ) : (
