@@ -22,6 +22,8 @@ interface Member {
 interface MembersSidebarProps {
   organizationId: string | number
   teamId?: string | number
+  isOpen?: boolean
+  onToggle?: (open: boolean) => void
 }
 
 interface TeamSummary {
@@ -59,9 +61,18 @@ interface MemberDetailsResponse {
 type TeamInfo = NonNullable<MemberDetailsResponse["team"]>
 type PermissionKey = keyof TeamInfo["permissions"]
 
-export default function MembersSidebar({ organizationId, teamId }: MembersSidebarProps) {
+export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenProp, onToggle }: MembersSidebarProps) {
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpenInternal, setIsOpenInternal] = useState(true)
+  const isControlled = isOpenProp !== undefined
+  const isOpen = isControlled ? isOpenProp : isOpenInternal
+  const setIsOpen = (val: boolean) => {
+    if (isControlled) {
+      onToggle?.(val)
+    } else {
+      setIsOpenInternal(val)
+    }
+  }
   const [sidebarWidth, setSidebarWidth] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
@@ -85,8 +96,8 @@ export default function MembersSidebar({ organizationId, teamId }: MembersSideba
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       // Close sidebar on mobile by default
-      if (mobile && isOpen) {
-        setIsOpen(false);
+      if (mobile && isOpenInternal) {
+        setIsOpenInternal(false);
       }
     };
     checkMobile();

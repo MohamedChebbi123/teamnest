@@ -222,6 +222,7 @@ export default function ChannelPage() {
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([])
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
   const [showInfo, setShowInfo] = useState(false)
+  const [showMembers, setShowMembers] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
@@ -788,7 +789,7 @@ export default function ChannelPage() {
     return `${typingUsers[0].first_name}, ${typingUsers[1].first_name} and ${typingUsers.length - 2} others are typing...`
   })()
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!message.trim() || !channel || isSendingMessage) return
 
@@ -1279,11 +1280,11 @@ export default function ChannelPage() {
     <>
       <Sidebar />
       <OrganizationNavBar organizationId={channel.organization.organization_id} />
-      <MembersSidebar organizationId={channel.organization.organization_id} />
+      <MembersSidebar organizationId={channel.organization.organization_id} isOpen={showMembers} onToggle={setShowMembers} />
       
-      <main className={`ml-[368px] min-h-screen bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.08),_transparent_55%),linear-gradient(to_bottom,_hsl(var(--background)),_hsl(var(--muted)/0.25))] transition-all duration-300 ${showInfo || showPinnedMessages ? 'mr-[640px]' : 'mr-80'}`}>
+      <main className={`ml-[368px] min-h-screen bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.08),_transparent_55%),linear-gradient(to_bottom,_hsl(var(--background)),_hsl(var(--muted)/0.25))] transition-all duration-300 ${showMembers ? ((showInfo || showPinnedMessages) ? 'mr-[640px]' : 'mr-80') : ((showInfo || showPinnedMessages) ? 'mr-80' : 'mr-0')}`}>
         {/* Channel Header */}
-        <header className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
+        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b shadow-sm">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/70 px-3 py-2">
@@ -1340,10 +1341,21 @@ export default function ChannelPage() {
               )}
 
               <Button
+                variant={showMembers ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setShowMembers(!showMembers)}
+                className="h-9 w-9"
+                title="Members"
+              >
+                <Users className="h-4 w-4" />
+              </Button>
+
+              <Button
                 variant={showInfo ? "secondary" : "ghost"}
                 size="icon"
                 onClick={() => { setShowInfo(!showInfo); if (!showInfo) setShowPinnedMessages(false) }}
                 className="h-9 w-9"
+                title="Channel info"
               >
                 <Info className="h-4 w-4" />
               </Button>
