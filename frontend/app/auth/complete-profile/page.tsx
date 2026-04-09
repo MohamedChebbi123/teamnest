@@ -112,7 +112,7 @@ export default function CompleteProfilePage() {
       formDataToSend.append("country", selectedCountry)
       formDataToSend.append("avatar", avatar)
 
-      const response = await fetch("http://localhost:8000/complete-profile", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/complete-profile`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

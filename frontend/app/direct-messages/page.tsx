@@ -322,7 +322,7 @@ export default function ChannelsPage() {
     const token = localStorage.getItem("access_token")
     if (!token) return
     setLoadingReceiverInfo(true)
-    fetch(`http://localhost:8000/get_user_info?user_id=${receiverId}`, {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_user_info?user_id=${receiverId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.ok ? r.json() : null)
@@ -337,7 +337,7 @@ export default function ChannelsPage() {
 
     setLoadingConversations(true)
     try {
-      const response = await fetch("http://localhost:8000/direct-messages", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok) throw new Error("Failed to fetch conversations")
@@ -356,7 +356,7 @@ export default function ChannelsPage() {
 
     setLoadingFriends(true)
     try {
-      const response = await fetch("http://localhost:8000/friends", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
@@ -376,7 +376,7 @@ export default function ChannelsPage() {
 
     setLoadingGroupChats(true)
     try {
-      const response = await fetch("http://localhost:8000/group_chats", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chats`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
@@ -396,7 +396,7 @@ export default function ChannelsPage() {
 
     setFriendActionLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/friends/${friendUserId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/${friendUserId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -421,7 +421,7 @@ export default function ChannelsPage() {
 
     setFriendActionLoading(true)
     try {
-      const response = await fetch("http://localhost:8000/friends/request", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/request`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -452,7 +452,7 @@ export default function ChannelsPage() {
 
     const fetchCurrentUser = async () => {
       try {
-        const response = await fetch("http://localhost:8000/profile", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) { router.push("/auth/login"); return }
@@ -476,7 +476,7 @@ export default function ChannelsPage() {
     const fetchConversation = async () => {
       setLoadingMessages(true)
       try {
-        const response = await fetch(`http://localhost:8000/direct-messages/${receiverId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages/${receiverId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) {
@@ -503,7 +503,7 @@ export default function ChannelsPage() {
     const connect = () => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return
 
-      const ws = new WebSocket(`ws://localhost:8000/ws/direct-messages?token=${token}`)
+      const ws = new WebSocket(`/ws/direct-messages?token=${token}`)
 
       ws.onopen = () => setIsConnected(true)
 
@@ -637,7 +637,7 @@ export default function ChannelsPage() {
         const token = localStorage.getItem("access_token")
         if (!token) { router.push("/auth/login"); return }
 
-        const response = await fetch("http://localhost:8000/direct-messages", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -681,7 +681,7 @@ export default function ChannelsPage() {
         const token = localStorage.getItem("access_token")
         if (!token) { router.push("/auth/login"); return }
 
-        const response = await fetch(`http://localhost:8000/direct-messages/${editingMessageId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages/${editingMessageId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ content: trimmed }),
@@ -713,7 +713,7 @@ export default function ChannelsPage() {
         const token = localStorage.getItem("access_token")
         if (!token) { router.push("/auth/login"); return }
 
-        const response = await fetch(`http://localhost:8000/direct-messages/${messageId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages/${messageId}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         })
@@ -791,7 +791,7 @@ export default function ChannelsPage() {
     const timeout = window.setTimeout(async () => {
       try {
         const response = await fetch(
-          `http://localhost:8000/direct-messages/${receiverId}/search?q=${encodeURIComponent(query)}`,
+          `${process.env.NEXT_PUBLIC_API_URL}/direct-messages/${receiverId}/search?q=${encodeURIComponent(query)}`,
           {
             headers: { Authorization: `Bearer ${token}` },
             signal: controller.signal,

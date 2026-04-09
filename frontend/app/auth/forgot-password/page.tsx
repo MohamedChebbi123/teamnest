@@ -54,7 +54,7 @@ export default function ForgotPassword() {
       const formData = new FormData()
       formData.append("email", email)
 
-      const response = await fetch("http://localhost:8000/forgot-password", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/forgot-password`, {
         method: "POST",
         body: formData,
       })

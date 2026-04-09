@@ -44,7 +44,7 @@ type VoiceChannelPanelProps = {
 }
 
 function buildVoiceWsUrl(channelId: number, orgId: number, token: string): string {
-  const wsBaseUrl = "ws://localhost:8000"
+  const wsBaseUrl = `${process.env.NEXT_PUBLIC_WS_URL}`
   const authValue = encodeURIComponent(`Bearer ${token}`)
   return `${wsBaseUrl}/voice/${channelId}?authorization=${authValue}&org_id=${orgId}`
 }
@@ -112,7 +112,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
         return
       }
 
-      const response = await fetch(`http://localhost:8000/voice/${channelId}/participants?org_id=${orgId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/voice/${channelId}/participants?org_id=${orgId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

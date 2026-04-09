@@ -193,7 +193,7 @@ export default function UpgradePage() {
         }
 
         const res = await fetch(
-          `http://localhost:8000/get_organization/${organizationId}`,
+          `${process.env.NEXT_PUBLIC_API_URL}/get_organization/${organizationId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
 
@@ -223,7 +223,7 @@ export default function UpgradePage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/organization/${organizationId}/subscribe`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/subscribe`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },

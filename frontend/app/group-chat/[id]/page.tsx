@@ -188,7 +188,7 @@ export default function GroupChatRoom() {
   const fetchMessages = async (token: string) => {
     setLoadingMessages(true)
     try {
-      const res = await fetch(`http://localhost:8000/group_chat/${groupId}/messages`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/messages`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {
@@ -210,7 +210,7 @@ export default function GroupChatRoom() {
   }
 
   const connectWebSocket = (token: string) => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/group_chat/${groupId}?token=${token}`)
+    const ws = new WebSocket(`/ws/group_chat/${groupId}?token=${token}`)
     wsRef.current = ws
 
     ws.onopen = () => setIsConnected(true)
@@ -347,7 +347,7 @@ export default function GroupChatRoom() {
       if (editGroupDescription) form.append("group_description", editGroupDescription)
       if (editGroupImage) form.append("image", editGroupImage)
 
-      const res = await fetch(`http://localhost:8000/group_chat/${groupId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -368,7 +368,7 @@ export default function GroupChatRoom() {
     setDeletingGroup(true)
     try {
       const token = localStorage.getItem("access_token")
-      const res = await fetch(`http://localhost:8000/group_chat/${groupId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -389,7 +389,7 @@ export default function GroupChatRoom() {
     setLoadingFriends(true)
     try {
       const token = localStorage.getItem("access_token")
-      const res = await fetch(`http://localhost:8000/group_chat/${groupId}/friends`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/friends`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
@@ -407,7 +407,7 @@ export default function GroupChatRoom() {
     setAddingMembers(true)
     try {
       const token = localStorage.getItem("access_token")
-      const res = await fetch(`http://localhost:8000/group_chat/${groupId}/add_members`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/add_members`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(selectedFriends),

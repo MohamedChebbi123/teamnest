@@ -53,7 +53,7 @@ export default function EditProfile() {
                 return
             }
 
-            const response = await fetch("http://localhost:8000/profile", {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }
@@ -128,7 +128,7 @@ export default function EditProfile() {
                 formData.append("avatar", avatarFile)
             }
 
-            const response = await fetch("http://localhost:8000/update-profile", {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/update-profile`, {
                 method: "PUT",
                 headers: {
                     "Authorization": `Bearer ${token}`
@@ -182,7 +182,7 @@ export default function EditProfile() {
                 formData.append("phone_number", phoneNumber)
             }
 
-            const response = await fetch("http://localhost:8000/update-contact-info", {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/update-contact-info`, {
                 method: "PUT",
                 headers: {
                     "Authorization": `Bearer ${token}`

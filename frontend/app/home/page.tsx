@@ -15,7 +15,7 @@ export default function Home() {
       }
 
       try {
-        const response = await fetch("http://localhost:8000/get_org_for_admin_org", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_org_for_admin_org`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

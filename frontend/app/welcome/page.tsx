@@ -92,7 +92,7 @@ export default function WelcomePage() {
 
         try {
             setSendingInvite(true)
-            const response = await fetch("http://localhost:8000/organization/join", {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/join`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

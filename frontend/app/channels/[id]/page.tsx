@@ -279,7 +279,7 @@ export default function ChannelPage() {
         }
 
         // Get current user info
-        const userResponse = await fetch("http://localhost:8000/profile", {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -293,7 +293,7 @@ export default function ChannelPage() {
           console.error('Failed to fetch user data')
         }
 
-        const response = await fetch(`http://localhost:8000/channel/${channelId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/channel/${channelId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -308,7 +308,7 @@ export default function ChannelPage() {
 
           // Fetch pinned messages for pin/unpin detection
           const pinnedResponse = await fetch(
-            `http://localhost:8000/organization/${data.org_id}/channel/${data.channel_id}/pinned`,
+            `${process.env.NEXT_PUBLIC_API_URL}/organization/${data.org_id}/channel/${data.channel_id}/pinned`,
             { headers: { 'Authorization': `Bearer ${token}` } }
           )
           if (pinnedResponse.ok) {
@@ -359,7 +359,7 @@ export default function ChannelPage() {
 
       try {
         // Note: Backend has endpoint /mesages/{channel_id} (typo in backend)
-        const wsUrl = `ws://localhost:8000/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
+        const wsUrl = `/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
         const ws = new WebSocket(wsUrl)
 
         ws.onopen = () => {
@@ -560,7 +560,7 @@ export default function ChannelPage() {
       if (!authToken) return
 
       const response = await fetch(
-        `http://localhost:8000/organization/${orgId}/channel/${channelId}/messages`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/channel/${channelId}/messages`,
         {
           headers: {
             'Authorization': `Bearer ${authToken}`,
@@ -598,7 +598,7 @@ export default function ChannelPage() {
       const authToken = token || localStorage.getItem('access_token')
       if (!authToken) return
 
-      const response = await fetch(`http://localhost:8000/organization/${orgId}/members`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/members`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
         },
@@ -641,7 +641,7 @@ export default function ChannelPage() {
         if (!token || !channel) return
 
         const response = await fetch(
-          `http://localhost:8000/organization/${channel.org_id}/channel/${channel.channel_id}/messages/search?q=${encodeURIComponent(query.trim())}`,
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${channel.org_id}/channel/${channel.channel_id}/messages/search?q=${encodeURIComponent(query.trim())}`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         )
 
@@ -832,7 +832,7 @@ export default function ChannelPage() {
     //     return
     //   }
 
-    //   const response = await fetch('http://localhost:8000/channel/send_message', {
+    //   const response = await fetch('${process.env.NEXT_PUBLIC_API_URL}/channel/send_message', {
     //     method: 'POST',
     //     headers: {
     //       'Content-Type': 'application/json',
@@ -898,7 +898,7 @@ export default function ChannelPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/message/${messageId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/message/${messageId}`,
         {
           method: 'PUT',
           headers: {
@@ -961,7 +961,7 @@ export default function ChannelPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/message/${messageToDelete}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/message/${messageToDelete}`,
         {
           method: 'DELETE',
           headers: {
@@ -1003,7 +1003,7 @@ export default function ChannelPage() {
       if (!token) return
 
       const response = await fetch(
-        `http://localhost:8000/organization/${channel.org_id}/channel/${channel.channel_id}/pinned`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${channel.org_id}/channel/${channel.channel_id}/pinned`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       )
 
@@ -1029,7 +1029,7 @@ export default function ChannelPage() {
       if (!token) return
 
       const response = await fetch(
-        `http://localhost:8000/organization/${channel.org_id}/message/${messageId}/pin`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${channel.org_id}/message/${messageId}/pin`,
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
@@ -1062,7 +1062,7 @@ export default function ChannelPage() {
       if (!token) return
 
       const response = await fetch(
-        `http://localhost:8000/organization/${channel.org_id}/message/${messageId}/unpin`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${channel.org_id}/message/${messageId}/unpin`,
         {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` },

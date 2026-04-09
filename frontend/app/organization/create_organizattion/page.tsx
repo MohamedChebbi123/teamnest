@@ -118,7 +118,7 @@ export default function CreateOrganization() {
       formDataToSend.append("organization_description", formData.organizationDescription)
       formDataToSend.append("image", imageFile)
 
-      const response = await fetch("http://localhost:8000/create_organization", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create_organization`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

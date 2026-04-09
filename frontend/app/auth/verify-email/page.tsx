@@ -29,7 +29,7 @@ export default function VerifyEmailPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:8000/profile", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,
@@ -80,7 +80,7 @@ export default function VerifyEmailPage() {
       const formDataToSend = new FormData()
       formDataToSend.append("email", emailAddress)
       
-      const response = await fetch("http://localhost:8000/resend-verification", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/resend-verification`, {
         method: "POST",
         body: formDataToSend,
       })
@@ -131,7 +131,7 @@ export default function VerifyEmailPage() {
       formDataToSend.append("email", email)
       formDataToSend.append("verification_code", verificationCode)
       
-      const response = await fetch("http://localhost:8000/verify-email", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/verify-email`, {
         method: "POST",
         body: formDataToSend,
       })

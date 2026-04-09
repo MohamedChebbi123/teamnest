@@ -144,7 +144,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
           return
         }
 
-        const response = await fetch(`http://localhost:8000/organization/${organizationId}/members`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/members`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -208,7 +208,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
         setLoadingMemberDetails(true)
 
         const teamsResponse = await fetch(
-          `http://localhost:8000/organization/${organizationId}/teams`,
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -232,7 +232,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
         const teamDetails = await Promise.all(
           teams.map(async (team) => {
             const response = await fetch(
-              `http://localhost:8000/organization/${organizationId}/team/${team.team_id}/member/${memberUserId}`,
+              `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${team.team_id}/member/${memberUserId}`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -292,7 +292,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
       }
 
       const response = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/member/${memberUserId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/member/${memberUserId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -376,7 +376,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
 
     setSendingFriendRequest(true)
     try {
-      const response = await fetch("http://localhost:8000/friends/request", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/request`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -438,7 +438,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
 
     try {
       const response = await fetch(
-        `http://localhost:8000/team/${team.team_id}/member/${selectedMemberId}/revoke-permissions?permission_name=${permissionKey}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/team/${team.team_id}/member/${selectedMemberId}/revoke-permissions?permission_name=${permissionKey}`,
         {
           method: "PUT",
           headers: {

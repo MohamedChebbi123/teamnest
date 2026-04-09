@@ -58,7 +58,7 @@ export default function VerifyResetCode() {
       formData.append("email", email)
       formData.append("reset_code", code)
 
-      const response = await fetch("http://localhost:8000/verify-reset-code", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/verify-reset-code`, {
         method: "POST",
         body: formData,
       })
@@ -97,7 +97,7 @@ export default function VerifyResetCode() {
       const formData = new FormData()
       formData.append("email", email)
 
-      const response = await fetch("http://localhost:8000/forgot-password", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/forgot-password`, {
         method: "POST",
         body: formData,
       })

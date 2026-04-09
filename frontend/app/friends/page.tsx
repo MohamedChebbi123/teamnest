@@ -78,7 +78,7 @@ export default function FriendsPage() {
     if (!token) return
 
     try {
-      const response = await fetch("http://localhost:8000/friends", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
@@ -104,7 +104,7 @@ export default function FriendsPage() {
     if (!token) return
 
     try {
-      const response = await fetch("http://localhost:8000/friends/requests", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/requests`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
@@ -124,7 +124,7 @@ export default function FriendsPage() {
     if (!token) return
 
     try {
-      const response = await fetch("http://localhost:8000/friends/blocked", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/blocked`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
@@ -154,7 +154,7 @@ export default function FriendsPage() {
 
     setActionLoading(requestId)
     try {
-      const response = await fetch(`http://localhost:8000/friends/request/${requestId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/request/${requestId}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -187,7 +187,7 @@ export default function FriendsPage() {
 
     setActionLoading(friendUserId)
     try {
-      const response = await fetch(`http://localhost:8000/friends/${friendUserId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/${friendUserId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -213,7 +213,7 @@ export default function FriendsPage() {
 
     setActionLoading(userId)
     try {
-      const response = await fetch(`http://localhost:8000/friends/block/${userId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/block/${userId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -240,7 +240,7 @@ export default function FriendsPage() {
 
     setActionLoading(userId)
     try {
-      const response = await fetch(`http://localhost:8000/friends/unblock/${userId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/unblock/${userId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -272,7 +272,7 @@ export default function FriendsPage() {
 
     setSendingByTag(true)
     try {
-      const response = await fetch("http://localhost:8000/friends/request", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/friends/request`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

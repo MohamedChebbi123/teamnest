@@ -29,7 +29,7 @@ function SuccessContent() {
       }
 
       try {
-        const url = `http://localhost:8000/organization/${orgId}/confirm-upgrade${sessionId ? `?session_id=${sessionId}` : ""}`
+        const url = `${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/confirm-upgrade${sessionId ? `?session_id=${sessionId}` : ""}`
         console.log("[SuccessPage] calling confirm-upgrade:", url)
 
         const response = await fetch(url, {

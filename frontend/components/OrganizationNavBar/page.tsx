@@ -222,7 +222,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
 
         // Get current user info
-        const userResponse = await fetch("http://localhost:8000/profile", {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -236,7 +236,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
 
         // Fetch all user organizations
-        const orgsResponse = await fetch("http://localhost:8000/get_org_for_admin_org", {
+        const orgsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_org_for_admin_org`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -256,7 +256,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
 
         // Fetch members and user role
-        const membersResponse = await fetch(`http://localhost:8000/organization/${organizationId}/members`, {
+        const membersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/members`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -274,7 +274,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
 
         
-        const channelsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/channels`, {
+        const channelsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/channels`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -286,7 +286,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
 
         // Fetch user teams
-        const teamsResponse = await fetch('http://localhost:8000/user/teams', {
+        const teamsResponse = await fetch('${process.env.NEXT_PUBLIC_API_URL}/user/teams', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -411,7 +411,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     const connect = () => {
       if (ws && ws.readyState === WebSocket.OPEN) return
 
-      ws = new WebSocket(`ws://localhost:8000/ws/notifications?token=${encodeURIComponent(token)}`)
+      ws = new WebSocket(`/ws/notifications?token=${encodeURIComponent(token)}`)
 
       ws.onmessage = (event) => {
         try {
@@ -557,7 +557,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       }
 
       const response = await fetch(
-        `http://localhost:8000/organization/${organizationId}/create_channel`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/create_channel`,
         {
           method: 'POST',
           headers: {
@@ -622,7 +622,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       }
 
       const response = await fetch(
-        `http://localhost:8000/channel/${editingChannel.channel_id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/channel/${editingChannel.channel_id}`,
         {
           method: 'PUT',
           headers: {
@@ -677,7 +677,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       }
 
       const response = await fetch(
-        `http://localhost:8000/channel/${deletingChannel.channel_id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/channel/${deletingChannel.channel_id}`,
         {
           method: 'DELETE',
           headers: {

@@ -99,7 +99,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           return;
         }
 
-        const response = await fetch("http://localhost:8000/profile", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -126,7 +126,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
         const token = localStorage.getItem('access_token');
         if (!token) return;
 
-        const response = await fetch("http://localhost:8000/get_org_for_admin_org", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_org_for_admin_org`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -208,7 +208,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
     try {
       setSendingJoin(true);
-      const response = await fetch("http://localhost:8000/organization/join", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/join`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

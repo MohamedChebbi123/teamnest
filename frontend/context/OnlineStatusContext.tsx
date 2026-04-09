@@ -22,7 +22,7 @@ export function OnlineStatusProvider({ children }: { children: React.ReactNode }
     const token = localStorage.getItem("access_token")
     if (!token) return
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/connectivity?token=${token}`)
+    const ws = new WebSocket(`/ws/connectivity?token=${token}`)
     wsRef.current = ws
 
     ws.onopen = () => {

@@ -55,7 +55,7 @@ export default function ProfilePage() {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 10000)
 
-        const response = await fetch("http://localhost:8000/profile", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,

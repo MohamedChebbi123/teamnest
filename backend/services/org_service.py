@@ -115,8 +115,8 @@ def create_subscritpion_service(org_id:int,authorization: str,db:Session):
             "price": "price_1THLoIRaAIW7J24MHlivlWuy",
             "quantity": 1,
         }],
-        success_url=f"http://localhost:3000/success?org_id={org_id}&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url="http://localhost:3000/cancel",
+        success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/success?org_id={org_id}&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/cancel",
         metadata={"org_id": str(org_id)},
     )
 

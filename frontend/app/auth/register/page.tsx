@@ -118,7 +118,7 @@ export default function Register() {
       formDataToSend.append("email", formData.email)
       formDataToSend.append("password", formData.password)
 
-      const response = await fetch("http://localhost:8000/register", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/register`, {
         method: "POST",
         body: formDataToSend,
       })

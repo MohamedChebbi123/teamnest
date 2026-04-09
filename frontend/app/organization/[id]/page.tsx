@@ -118,7 +118,7 @@ export default function OrganizationPage() {
         }
 
         // Get current user info
-        const userResponse = await fetch("http://localhost:8000/profile", {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -128,7 +128,7 @@ export default function OrganizationPage() {
           const userData = await userResponse.json()
           setCurrentUserId(userData.user_id)
 
-          const roleResponse = await fetch(`http://localhost:8000/organization/${organizationId}/members`, {
+          const roleResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/members`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -143,7 +143,7 @@ export default function OrganizationPage() {
           }
         }
 
-        const response = await fetch("http://localhost:8000/get_org_for_admin_org", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_org_for_admin_org`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -203,7 +203,7 @@ export default function OrganizationPage() {
         const token = localStorage.getItem('access_token')
         if (!token) return
 
-        const response = await fetch(`http://localhost:8000/organization/${organizationId}/join-requests`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/join-requests`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -241,7 +241,7 @@ export default function OrganizationPage() {
         const token = localStorage.getItem('access_token')
         if (!token) return
 
-        const response = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -291,7 +291,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const response = await fetch(`http://localhost:8000/organization/${organizationId}/add_member`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/add_member`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -361,7 +361,7 @@ export default function OrganizationPage() {
         formData.append('image', editImage)
       }
 
-      const response = await fetch(`http://localhost:8000/organization/${organizationId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -413,7 +413,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const response = await fetch(`http://localhost:8000/organization/${organizationId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -468,7 +468,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const response = await fetch(`http://localhost:8000/organization/${organizationId}/create_team`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/create_team`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -493,7 +493,7 @@ export default function OrganizationPage() {
         setTeamDescription("")
         
         // Refresh teams list
-        const teamsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+        const teamsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -551,7 +551,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const response = await fetch(`http://localhost:8000/team/${editingTeam.team_id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/team/${editingTeam.team_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -573,7 +573,7 @@ export default function OrganizationPage() {
         setEditingTeam(null)
         
         // Refresh teams list
-        const teamsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+        const teamsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -617,7 +617,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const response = await fetch(`http://localhost:8000/team/${deletingTeam.team_id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/team/${deletingTeam.team_id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -632,7 +632,7 @@ export default function OrganizationPage() {
         setDeletingTeam(null)
         
         // Refresh teams list
-        const teamsResponse = await fetch(`http://localhost:8000/organization/${organizationId}/teams`, {
+        const teamsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -676,7 +676,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const url = `http://localhost:8000/organization/${organizationId}/join-requests/${requestId}?action=${action}&role_user=${roleUser}`
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/join-requests/${requestId}?action=${action}&role_user=${roleUser}`
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -717,7 +717,7 @@ export default function OrganizationPage() {
         return
       }
 
-      const response = await fetch(`http://localhost:8000/organization/${organizationId}/subscribe`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/subscribe`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -747,7 +747,7 @@ export default function OrganizationPage() {
       const token = localStorage.getItem("access_token")
       if (!token) { router.push("/auth/login"); return }
 
-      const response = await fetch(`http://localhost:8000/organization/${organizationId}/cancel-subscription`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/cancel-subscription`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       })

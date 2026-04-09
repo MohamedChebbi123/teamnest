@@ -192,7 +192,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (res.ok) setTasks(await res.json())
@@ -206,7 +206,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const tasks_list = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/my-tasks`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/my-tasks`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (tasks_list.ok) {
@@ -223,7 +223,7 @@ export default function TasksPage() {
         const token = localStorage.getItem("access_token")
         if (!token) { router.push("/auth/login"); return }
 
-        const userRes = await fetch("http://localhost:8000/profile", {
+        const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         let userId: number | null = null
@@ -231,7 +231,7 @@ export default function TasksPage() {
         setUserId(userId)
 
         const orgRes = await fetch(
-          `http://localhost:8000/organization/${organizationId}/members`,
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/members`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         if (orgRes.ok) {
@@ -241,7 +241,7 @@ export default function TasksPage() {
         }
 
         const teamRes = await fetch(
-          `http://localhost:8000/team/${teamId}/members`,
+          `${process.env.NEXT_PUBLIC_API_URL}/team/${teamId}/members`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         if (teamRes.ok) {
@@ -276,7 +276,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -311,7 +311,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -354,7 +354,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${selectedTask.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${selectedTask.id}`,
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -384,7 +384,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${selectedTask.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${selectedTask.id}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
@@ -415,7 +415,7 @@ export default function TasksPage() {
       reader.onload = async () => {
         const base64 = reader.result as string
         const res = await fetch(
-          `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${taskId}/attachments`,
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${taskId}/attachments`,
           {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -444,7 +444,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${taskId}/attachments/${attachmentId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${taskId}/attachments/${attachmentId}`,
         { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
       )
       if (res.ok) {
@@ -465,7 +465,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${taskId}/review?action=${action}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${taskId}/review?action=${action}`,
         { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }
       )
       const data = await res.json()
@@ -487,7 +487,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/my-tasks/${taskId}/status`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/my-tasks/${taskId}/status`,
         {
           method: "PATCH",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -516,7 +516,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${editingSubtask.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${editingSubtask.id}`,
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -544,7 +544,7 @@ export default function TasksPage() {
       const token = localStorage.getItem("access_token")
       if (!token) return
       const res = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/tasks/${subtaskId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${subtaskId}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },

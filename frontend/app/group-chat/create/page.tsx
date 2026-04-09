@@ -102,7 +102,7 @@ export default function CreateGroupChat() {
     setLoadingFriends(true)
     try {
       const token = localStorage.getItem("access_token")
-      const response = await fetch(`http://localhost:8000/group_chat/${groupId}/friends`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/friends`, {
         headers: { "Authorization": `Bearer ${token}` }
       })
       const data = await response.json()
@@ -131,7 +131,7 @@ export default function CreateGroupChat() {
     setAddingMembers(true)
     try {
       const token = localStorage.getItem("access_token")
-      const response = await fetch(`http://localhost:8000/group_chat/${createdGroupId}/add_members`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${createdGroupId}/add_members`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -197,7 +197,7 @@ export default function CreateGroupChat() {
       formDataToSend.append("group_description", formData.groupDescription)
       formDataToSend.append("image", imageFile)
 
-      const response = await fetch("http://localhost:8000/create_group_chat", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create_group_chat`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

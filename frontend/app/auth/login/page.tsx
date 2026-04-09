@@ -60,7 +60,7 @@ export default function Login() {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 12000)
 
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

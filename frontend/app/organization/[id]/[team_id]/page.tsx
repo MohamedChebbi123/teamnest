@@ -193,7 +193,7 @@ export default function TeamPage() {
       if (!token) return
 
       const response = await fetch(
-        `http://localhost:8000/team/${teamId}/members`,
+        `${process.env.NEXT_PUBLIC_API_URL}/team/${teamId}/members`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -229,7 +229,7 @@ export default function TeamPage() {
       if (!token) return
 
       const response = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/channels`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/channels`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -260,7 +260,7 @@ export default function TeamPage() {
       const fileResponses = await Promise.all(
         teamChannels.map(async (channel) => {
           const response = await fetch(
-            `http://localhost:8000/organization/${organizationId}/team/${teamId}/channel/${channel.channel_id}/files`,
+            `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/channel/${channel.channel_id}/files`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -318,7 +318,7 @@ export default function TeamPage() {
         }
 
         // Get current user info
-        const userResponse = await fetch("http://localhost:8000/profile", {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -333,7 +333,7 @@ export default function TeamPage() {
 
         // Fetch all teams and find the specific one
         const teamsResponse = await fetch(
-          `http://localhost:8000/organization/${organizationId}/teams`,
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -365,7 +365,7 @@ export default function TeamPage() {
 
         // Fetch organization members to determine user role
         const orgMembersResponse = await fetch(
-          `http://localhost:8000/organization/${organizationId}/members`,
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/members`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -431,7 +431,7 @@ export default function TeamPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/team/${teamId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/team/${teamId}`,
         {
           method: 'PUT',
           headers: {
@@ -486,7 +486,7 @@ export default function TeamPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/team/${teamId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/team/${teamId}`,
         {
           method: 'POST',
           headers: {
@@ -574,7 +574,7 @@ export default function TeamPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/team/${teamId}/member/${editingMember.user_id}/permissions`,
+        `${process.env.NEXT_PUBLIC_API_URL}/team/${teamId}/member/${editingMember.user_id}/permissions`,
         {
           method: 'PUT',
           headers: {
@@ -630,7 +630,7 @@ export default function TeamPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/team/${teamId}/member/${memberId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/team/${teamId}/member/${memberId}`,
         {
           method: 'DELETE',
           headers: {
@@ -677,7 +677,7 @@ export default function TeamPage() {
       }
 
       const response = await fetch(
-        `http://localhost:8000/organization/${organizationId}/team/${teamId}/channels`,
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/channels`,
         {
           method: 'POST',
           headers: {
