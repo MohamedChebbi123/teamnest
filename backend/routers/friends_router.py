@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.Friend_input import FriendRequestInput, FriendRequestAction
@@ -12,8 +12,25 @@ from services.friends_service import (
     unblock_user_service,
     get_blocked_users_service,
 )
+from utils.Websocket_manager import friend_request_ws_manager
+from utils.jwt_handler import verify_token
 
 router = APIRouter()
+
+
+@router.websocket("/ws/friend-requests")
+async def friend_requests_ws(websocket: WebSocket, token: str):
+    payload = verify_token(token, "access")
+    if not payload or "sub" not in payload:
+        await websocket.close(code=4001)
+        return
+    user_id = int(payload["sub"])
+    await friend_request_ws_manager.connect(user_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        friend_request_ws_manager.disconnect(user_id, websocket)
 
 
 @router.post("/friends/request")
@@ -22,7 +39,7 @@ async def send_friend_request(
     authorization: str = Header(...),
     db: Session = Depends(connect_databse),
 ):
-    return send_friend_request_service(authorization, db, user_tag=data.user_tag, receiver_id=data.receiver_id)
+    return await send_friend_request_service(authorization, db, user_tag=data.user_tag, receiver_id=data.receiver_id)
 
 
 @router.post("/friends/request/{request_id}")

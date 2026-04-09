@@ -436,11 +436,16 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
           setLiveNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
           playNotificationSound()
-          toast.info("New notification", {
-            description: nextNotification.type === "channel_mention"
-              ? "You were mentioned in a channel"
-              : "You received a new direct message",
-          })
+
+          if (nextNotification.type === "channel_mention") {
+            const sender = members.find((m) => m.user_id === nextNotification.sender_id)
+            const channel = channels.find((c) => c.channel_id === nextNotification.channel_id)
+            const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
+            const channelName = channel ? `#${channel.channel_name}` : "a channel"
+            toast.info(`${senderName} mentioned you`, { description: `In ${channelName}` })
+          } else {
+            toast.info("New notification", { description: "You received a new direct message" })
+          }
         } catch (err) {
           console.error("Failed to parse notification event:", err)
         }
@@ -737,6 +742,20 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
   const isExpanded = navbarWidth > 100
 
+  const resolveNotificationText = (notification: LiveNotification) => {
+    if (notification.type === "channel_mention") {
+      const sender = members.find((m) => m.user_id === notification.sender_id)
+      const channel = channels.find((c) => c.channel_id === notification.channel_id)
+      const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
+      const channelName = channel ? `#${channel.channel_name}` : "a channel"
+      return { title: `${senderName} mentioned you`, subtitle: `In ${channelName}` }
+    }
+    return {
+      title: "New message",
+      subtitle: notification.sender_id ? `From user #${notification.sender_id}` : "Direct message notification",
+    }
+  }
+
   const NotificationList = ({ notifications }: { notifications: LiveNotification[] }) => (
     <>
       {notifications.length === 0 ? (
@@ -768,16 +787,12 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">
-                  {notification.type === "channel_mention" ? "New mention" : "New message"}
+                  {resolveNotificationText(notification).title}
                 </span>
                 {!notification.read && <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />}
               </div>
               <span className="text-xs text-muted-foreground">
-                {notification.type === "channel_mention"
-                  ? "Mentioned in a channel"
-                  : notification.sender_id
-                    ? `From user #${notification.sender_id}`
-                    : "Direct message notification"}
+                {resolveNotificationText(notification).subtitle}
               </span>
             </div>
           </DropdownMenuItem>

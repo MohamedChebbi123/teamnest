@@ -2,6 +2,7 @@
 
 import{ useState, useEffect } from 'react';
 import { useOnlineStatus } from '@/context/OnlineStatusContext';
+import { useFriendRequests } from '@/context/FriendRequestContext';
 import { useTheme } from '@/context/ThemeContext';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -88,6 +89,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const router = useRouter();
 
   const { disconnect } = useOnlineStatus()
+  const { notifications: friendRequestNotifs, unreadCount: friendRequestUnread, markAllRead: markFriendRequestsRead } = useFriendRequests()
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
 
   useEffect(() => {
@@ -266,7 +268,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   ];
 
   const activeNotifications = notifications.filter(n => n.show);
-  const unreadCount = activeNotifications.length;
+  const unreadCount = activeNotifications.length + friendRequestUnread;
 
   return (
     <>
@@ -370,7 +372,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           </Button>
 
           {/* Notifications Button */}
-          <DropdownMenu open={showNotifications} onOpenChange={setShowNotifications}>
+          <DropdownMenu open={showNotifications} onOpenChange={(open) => { setShowNotifications(open); if (open) markFriendRequestsRead(); }}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -382,8 +384,8 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               >
                 <Bell className="h-5 w-5 flex-shrink-0" />
                 {unreadCount > 0 && (
-                  <Badge 
-                    variant="destructive" 
+                  <Badge
+                    variant="destructive"
                     className={cn(
                       "h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs",
                       "absolute -top-1 -right-1"
@@ -397,11 +399,27 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
             <DropdownMenuContent align="start" side="right" className="w-80 ml-2">
               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {friendRequestNotifs.map((notif) => (
+                <DropdownMenuItem
+                  key={notif.id}
+                  onClick={() => router.push('/friends')}
+                  className={cn("flex flex-col items-start gap-1 p-3 cursor-pointer", !notif.read && "bg-primary/5")}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <Users className="h-4 w-4 text-green-500" />
+                    <span className="font-medium text-sm">
+                      {notif.first_name} {notif.last_name} sent you a friend request
+                    </span>
+                    {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0 ml-auto" />}
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-6">@{notif.user_tag}</span>
+                </DropdownMenuItem>
+              ))}
               {activeNotifications.length > 0 ? (
                 activeNotifications.map((notification) => {
                   const Icon = notification.icon;
                   return (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       key={notification.id}
                       onClick={notification.action}
                       className="flex flex-col items-start gap-1 p-3 cursor-pointer"
@@ -416,11 +434,11 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                     </DropdownMenuItem>
                   );
                 })
-              ) : (
+              ) : friendRequestNotifs.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   No new notifications
                 </div>
-              )}
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
 

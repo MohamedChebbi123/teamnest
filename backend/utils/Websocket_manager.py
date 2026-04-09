@@ -251,3 +251,31 @@ class GroupChatWebSocketManager():
 
 
 group_chat_ws_manager = GroupChatWebSocketManager()
+
+
+class FriendRequestWSManager:
+    def __init__(self):
+        self.connections: Dict[int, List[WebSocket]] = {}
+
+    async def connect(self, user_id: int, websocket: WebSocket):
+        await websocket.accept()
+        user_connections = self.connections.setdefault(user_id, [])
+        if websocket not in user_connections:
+            user_connections.append(websocket)
+
+    def disconnect(self, user_id: int, websocket: WebSocket):
+        if user_id in self.connections:
+            if websocket in self.connections[user_id]:
+                self.connections[user_id].remove(websocket)
+            if not self.connections[user_id]:
+                self.connections.pop(user_id, None)
+
+    async def send(self, user_id: int, message: dict):
+        for ws in list(self.connections.get(user_id, [])):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                self.disconnect(user_id, ws)
+
+
+friend_request_ws_manager = FriendRequestWSManager()

@@ -5,9 +5,10 @@ from models.Users import Users
 from models.Pending_friends_request import Pending_friends_request
 from models.Friends import Friends
 from models.Blocked_users import Blocked_users
+from utils.Websocket_manager import friend_request_ws_manager
 
 
-def send_friend_request_service(authorization: str, db: Session, user_tag: str = None, receiver_id: int = None):
+async def send_friend_request_service(authorization: str, db: Session, user_tag: str = None, receiver_id: int = None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -64,6 +65,17 @@ def send_friend_request_service(authorization: str, db: Session, user_tag: str =
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
+
+    sender = db.query(Users).filter(Users.user_id == user_id).first()
+    await friend_request_ws_manager.send(receiver.user_id, {
+        "type": "friend_request_received",
+        "request_id": new_request.id,
+        "sender_id": user_id,
+        "first_name": sender.first_name if sender else "",
+        "last_name": sender.last_name if sender else "",
+        "user_tag": sender.user_tag if sender else "",
+        "avatar_url": sender.avatar_url if sender else None,
+    })
 
     return {
         "message": "Friend request sent successfully",

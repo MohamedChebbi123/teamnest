@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
+import { FriendRequestProvider } from "@/context/FriendRequestContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 
 export const metadata: Metadata = {
@@ -21,7 +22,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AntdRegistry>
             <OnlineStatusProvider>
-              {children}
+              <FriendRequestProvider>
+                {children}
+              </FriendRequestProvider>
             </OnlineStatusProvider>
           </AntdRegistry>
           <Toaster />
