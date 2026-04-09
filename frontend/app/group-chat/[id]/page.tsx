@@ -77,6 +77,7 @@ export default function GroupChatRoom() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
+  const [isReconnecting, setIsReconnecting] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState("")
   const [replyingTo, setReplyingTo] = useState<GroupMessage | null>(null)
@@ -102,6 +103,7 @@ export default function GroupChatRoom() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const localTypingStopRef = useRef<NodeJS.Timeout | null>(null)
   const remoteTypingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isTypingRef = useRef(false)
   const emojiPickerContainerRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -126,6 +128,7 @@ export default function GroupChatRoom() {
     connectWebSocket(token)
 
     return () => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
       wsRef.current?.close()
     }
   }, [groupId])
@@ -210,11 +213,19 @@ export default function GroupChatRoom() {
   }
 
   const connectWebSocket = (token: string) => {
-    const ws = new WebSocket(`/ws/group_chat/${groupId}?token=${token}`)
+    const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/group_chat/${groupId}?token=${token}`)
     wsRef.current = ws
 
-    ws.onopen = () => setIsConnected(true)
-    ws.onclose = () => setIsConnected(false)
+    ws.onopen = () => {
+      setIsConnected(true)
+      setIsReconnecting(false)
+    }
+
+    ws.onclose = () => {
+      setIsConnected(false)
+      setIsReconnecting(true)
+      reconnectTimeoutRef.current = setTimeout(() => connectWebSocket(token), 3000)
+    }
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
@@ -867,6 +878,14 @@ export default function GroupChatRoom() {
             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setReplyingTo(null)}>
               <X className="h-3 w-3" />
             </Button>
+          </div>
+        )}
+
+        {/* Reconnecting banner */}
+        {isReconnecting && (
+          <div className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/10 border-t border-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-medium shrink-0">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Reconnecting…
           </div>
         )}
 

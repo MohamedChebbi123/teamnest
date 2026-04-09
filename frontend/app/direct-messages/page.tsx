@@ -161,6 +161,7 @@ export default function ChannelsPage() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
+  const [isReconnecting, setIsReconnecting] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -505,7 +506,7 @@ export default function ChannelsPage() {
 
       const ws = new WebSocket(`/ws/direct-messages?token=${token}`)
 
-      ws.onopen = () => setIsConnected(true)
+      ws.onopen = () => { setIsConnected(true); setIsReconnecting(false) }
 
       ws.onmessage = (event) => {
         try {
@@ -586,10 +587,11 @@ export default function ChannelsPage() {
 
       ws.onclose = () => {
         setIsConnected(false)
+        setIsReconnecting(true)
         reconnectTimeoutRef.current = setTimeout(connect, 3000)
       }
 
-      ws.onerror = () => setIsConnected(false)
+      ws.onerror = () => { setIsConnected(false); setIsReconnecting(true) }
       wsRef.current = ws
     }
 
@@ -1424,6 +1426,14 @@ export default function ChannelsPage() {
             )}
           </div>
         </ScrollArea>
+
+        {/* Reconnecting banner */}
+        {isReconnecting && (
+          <div className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/10 border-t border-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-medium flex-shrink-0">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Reconnecting…
+          </div>
+        )}
 
         {/* Input Area — always rendered */}
         <div className="relative flex-shrink-0 px-4 pb-4 pt-2">

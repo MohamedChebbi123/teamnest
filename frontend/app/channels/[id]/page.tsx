@@ -1306,9 +1306,13 @@ export default function ChannelPage() {
             <div className="flex items-center gap-2">
               {/* WebSocket Connection Status */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 bg-muted/50">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                {isConnected ? (
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                ) : (
+                  <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
+                )}
                 <span className="text-xs font-medium text-muted-foreground">
-                  {isConnected ? 'Live' : 'Offline'}
+                  {isConnected ? 'Live' : 'Reconnecting…'}
                 </span>
               </div>
               
