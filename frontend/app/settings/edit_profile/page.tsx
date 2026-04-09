@@ -41,6 +41,7 @@ export default function EditProfile() {
     const [country, setCountry] = useState("")
     const [phoneNumber, setPhoneNumber] = useState("")
 
+
     useEffect(() => {
         fetchProfile()
     }, [])
@@ -210,23 +211,15 @@ export default function EditProfile() {
     }
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <p>Loading profile...</p>
-            </div>
-        )
+        return <p className="text-muted-foreground text-sm">Loading profile...</p>
     }
 
     if (!profile) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <p>Failed to load profile</p>
-            </div>
-        )
+        return <p className="text-muted-foreground text-sm">Failed to load profile</p>
     }
 
     return (
-        <div className="container max-w-2xl mx-auto p-6 space-y-6">
+        <div className="space-y-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Edit Profile</CardTitle>

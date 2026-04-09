@@ -11,6 +11,7 @@ from services.auth_service import (
     send_password_reset_code_service,
     verify_reset_code_service,
     reset_password_service,
+    change_password_service,
     get_user_info_by_id_service,
     check_connectivity,
     get_online_status
@@ -148,6 +149,16 @@ async def reset_password(
 ):
     return await reset_password_service(email, reset_code, new_password, db)
 
+
+
+@router.put("/change-password")
+async def change_password(
+    authorization: str = Header(None),
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(connect_databse)
+):
+    return await change_password_service(authorization, current_password, new_password, db)
 
 
 @router.get("/get_user_info")

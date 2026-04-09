@@ -441,6 +441,46 @@ async def reset_password_service(email: str, reset_code: str, new_password: str,
 
 
 
+async def change_password_service(authorization: str, current_password: str, new_password: str, db: Session):
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user = db.query(Users).filter(Users.email == payload["sub"]).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(current_password, user.password_hashed):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+    if not re.search(r'[a-z]', new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+
+    if not re.search(r'[A-Z]', new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+
+    if not re.search(r'[0-9]', new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+
+    if current_password == new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from current password")
+
+    user.password_hashed = hash_password(new_password)
+    db.commit()
+
+    return {"message": "Password changed successfully"}
+
+
 async def get_user_info_by_id_service(user_id:int,authorization: str,db: Session):
 
     if not authorization or not authorization.startswith("Bearer "):
