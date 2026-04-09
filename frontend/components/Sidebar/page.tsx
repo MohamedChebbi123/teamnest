@@ -4,6 +4,7 @@ import{ useState, useEffect } from 'react';
 import { useOnlineStatus } from '@/context/OnlineStatusContext';
 import { useFriendRequests } from '@/context/FriendRequestContext';
 import { useDirectMessageNotifications } from '@/context/DirectMessageNotificationContext';
+import { useMentionNotifications } from '@/context/MentionNotificationContext';
 import { useTheme } from '@/context/ThemeContext';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -91,6 +92,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const { disconnect } = useOnlineStatus()
   const { unreadCount: friendRequestUnread } = useFriendRequests()
   const { unreadDmCount, markDmsRead } = useDirectMessageNotifications()
+  const { unreadCount: mentionUnread } = useMentionNotifications()
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
 
   useEffect(() => {
@@ -275,7 +277,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   ];
 
   const activeNotifications = notifications.filter(n => n.show);
-  const unreadCount = activeNotifications.length + friendRequestUnread;
+  const unreadCount = activeNotifications.length + friendRequestUnread + mentionUnread;
 
   return (
     <>

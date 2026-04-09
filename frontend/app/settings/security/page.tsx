@@ -43,8 +43,10 @@ export default function SecuritySettings() {
             })
 
             if (!response.ok) {
-                const error = await response.json()
-                throw new Error(error.detail || "Failed to change password")
+                const text = await response.text()
+                let detail = "Failed to change password"
+                try { detail = JSON.parse(text).detail || detail } catch {}
+                throw new Error(detail)
             }
 
             toast.success("Password changed successfully!")

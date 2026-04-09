@@ -2,18 +2,35 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 
+export interface DmNotification {
+  id: string
+  sender_id: number
+  sender_first_name: string
+  sender_last_name: string
+  sender_avatar_url: string | null
+  sender_user_tag: string | null
+  last_message_preview: string
+  count: number
+  latest_at: string
+  read: boolean
+}
+
 interface DirectMessageNotificationContextType {
   unreadDmCount: number
+  dmNotifications: DmNotification[]
   markDmsRead: () => void
+  dismissDm: (senderId: number) => void
 }
 
 const DirectMessageNotificationContext = createContext<DirectMessageNotificationContextType>({
   unreadDmCount: 0,
+  dmNotifications: [],
   markDmsRead: () => {},
+  dismissDm: () => {},
 })
 
 export function DirectMessageNotificationProvider({ children }: { children: React.ReactNode }) {
-  const [unreadDmCount, setUnreadDmCount] = useState(0)
+  const [dmNotifications, setDmNotifications] = useState<DmNotification[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectDelayRef = useRef(3000)
@@ -24,7 +41,6 @@ export function DirectMessageNotificationProvider({ children }: { children: Reac
     const token = localStorage.getItem("access_token")
     if (!token) return
 
-    // Decode user_id from JWT to know which messages are "incoming"
     try {
       const payload = JSON.parse(atob(token.split(".")[1]))
       currentUserIdRef.current = payload.sub ? Number(payload.sub) : null
@@ -49,11 +65,42 @@ export function DirectMessageNotificationProvider({ children }: { children: Reac
           const data = JSON.parse(event.data)
           if (data.type !== "new_direct_message" || !data.message) return
 
-          const senderId = data.message.sender_id
-          // Only count messages received from others (not sent by current user)
-          if (currentUserIdRef.current !== null && senderId !== currentUserIdRef.current) {
-            setUnreadDmCount((prev) => prev + 1)
-          }
+          const msg = data.message
+          const senderId = msg.sender_id
+
+          if (currentUserIdRef.current !== null && senderId === currentUserIdRef.current) return
+
+          const sender = msg.sender ?? {}
+
+          setDmNotifications((prev) => {
+            const existing = prev.find((n) => n.sender_id === senderId)
+            if (existing) {
+              return prev.map((n) =>
+                n.sender_id === senderId
+                  ? {
+                      ...n,
+                      count: n.count + 1,
+                      last_message_preview: msg.is_file ? "Sent a file" : (msg.content || ""),
+                      latest_at: msg.sent_at || new Date().toISOString(),
+                      read: false,
+                    }
+                  : n
+              )
+            }
+            const newNotif: DmNotification = {
+              id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              sender_id: senderId,
+              sender_first_name: sender.first_name || "",
+              sender_last_name: sender.last_name || "",
+              sender_avatar_url: sender.avatar_url ?? null,
+              sender_user_tag: sender.user_tag ?? null,
+              last_message_preview: msg.is_file ? "Sent a file" : (msg.content || ""),
+              count: 1,
+              latest_at: msg.sent_at || new Date().toISOString(),
+              read: false,
+            }
+            return [newNotif, ...prev].slice(0, 30)
+          })
         } catch {}
       }
 
@@ -75,10 +122,13 @@ export function DirectMessageNotificationProvider({ children }: { children: Reac
     }
   }, [])
 
-  const markDmsRead = () => setUnreadDmCount(0)
+  const unreadDmCount = dmNotifications.filter((n) => !n.read).reduce((sum, n) => sum + n.count, 0)
+  const markDmsRead = () => setDmNotifications((prev) => prev.map((n) => ({ ...n, read: true, count: 0 })))
+  const dismissDm = (senderId: number) =>
+    setDmNotifications((prev) => prev.filter((n) => n.sender_id !== senderId))
 
   return (
-    <DirectMessageNotificationContext.Provider value={{ unreadDmCount, markDmsRead }}>
+    <DirectMessageNotificationContext.Provider value={{ unreadDmCount, dmNotifications, markDmsRead, dismissDm }}>
       {children}
     </DirectMessageNotificationContext.Provider>
   )

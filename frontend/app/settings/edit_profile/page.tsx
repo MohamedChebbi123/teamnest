@@ -138,8 +138,10 @@ export default function EditProfile() {
             })
 
             if (!response.ok) {
-                const error = await response.json()
-                throw new Error(error.detail || "Failed to update profile")
+                const text = await response.text()
+                let detail = "Failed to update profile"
+                try { detail = JSON.parse(text).detail || detail } catch {}
+                throw new Error(detail)
             }
 
             const data = await response.json()
@@ -192,8 +194,10 @@ export default function EditProfile() {
             })
 
             if (!response.ok) {
-                const error = await response.json()
-                throw new Error(error.detail || "Failed to update contact information")
+                const text = await response.text()
+                let detail = "Failed to update contact information"
+                try { detail = JSON.parse(text).detail || detail } catch {}
+                throw new Error(detail)
             }
 
             const data = await response.json()

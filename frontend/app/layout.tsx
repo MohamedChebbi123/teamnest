@@ -6,6 +6,7 @@ import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
 import { FriendRequestProvider } from "@/context/FriendRequestContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { DirectMessageNotificationProvider } from "@/context/DirectMessageNotificationContext";
+import { MentionNotificationProvider } from "@/context/MentionNotificationContext";
 
 export const metadata: Metadata = {
   title: "TeamNest",
@@ -25,7 +26,9 @@ export default function RootLayout({
             <OnlineStatusProvider>
               <FriendRequestProvider>
                 <DirectMessageNotificationProvider>
-                  {children}
+                  <MentionNotificationProvider>
+                    {children}
+                  </MentionNotificationProvider>
                 </DirectMessageNotificationProvider>
               </FriendRequestProvider>
             </OnlineStatusProvider>

@@ -288,7 +288,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
 
         // Fetch user teams
-        const teamsResponse = await fetch('${process.env.NEXT_PUBLIC_API_URL}/user/teams', {
+        const teamsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/teams`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -575,7 +575,9 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
       )
 
-      const data = await response.json()
+      const text = await response.text()
+      let data: any = null
+      try { data = JSON.parse(text) } catch {}
 
       if (response.ok) {
         toast.success("Success", {
@@ -588,11 +590,11 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         setIsDialogOpen(false)
         setUpgradeModal({
           title: "Channel limit reached",
-          description: data.detail || "Upgrade to Pro for unlimited channels.",
+          description: data?.detail || "Upgrade to Pro for unlimited channels.",
         })
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to create channel"
+          description: data?.detail || "Failed to create channel"
         })
       }
     } catch (error) {
@@ -646,21 +648,22 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
       )
 
-      const data = await response.json()
+      const text = await response.text()
+      let data: any = null
+      try { data = JSON.parse(text) } catch {}
 
       if (response.ok) {
         toast.success("Success", {
           description: "Channel updated successfully"
         })
-        // Update the channel in the list
-        setChannels(channels.map(ch => 
+        setChannels(channels.map(ch =>
           ch.channel_id === editingChannel.channel_id ? data.channel : ch
         ))
         setEditDialogOpen(false)
         setEditingChannel(null)
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to update channel"
+          description: data?.detail || "Failed to update channel"
         })
       }
     } catch (error) {
@@ -699,24 +702,24 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
       )
 
-      const data = await response.json()
+      const text = await response.text()
+      let data: any = null
+      try { data = JSON.parse(text) } catch {}
 
       if (response.ok) {
         toast.success("Success", {
           description: "Channel deleted successfully"
         })
-        // Remove the channel from the list
         setChannels(channels.filter(ch => ch.channel_id !== deletingChannel.channel_id))
         setDeleteDialogOpen(false)
         setDeletingChannel(null)
-        
-        // If user is currently viewing this channel, redirect to org page
+
         if (pathname === `/channels/${deletingChannel.channel_id}`) {
           router.push(`/organization/${organizationId}`)
         }
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to delete channel"
+          description: data?.detail || "Failed to delete channel"
         })
       }
     } catch (error) {

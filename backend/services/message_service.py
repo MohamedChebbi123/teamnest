@@ -81,6 +81,11 @@ async def push_mention_notification(
     message_id: int,
     channel_id: int,
     org_id: int,
+    sender_first_name: str = "",
+    sender_last_name: str = "",
+    sender_avatar_url: str | None = None,
+    sender_user_tag: str | None = None,
+    channel_name: str = "",
 ):
     await notification_manager.send(
         receiver_id,
@@ -93,6 +98,11 @@ async def push_mention_notification(
                 "channel_id": channel_id,
                 "org_id": org_id,
                 "created_at": datetime.now(UTC).isoformat(),
+                "sender_first_name": sender_first_name,
+                "sender_last_name": sender_last_name,
+                "sender_avatar_url": sender_avatar_url,
+                "sender_user_tag": sender_user_tag,
+                "channel_name": channel_name,
             },
         },
     )
@@ -631,6 +641,11 @@ async def send_messages_realtime(
                             message_id=new_message.message_id,
                             channel_id=channel_id,
                             org_id=org_id,
+                            sender_first_name=sender.first_name if sender else "",
+                            sender_last_name=sender.last_name if sender else "",
+                            sender_avatar_url=sender.avatar_url if sender else None,
+                            sender_user_tag=sender.user_tag if sender else None,
+                            channel_name=channel.channel_name if channel else "",
                         )
                     except Exception:
                         continue

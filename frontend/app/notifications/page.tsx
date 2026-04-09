@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useFriendRequests } from "@/context/FriendRequestContext"
 import { useDirectMessageNotifications } from "@/context/DirectMessageNotificationContext"
+import { useMentionNotifications } from "@/context/MentionNotificationContext"
 import {
   Bell,
   Users,
@@ -19,6 +20,8 @@ import {
   CheckCheck,
   Trash2,
   BellOff,
+  AtSign,
+  Hash,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -31,17 +34,31 @@ interface UserData {
   profile_completed?: boolean
 }
 
-type TabType = "all" | "friend_requests" | "messages" | "system"
+type TabType = "all" | "friend_requests" | "mentions" | "messages" | "system"
+
+const formatTime = (dateStr: string) => {
+  if (!dateStr) return ""
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return date.toLocaleDateString()
+}
 
 export default function NotificationsPage() {
   const router = useRouter()
-  const { notifications: friendRequestNotifs, markAllRead, dismiss } = useFriendRequests()
-  const { unreadDmCount, markDmsRead } = useDirectMessageNotifications()
+  const { notifications: friendRequestNotifs, markAllRead: markFriendRequestsRead, dismiss } = useFriendRequests()
+  const { unreadDmCount, dmNotifications, markDmsRead, dismissDm } = useDirectMessageNotifications()
+  const { mentions, unreadCount: mentionUnread, markAllRead: markMentionsRead, dismiss: dismissMention } = useMentionNotifications()
   const [user, setUser] = useState<UserData | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>("all")
 
   useEffect(() => {
-    markAllRead()
+    markFriendRequestsRead()
   }, [])
 
   useEffect(() => {
@@ -80,36 +97,48 @@ export default function NotificationsPage() {
     },
   ].filter((n) => n.show)
 
-  const dmNotification = unreadDmCount > 0
-    ? [{
-        id: "unread-dms",
-        count: unreadDmCount,
-      }]
-    : []
+  const unreadDmNotifs = dmNotifications.filter((n) => !n.read)
+  const unreadMentions = mentions.filter((m) => !m.read)
 
   const counts = {
     friend_requests: friendRequestNotifs.length,
-    messages: dmNotification.length,
+    mentions: unreadMentions.length,
+    messages: unreadDmNotifs.length,
     system: systemNotifications.length,
   }
-  const totalCount = counts.friend_requests + counts.messages + counts.system
+  const totalCount = counts.friend_requests + counts.mentions + counts.messages + counts.system
 
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: "all", label: "All", count: totalCount },
     { key: "friend_requests", label: "Friend Requests", count: counts.friend_requests },
+    { key: "mentions", label: "Mentions", count: counts.mentions },
     { key: "messages", label: "Messages", count: counts.messages },
     { key: "system", label: "System", count: counts.system },
   ]
 
   const showFriendRequests = activeTab === "all" || activeTab === "friend_requests"
+  const showMentions = activeTab === "all" || activeTab === "mentions"
   const showMessages = activeTab === "all" || activeTab === "messages"
   const showSystem = activeTab === "all" || activeTab === "system"
 
   const activeCount =
     activeTab === "all" ? totalCount
     : activeTab === "friend_requests" ? counts.friend_requests
+    : activeTab === "mentions" ? counts.mentions
     : activeTab === "messages" ? counts.messages
     : counts.system
+
+  const handleMarkAllRead = () => {
+    markFriendRequestsRead()
+    markDmsRead()
+    markMentionsRead()
+  }
+
+  const handleClearAll = () => {
+    friendRequestNotifs.forEach((n) => dismiss(n.id))
+    markDmsRead()
+    mentions.forEach((m) => dismissMention(m.id))
+  }
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -136,10 +165,7 @@ export default function NotificationsPage() {
                 variant="outline"
                 size="sm"
                 className="gap-2 text-xs"
-                onClick={() => {
-                  markAllRead()
-                  markDmsRead()
-                }}
+                onClick={handleMarkAllRead}
               >
                 <CheckCheck className="h-3.5 w-3.5" />
                 Mark all read
@@ -148,10 +174,7 @@ export default function NotificationsPage() {
                 variant="ghost"
                 size="sm"
                 className="gap-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => {
-                  friendRequestNotifs.forEach((n) => dismiss(n.id))
-                  markDmsRead()
-                }}
+                onClick={handleClearAll}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Clear all
@@ -161,7 +184,7 @@ export default function NotificationsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-muted/40 rounded-xl p-1 w-fit">
+        <div className="flex gap-1 mb-6 bg-muted/40 rounded-xl p-1 w-fit flex-wrap">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -267,44 +290,155 @@ export default function NotificationsPage() {
               </section>
             )}
 
+            {/* Mentions Section */}
+            {showMentions && unreadMentions.length > 0 && (
+              <section>
+                {activeTab === "all" && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <AtSign className="h-4 w-4 text-violet-500" />
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Mentions
+                    </span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.mentions}</Badge>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {unreadMentions.map((mention) => (
+                    <div
+                      key={mention.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all cursor-pointer border-l-4 border-l-violet-500"
+                      onClick={() => {
+                        dismissMention(mention.id)
+                        router.push(`/channels/${mention.channel_id}`)
+                      }}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-11 w-11">
+                          <AvatarImage src={mention.sender_avatar_url ?? undefined} />
+                          <AvatarFallback className="bg-violet-500/10 text-violet-600 font-semibold">
+                            {mention.sender_first_name[0]}{mention.sender_last_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-violet-500/10 border-2 border-background flex items-center justify-center">
+                          <AtSign className="h-2.5 w-2.5 text-violet-500" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {mention.sender_first_name} {mention.sender_last_name}
+                          <span className="font-normal text-muted-foreground"> mentioned you in </span>
+                          <span className="text-violet-500">
+                            <Hash className="h-3 w-3 inline-block" />
+                            {mention.channel_name || "a channel"}
+                          </span>
+                        </p>
+                        {mention.sender_user_tag && (
+                          <p className="text-xs text-muted-foreground mt-0.5">@{mention.sender_user_tag}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-0.5">{formatTime(mention.created_at)}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-violet-500 hover:bg-violet-600 text-white"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            dismissMention(mention.id)
+                            router.push(`/channels/${mention.channel_id}`)
+                          }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => { e.stopPropagation(); dismissMention(mention.id) }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Messages Section */}
-            {showMessages && dmNotification.length > 0 && (
+            {showMessages && unreadDmNotifs.length > 0 && (
               <section>
                 {activeTab === "all" && (
                   <div className="flex items-center gap-2 mb-3">
                     <MessageCircle className="h-4 w-4 text-primary" />
                     <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      Messages
+                      Direct Messages
                     </span>
-                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.messages}</Badge>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{unreadDmCount}</Badge>
                   </div>
                 )}
-                <div
-                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all cursor-pointer border-l-4 border-l-primary"
-                  onClick={() => { markDmsRead(); router.push("/direct-messages") }}
-                >
-                  <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <MessageCircle className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">
-                      {unreadDmCount} unread direct message{unreadDmCount !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Click to open your messages</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge variant="destructive" className="text-xs">
-                      {unreadDmCount > 99 ? "99+" : unreadDmCount}
-                    </Badge>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => { e.stopPropagation(); markDmsRead() }}
+                <div className="space-y-2">
+                  {unreadDmNotifs.map((dm) => (
+                    <div
+                      key={dm.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all cursor-pointer border-l-4 border-l-primary"
+                      onClick={() => {
+                        dismissDm(dm.sender_id)
+                        router.push(`/direct-messages?dm_user_id=${dm.sender_id}`)
+                      }}
                     >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </div>
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-11 w-11">
+                          <AvatarImage src={dm.sender_avatar_url ?? undefined} />
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                            {dm.sender_first_name[0]}{dm.sender_last_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center">
+                          <MessageCircle className="h-2.5 w-2.5 text-primary" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {dm.sender_first_name} {dm.sender_last_name}
+                        </p>
+                        {dm.sender_user_tag && (
+                          <p className="text-xs text-muted-foreground truncate">@{dm.sender_user_tag}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{dm.last_message_preview}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{formatTime(dm.latest_at)}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {dm.count > 1 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {dm.count > 99 ? "99+" : dm.count}
+                          </Badge>
+                        )}
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            dismissDm(dm.sender_id)
+                            router.push(`/direct-messages?dm_user_id=${dm.sender_id}`)
+                          }}
+                        >
+                          Reply
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => { e.stopPropagation(); dismissDm(dm.sender_id) }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}

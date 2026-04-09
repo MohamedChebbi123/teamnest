@@ -318,10 +318,10 @@ export default function ChannelPage() {
             setPinnedMessages(pinnedData)
           }
         } else {
-          const errorData = await response.json()
-          toast.error("Error", {
-            description: errorData.detail || "Failed to load channel"
-          })
+          const text = await response.text()
+          let detail = "Failed to load channel"
+          try { detail = JSON.parse(text).detail || detail } catch {}
+          toast.error("Error", { description: detail })
           router.push('/welcome')
         }
       } catch (error) {
@@ -580,10 +580,10 @@ export default function ChannelPage() {
 
         setMessages(normalizedMessages)
       } else {
-        const errorData = await response.json()
-        toast.error("Error", {
-          description: errorData.detail || "Failed to load messages"
-        })
+        const text = await response.text()
+        let detail = "Failed to load messages"
+        try { detail = JSON.parse(text).detail || detail } catch {}
+        toast.error("Error", { description: detail })
       }
     } catch (error) {
       console.error('Error fetching messages:', error)
