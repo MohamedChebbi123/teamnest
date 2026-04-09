@@ -5,6 +5,7 @@ import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
 import { FriendRequestProvider } from "@/context/FriendRequestContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { DirectMessageNotificationProvider } from "@/context/DirectMessageNotificationContext";
 
 export const metadata: Metadata = {
   title: "TeamNest",
@@ -23,7 +24,9 @@ export default function RootLayout({
           <AntdRegistry>
             <OnlineStatusProvider>
               <FriendRequestProvider>
-                {children}
+                <DirectMessageNotificationProvider>
+                  {children}
+                </DirectMessageNotificationProvider>
               </FriendRequestProvider>
             </OnlineStatusProvider>
           </AntdRegistry>

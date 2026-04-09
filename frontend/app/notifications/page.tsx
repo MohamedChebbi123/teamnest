@@ -1,0 +1,360 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Sidebar from "@/components/Sidebar/page"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { useFriendRequests } from "@/context/FriendRequestContext"
+import { useDirectMessageNotifications } from "@/context/DirectMessageNotificationContext"
+import {
+  Bell,
+  Users,
+  Mail,
+  FileText,
+  Check,
+  X,
+  MessageCircle,
+  CheckCheck,
+  Trash2,
+  BellOff,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface UserData {
+  first_name?: string
+  last_name?: string
+  email?: string
+  avatar_url?: string
+  is_verified?: boolean
+  profile_completed?: boolean
+}
+
+type TabType = "all" | "friend_requests" | "messages" | "system"
+
+export default function NotificationsPage() {
+  const router = useRouter()
+  const { notifications: friendRequestNotifs, markAllRead, dismiss } = useFriendRequests()
+  const { unreadDmCount, markDmsRead } = useDirectMessageNotifications()
+  const [user, setUser] = useState<UserData | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>("all")
+
+  useEffect(() => {
+    markAllRead()
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token")
+    if (!token) { router.push("/auth/login"); return }
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then(setUser)
+      .catch(() => router.push("/auth/login"))
+  }, [router])
+
+  const systemNotifications = [
+    {
+      id: "verify-email",
+      title: "Verify your email",
+      description: "Please verify your email address to access all features of TeamNest",
+      icon: Mail,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+      action: () => router.push("/auth/verify-email"),
+      actionLabel: "Verify now",
+      show: user && !user.is_verified,
+    },
+    {
+      id: "complete-profile",
+      title: "Complete your profile",
+      description: "Add your details to help teammates find and connect with you",
+      icon: FileText,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+      action: () => router.push("/auth/complete-profile"),
+      actionLabel: "Complete profile",
+      show: user && !user.profile_completed,
+    },
+  ].filter((n) => n.show)
+
+  const dmNotification = unreadDmCount > 0
+    ? [{
+        id: "unread-dms",
+        count: unreadDmCount,
+      }]
+    : []
+
+  const counts = {
+    friend_requests: friendRequestNotifs.length,
+    messages: dmNotification.length,
+    system: systemNotifications.length,
+  }
+  const totalCount = counts.friend_requests + counts.messages + counts.system
+
+  const tabs: { key: TabType; label: string; count: number }[] = [
+    { key: "all", label: "All", count: totalCount },
+    { key: "friend_requests", label: "Friend Requests", count: counts.friend_requests },
+    { key: "messages", label: "Messages", count: counts.messages },
+    { key: "system", label: "System", count: counts.system },
+  ]
+
+  const showFriendRequests = activeTab === "all" || activeTab === "friend_requests"
+  const showMessages = activeTab === "all" || activeTab === "messages"
+  const showSystem = activeTab === "all" || activeTab === "system"
+
+  const activeCount =
+    activeTab === "all" ? totalCount
+    : activeTab === "friend_requests" ? counts.friend_requests
+    : activeTab === "messages" ? counts.messages
+    : counts.system
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+      <main className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4 py-6">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Bell className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold leading-tight">Notifications</h1>
+              <p className="text-sm text-muted-foreground">
+                {totalCount === 0 ? "You're all caught up" : `${totalCount} notification${totalCount !== 1 ? "s" : ""}`}
+              </p>
+            </div>
+          </div>
+
+          {totalCount > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-xs"
+                onClick={() => {
+                  markAllRead()
+                  markDmsRead()
+                }}
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                Mark all read
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  friendRequestNotifs.forEach((n) => dismiss(n.id))
+                  markDmsRead()
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear all
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-muted/40 rounded-xl p-1 w-fit">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                activeTab === tab.key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <Badge
+                  variant={activeTab === tab.key ? "default" : "secondary"}
+                  className="h-5 min-w-5 px-1.5 text-xs rounded-full"
+                >
+                  {tab.count}
+                </Badge>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {activeCount === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 py-24 text-muted-foreground gap-4">
+            <div className="h-20 w-20 rounded-2xl bg-muted/60 flex items-center justify-center">
+              <BellOff className="h-10 w-10 opacity-40" />
+            </div>
+            <div className="text-center">
+              <p className="text-base font-medium">No notifications here</p>
+              <p className="text-sm mt-1 opacity-70">
+                {activeTab === "all" ? "You're completely caught up!" : `No ${activeTab.replace("_", " ")} notifications`}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+
+            {/* Friend Requests Section */}
+            {showFriendRequests && friendRequestNotifs.length > 0 && (
+              <section>
+                {activeTab === "all" && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Friend Requests
+                    </span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.friend_requests}</Badge>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {friendRequestNotifs.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={cn(
+                        "flex items-center gap-4 p-4 rounded-xl border bg-card transition-all",
+                        "hover:shadow-sm hover:border-border/80",
+                        !notif.read && "border-l-4 border-l-green-500"
+                      )}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-11 w-11">
+                          <AvatarImage src={notif.avatar_url ?? undefined} />
+                          <AvatarFallback className="bg-green-500/10 text-green-600 font-semibold">
+                            {notif.first_name[0]}{notif.last_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-green-500/10 border-2 border-background flex items-center justify-center">
+                          <Users className="h-2.5 w-2.5 text-green-500" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {notif.first_name} {notif.last_name}
+                          <span className="font-normal text-muted-foreground"> sent you a friend request</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">@{notif.user_tag}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-green-500 hover:bg-green-600 text-white"
+                          onClick={() => { router.push("/friends"); dismiss(notif.id) }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => dismiss(notif.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Messages Section */}
+            {showMessages && dmNotification.length > 0 && (
+              <section>
+                {activeTab === "all" && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <MessageCircle className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Messages
+                    </span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.messages}</Badge>
+                  </div>
+                )}
+                <div
+                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all cursor-pointer border-l-4 border-l-primary"
+                  onClick={() => { markDmsRead(); router.push("/direct-messages") }}
+                >
+                  <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">
+                      {unreadDmCount} unread direct message{unreadDmCount !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Click to open your messages</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge variant="destructive" className="text-xs">
+                      {unreadDmCount > 99 ? "99+" : unreadDmCount}
+                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => { e.stopPropagation(); markDmsRead() }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* System Section */}
+            {showSystem && systemNotifications.length > 0 && (
+              <section>
+                {activeTab === "all" && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bell className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      System
+                    </span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.system}</Badge>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {systemNotifications.map((notif) => {
+                    const Icon = notif.icon
+                    return (
+                      <div
+                        key={notif.id}
+                        className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all cursor-pointer border-l-4 border-l-amber-500"
+                        onClick={notif.action}
+                      >
+                        <div className={cn("h-11 w-11 rounded-full flex items-center justify-center flex-shrink-0", notif.bg)}>
+                          <Icon className={cn("h-5 w-5", notif.color)} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">{notif.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{notif.description}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs flex-shrink-0"
+                          variant="outline"
+                          onClick={(e) => { e.stopPropagation(); notif.action() }}
+                        >
+                          {notif.actionLabel}
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

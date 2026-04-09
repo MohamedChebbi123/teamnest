@@ -3,6 +3,7 @@
 import{ useState, useEffect } from 'react';
 import { useOnlineStatus } from '@/context/OnlineStatusContext';
 import { useFriendRequests } from '@/context/FriendRequestContext';
+import { useDirectMessageNotifications } from '@/context/DirectMessageNotificationContext';
 import { useTheme } from '@/context/ThemeContext';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -80,7 +81,6 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const [user, setUser] = useState<UserData | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [orgSearch, setOrgSearch] = useState('');
   const [orgTag, setOrgTag] = useState('');
@@ -89,8 +89,15 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const router = useRouter();
 
   const { disconnect } = useOnlineStatus()
-  const { notifications: friendRequestNotifs, unreadCount: friendRequestUnread, markAllRead: markFriendRequestsRead } = useFriendRequests()
+  const { unreadCount: friendRequestUnread } = useFriendRequests()
+  const { unreadDmCount, markDmsRead } = useDirectMessageNotifications()
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
+
+  useEffect(() => {
+    if (pathname === '/direct-messages' || pathname?.startsWith('/direct-messages')) {
+      markDmsRead();
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -343,17 +350,27 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
           {/* Direct Messages Button */}
           <Button
-            asChild
             variant={pathname === '/direct-messages' ? 'secondary' : 'ghost'}
             className={cn(
-              'w-full h-12 transition-all',
+              'w-full h-12 relative transition-all',
               'justify-center px-2',
               pathname === '/direct-messages' && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
+            onClick={() => { markDmsRead(); router.push('/direct-messages'); }}
+            title="Direct Messages"
           >
-            <Link href="/direct-messages" title="Direct Messages">
-              <MessageCircle className="h-5 w-5 flex-shrink-0" />
-            </Link>
+            <MessageCircle className="h-5 w-5 flex-shrink-0" />
+            {unreadDmCount > 0 && (
+              <Badge
+                variant="destructive"
+                className={cn(
+                  "h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs",
+                  "absolute -top-1 -right-1"
+                )}
+              >
+                {unreadDmCount > 99 ? '99+' : unreadDmCount}
+              </Badge>
+            )}
           </Button>
 
           {/* Create Group Chat Button */}
@@ -372,75 +389,29 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           </Button>
 
           {/* Notifications Button */}
-          <DropdownMenu open={showNotifications} onOpenChange={(open) => { setShowNotifications(open); if (open) markFriendRequestsRead(); }}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
+          <Button
+            variant={pathname === '/notifications' ? 'secondary' : 'ghost'}
+            className={cn(
+              'w-full h-12 relative transition-all hover:bg-accent/60',
+              'justify-center px-2',
+              pathname === '/notifications' && 'bg-primary/10 text-primary hover:bg-primary/20'
+            )}
+            title="Notifications"
+            onClick={() => router.push('/notifications')}
+          >
+            <Bell className="h-5 w-5 flex-shrink-0" />
+            {unreadCount > 0 && (
+              <Badge
+                variant="destructive"
                 className={cn(
-                  'w-full h-12 relative transition-all hover:bg-accent/60',
-                  'justify-center px-2'
+                  "h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs",
+                  "absolute -top-1 -right-1"
                 )}
-                title="Notifications"
               >
-                <Bell className="h-5 w-5 flex-shrink-0" />
-                {unreadCount > 0 && (
-                  <Badge
-                    variant="destructive"
-                    className={cn(
-                      "h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs",
-                      "absolute -top-1 -right-1"
-                    )}
-                  >
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="right" className="w-80 ml-2">
-              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {friendRequestNotifs.map((notif) => (
-                <DropdownMenuItem
-                  key={notif.id}
-                  onClick={() => router.push('/friends')}
-                  className={cn("flex flex-col items-start gap-1 p-3 cursor-pointer", !notif.read && "bg-primary/5")}
-                >
-                  <div className="flex items-center gap-2 w-full">
-                    <Users className="h-4 w-4 text-green-500" />
-                    <span className="font-medium text-sm">
-                      {notif.first_name} {notif.last_name} sent you a friend request
-                    </span>
-                    {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0 ml-auto" />}
-                  </div>
-                  <span className="text-xs text-muted-foreground ml-6">@{notif.user_tag}</span>
-                </DropdownMenuItem>
-              ))}
-              {activeNotifications.length > 0 ? (
-                activeNotifications.map((notification) => {
-                  const Icon = notification.icon;
-                  return (
-                    <DropdownMenuItem
-                      key={notification.id}
-                      onClick={notification.action}
-                      className="flex flex-col items-start gap-1 p-3 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <Icon className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-sm">{notification.title}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground ml-6">
-                        {notification.description}
-                      </span>
-                    </DropdownMenuItem>
-                  );
-                })
-              ) : friendRequestNotifs.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No new notifications
-                </div>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {unreadCount}
+              </Badge>
+            )}
+          </Button>
 
           {/* Divider */}
           {organizations.length > 0 && (
