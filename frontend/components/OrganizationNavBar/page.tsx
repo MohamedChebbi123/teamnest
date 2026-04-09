@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import UpgradeModal from "@/components/UpgradeModal"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -135,6 +136,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [expandedTeams, setExpandedTeams] = useState<Set<number>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
+  const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
   const [navbarWidth, setNavbarWidth] = useState(240)
   const [isResizing, setIsResizing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -411,7 +413,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     const connect = () => {
       if (ws && ws.readyState === WebSocket.OPEN) return
 
-      ws = new WebSocket(`/ws/notifications?token=${encodeURIComponent(token)}`)
+      ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/notifications?token=${encodeURIComponent(token)}`)
 
       ws.onmessage = (event) => {
         try {
@@ -577,6 +579,12 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         setChannels([...channels, data.channel])
         setIsDialogOpen(false)
         setNewChannel({ channel_name: "", channel_mode: "orgbased", channel_category: "text", description: "" })
+      } else if (response.status === 403) {
+        setIsDialogOpen(false)
+        setUpgradeModal({
+          title: "Channel limit reached",
+          description: data.detail || "Upgrade to Pro for unlimited channels.",
+        })
       } else {
         toast.error("Error", {
           description: data.detail || "Failed to create channel"
@@ -1371,6 +1379,13 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           </DialogContent>
         </Dialog>
       </aside>
+      <UpgradeModal
+        open={!!upgradeModal}
+        onClose={() => setUpgradeModal(null)}
+        title={upgradeModal?.title ?? ""}
+        description={upgradeModal?.description ?? ""}
+        upgradeUrl={`/organization/${organizationId}/upgrade`}
+      />
       </>
     </TooltipProvider>
   )

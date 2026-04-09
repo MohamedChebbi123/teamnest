@@ -28,6 +28,7 @@ import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import Sidebar from "@/components/Sidebar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
+import UpgradeModal from "@/components/UpgradeModal"
 
 interface Attachment {
   id: number
@@ -186,6 +187,7 @@ export default function TasksPage() {
   const [isEditingSubtask, setIsEditingSubtask] = useState(false)
   const [deletingSubtaskId, setDeletingSubtaskId] = useState<number | null>(null)
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [showFileSizeModal, setShowFileSizeModal] = useState(false)
 
   const fetchTasks = async () => {
     try {
@@ -407,6 +409,11 @@ export default function TasksPage() {
   }
 
   const handleUploadAttachment = async (taskId: number, file: File) => {
+    const MAX_FREE_BYTES = 10 * 1024 * 1024
+    if (file.size > MAX_FREE_BYTES) {
+      setShowFileSizeModal(true)
+      return
+    }
     setIsUploadingAttachment(true)
     try {
       const token = localStorage.getItem("access_token")
@@ -419,7 +426,7 @@ export default function TasksPage() {
           {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ file_name: file.name, file_base64: base64 }),
+            body: JSON.stringify({ file_name: file.name, file_base64: base64, file_size: file.size }),
           }
         )
         const data = await res.json()
@@ -1817,6 +1824,13 @@ export default function TasksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UpgradeModal
+        open={showFileSizeModal}
+        onClose={() => setShowFileSizeModal(false)}
+        title="File too large"
+        description="Your plan allows files up to 10 MB. Upgrade to Pro for up to 100 MB uploads."
+        upgradeUrl={`/organization/${organizationId}/upgrade`}
+      />
     </div>
   )
 }

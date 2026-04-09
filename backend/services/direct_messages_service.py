@@ -11,6 +11,7 @@ from models.Direct_messages import Direct_messages
 from models.Notifications import Notifications
 from models.Users import Users
 from utils.Websocket_manager import DMWebSocketManager, notification_manager
+from utils.plan_limits import FREE_MAX_FILE_SIZE_BYTES, FREE_MAX_FILE_SIZE_MB
 
 dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
@@ -203,6 +204,12 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
 
     if file_size <= 0:
         raise HTTPException(status_code=400, detail="file_size must be greater than 0")
+
+    if file_size > FREE_MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds the {FREE_MAX_FILE_SIZE_MB} MB limit."
+        )
 
     if parent_id is not None:
         try:
@@ -783,6 +790,13 @@ async def send_direct_messages_realtime(
                     await websocket.send_json({
                         "type": "error",
                         "detail": "file_size must be greater than 0"
+                    })
+                    continue
+
+                if file_size > FREE_MAX_FILE_SIZE_BYTES:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": f"File size exceeds the {FREE_MAX_FILE_SIZE_MB} MB limit."
                     })
                     continue
 

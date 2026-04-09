@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import UpgradeModal from "@/components/UpgradeModal"
 
 type ReceiverInfo = {
   user_id: number
@@ -179,6 +180,7 @@ export default function ChannelsPage() {
   const [sidebarFilter, setSidebarFilter] = useState<"friends" | "groups">("friends")
   const [friendActionLoading, setFriendActionLoading] = useState(false)
   const [isReceiverTyping, setIsReceiverTyping] = useState(false)
+  const [showFileSizeModal, setShowFileSizeModal] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -504,7 +506,7 @@ export default function ChannelsPage() {
     const connect = () => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return
 
-      const ws = new WebSocket(`/ws/direct-messages?token=${token}`)
+      const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/direct-messages?token=${token}`)
 
       ws.onopen = () => { setIsConnected(true); setIsReconnecting(false) }
 
@@ -740,6 +742,13 @@ export default function ChannelsPage() {
 
   const uploadFileMessage = async (file: File) => {
     if (!receiverId) return
+
+    const MAX_FREE_BYTES = 10 * 1024 * 1024
+    if (file.size > MAX_FREE_BYTES) {
+      setShowFileSizeModal(true)
+      return
+    }
+
     setIsUploadingFile(true)
     try {
       const fileBase64 = await fileToDataUrl(file)
@@ -1671,6 +1680,12 @@ export default function ChannelsPage() {
           </div>
         )}
       </div>
+      <UpgradeModal
+        open={showFileSizeModal}
+        onClose={() => setShowFileSizeModal(false)}
+        title="File too large"
+        description="Your plan allows files up to 10 MB. Upgrade an organization to Pro for up to 100 MB uploads."
+      />
     </div>
   )
 }

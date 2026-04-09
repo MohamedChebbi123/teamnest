@@ -10,6 +10,8 @@ from models.Team_association import Team_association
 from models.Team_roles import Team_roles
 from schemas.Task_input import Task_input, Task_update, Task_status_update
 from schemas.Task_attachment_input import Task_attachment_input
+from models.Teams import Teams
+from utils.plan_limits import get_file_size_limit
 
 
 def task_to_dict(task):
@@ -469,6 +471,18 @@ def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachmen
     task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.team_id == team_id, Tasks.is_deleted == False).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Estimate file size from base64 payload and enforce plan limit
+    raw_b64 = data.file_base64.split(",", 1)[-1]  # strip data URI prefix if present
+    estimated_bytes = len(raw_b64) * 3 // 4
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    org = db.query(Organization).filter(Organization.organization_id == team.org_id).first() if team else None
+    file_size_limit = get_file_size_limit(org.organization_plan if org else None)
+    if file_size_limit is not None and estimated_bytes > file_size_limit:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds the {file_size_limit // (1024 * 1024)} MB limit. Upgrade to Pro for larger uploads."
+        )
 
     file_url = upload_chat_file_from_base64(data.file_name, data.file_base64)
 

@@ -45,6 +45,7 @@ import Sidebar from "@/components/Sidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import VoiceChannelPanel from "@/components/VoiceChannelPanel"
+import UpgradeModal from "@/components/UpgradeModal"
 
 interface ChannelDetails {
   channel_id: number
@@ -268,6 +269,7 @@ export default function ChannelPage() {
   const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([])
   const [loadingPinnedMessages, setLoadingPinnedMessages] = useState(false)
   const [pinningMessageId, setPinningMessageId] = useState<number | null>(null)
+  const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
 
   useEffect(() => {
     const fetchChannelData = async () => {
@@ -359,7 +361,7 @@ export default function ChannelPage() {
 
       try {
         // Note: Backend has endpoint /mesages/{channel_id} (typo in backend)
-        const wsUrl = `/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
+        const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
         const ws = new WebSocket(wsUrl)
 
         ws.onopen = () => {
@@ -789,8 +791,7 @@ export default function ChannelPage() {
     return `${typingUsers[0].first_name}, ${typingUsers[1].first_name} and ${typingUsers.length - 2} others are typing...`
   })()
 
-  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const sendMessage = async () => {
     if (!message.trim() || !channel || isSendingMessage) return
 
     setIsSendingMessage(true)
@@ -1118,6 +1119,15 @@ export default function ChannelPage() {
 
     if (!selectedFile || !channel || isUploadingFile) return
 
+    const MAX_FREE_BYTES = 10 * 1024 * 1024
+    if (selectedFile.size > MAX_FREE_BYTES) {
+      setUpgradeModal({
+        title: "File too large",
+        description: `Your plan allows files up to 10 MB. This file is ${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB. Upgrade to Pro for up to 100 MB uploads.`,
+      })
+      return
+    }
+
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       toast.error("Realtime unavailable", {
         description: "Reconnect to channel before sending files"
@@ -1251,7 +1261,7 @@ export default function ChannelPage() {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSendMessage(e)
+      sendMessage()
     }
   }
 
@@ -1681,7 +1691,7 @@ export default function ChannelPage() {
                 {/* Message Input Area */}
                 <div className="border-t bg-background/70 backdrop-blur px-4 py-4">
                   <div className="max-w-6xl mx-auto">
-                    <form onSubmit={handleSendMessage} className="relative">
+                    <form onSubmit={(e) => { e.preventDefault(); sendMessage() }} className="relative">
                       <div className="rounded-2xl border border-border/70 bg-background/90 p-3 shadow-sm">
                         {/* Main Input Container */}
                         <div className="flex-1 relative">
@@ -2036,6 +2046,13 @@ export default function ChannelPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UpgradeModal
+        open={!!upgradeModal}
+        onClose={() => setUpgradeModal(null)}
+        title={upgradeModal?.title ?? ""}
+        description={upgradeModal?.description ?? ""}
+        upgradeUrl={channel ? `/organization/${channel.org_id}/upgrade` : undefined}
+      />
     </>
   )
 }

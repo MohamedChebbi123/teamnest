@@ -17,6 +17,7 @@ import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, 
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
+import UpgradeModal from "@/components/UpgradeModal"
 
 interface OrganizationDetails {
   organization_id: number
@@ -104,6 +105,7 @@ export default function OrganizationPage() {
   const [deleteTeamDialogOpen, setDeleteTeamDialogOpen] = useState(false)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
+  const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
 
   useEffect(() => {
     const fetchOrganizationDetails = async () => {
@@ -320,9 +322,16 @@ export default function OrganizationPage() {
         })
       } else if (response.status === 403) {
         const data = await response.json()
-        toast.error("Permission denied", {
-          description: data.detail || "You don't have permission to add members"
-        })
+        const isLimitError = data.detail?.toLowerCase().includes("maximum")
+        if (isLimitError) {
+          setAddMemberDialogOpen(false)
+          setUpgradeModal({
+            title: "Member limit reached",
+            description: data.detail,
+          })
+        } else {
+          toast.error("Permission denied", { description: data.detail || "You don't have permission to add members" })
+        }
       } else {
         throw new Error("Failed to add member")
       }
@@ -1388,6 +1397,13 @@ export default function OrganizationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UpgradeModal
+        open={!!upgradeModal}
+        onClose={() => setUpgradeModal(null)}
+        title={upgradeModal?.title ?? ""}
+        description={upgradeModal?.description ?? ""}
+        upgradeUrl={`/organization/${organizationId}/upgrade`}
+      />
     </>
   )
 }

@@ -39,6 +39,7 @@ import {
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
+import UpgradeModal from "@/components/UpgradeModal"
 import Sidebar from "@/components/Sidebar/page"
 import {
   Select,
@@ -176,6 +177,7 @@ export default function TeamPage() {
   const [channelCategory, setChannelCategory] = useState<"teambased" | "orgbased" | "announcement">("teambased")
   const [channelDescription, setChannelDescription] = useState("")
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
+  const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
   const [channels, setChannels] = useState<Channel[]>([])
   const [teamChannelFiles, setTeamChannelFiles] = useState<TeamChannelFile[]>([])
 
@@ -707,6 +709,12 @@ export default function TeamPage() {
         setChannelDescription("")
         // Refresh channels list
         await fetchTeamChannels()
+      } else if (response.status === 403) {
+        setCreateChannelDialogOpen(false)
+        setUpgradeModal({
+          title: "Channel limit reached",
+          description: data.detail || "Upgrade to Pro for unlimited channels.",
+        })
       } else {
         toast.error("Error", {
           description: data.detail || "Failed to create channel"
@@ -1460,6 +1468,13 @@ export default function TeamPage() {
         </Dialog>
 
       </main>
+      <UpgradeModal
+        open={!!upgradeModal}
+        onClose={() => setUpgradeModal(null)}
+        title={upgradeModal?.title ?? ""}
+        description={upgradeModal?.description ?? ""}
+        upgradeUrl={`/organization/${organizationId}/upgrade`}
+      />
     </div>
   )
 }

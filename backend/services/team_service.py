@@ -13,6 +13,7 @@ from schemas.team_creation import team_creation
 from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
 from schemas.Channels_input import Channels_input
+from utils.plan_limits import get_channel_limit
 
 
 
@@ -648,6 +649,15 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
     
     if existing_channel:
         raise HTTPException(status_code=400, detail="Channel name already exists in this team")
+
+    channel_limit = get_channel_limit(found_organization.organization_plan)
+    if channel_limit is not None:
+        current_count = db.query(Channels).filter(Channels.org_id == org_id).count()
+        if current_count >= channel_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Free plan allows a maximum of {channel_limit} channels. Upgrade to Pro for unlimited channels."
+            )
     
     new_channel = Channels(
         channel_name=data.channel_name,
