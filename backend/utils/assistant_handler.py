@@ -20,7 +20,7 @@ def ask_assistant(query: str, context: list[dict]) -> str:
             "role": "system",
             "content": (
                 "You are TeamNest AI, a helpful assistant for a team collaboration platform. "
-                "Answer questions based on the provided context from team tasks. "
+                "Answer questions based on the provided context from team tasks and uploaded documents. "
                 "Be concise and helpful. If the context doesn't contain enough information to answer, "
                 "say so honestly. Do not make up information."
             )

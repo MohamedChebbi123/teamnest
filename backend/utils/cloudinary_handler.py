@@ -50,10 +50,14 @@ def upload_chat_file_from_base64(file_name: str, file_base64: str, mime_type: st
     if not re.match(r"^data:[^;]+;base64,", data_uri):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 file payload")
 
+    image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
+    ext = os.path.splitext(file_name)[1].lower()
+    resource_type = "image" if ext in image_extensions else "raw"
+
     try:
         result = cloudinary.uploader.upload(
             data_uri,
-            resource_type="auto",
+            resource_type=resource_type,
             folder="teamnest/chat_files",
             public_id=f"{os.path.splitext(file_name)[0]}_{os.urandom(4).hex()}",
             overwrite=False,

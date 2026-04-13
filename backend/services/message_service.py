@@ -18,6 +18,7 @@ from schemas.Message_edit_input import Message_edit_input
 from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
 from utils.cloudinary_handler import upload_chat_file_from_base64
 from utils.plan_limits import get_file_size_limit
+from utils.document_handler import embed_document
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
@@ -229,6 +230,17 @@ async def send_file_realtime_service(
     }
 
     await manager.broadcast(channel_id, file_data)
+
+    try:
+        embed_document(
+            file_url=file_url,
+            file_name=stored_file_name,
+            document_id=str(new_file.id),
+            user_id=str(user_id),
+            team_id=channel.team_id
+        )
+    except Exception as e:
+        print(f"[EMBED ERROR] Failed to embed document {stored_file_name}: {e}")
 
 
 def fetch_voice_participants_service(channel_id: int, org_id: int, authorization: str, db: Session):

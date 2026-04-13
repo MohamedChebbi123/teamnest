@@ -10,3 +10,4 @@ bcrypt
 pydantic[email]
 pinecone
 groq
+llama-index
