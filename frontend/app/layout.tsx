@@ -7,6 +7,7 @@ import { FriendRequestProvider } from "@/context/FriendRequestContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { DirectMessageNotificationProvider } from "@/context/DirectMessageNotificationContext";
 import { MentionNotificationProvider } from "@/context/MentionNotificationContext";
+import AiAssistant from "@/components/AiAssistant/AiAssistant";
 
 export const metadata: Metadata = {
   title: "TeamNest",
@@ -28,6 +29,7 @@ export default function RootLayout({
                 <DirectMessageNotificationProvider>
                   <MentionNotificationProvider>
                     {children}
+                    <AiAssistant />
                   </MentionNotificationProvider>
                 </DirectMessageNotificationProvider>
               </FriendRequestProvider>

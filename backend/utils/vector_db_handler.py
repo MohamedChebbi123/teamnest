@@ -36,17 +36,11 @@ def upsert_task(task_id: int, title: str, description: str, team_id: int):
     )
 
 
-def upsert_message(message_id: int, content: str, channel_id: int, sender_id: int):
-    index.upsert_records(
-        namespace=f"channel-{channel_id}",
-        records=[{
-            "_id": f"msg-{message_id}",
-            "chunk_text": content,
-            "type": "message",
-            "message_id": message_id,
-            "channel_id": channel_id,
-            "sender_id": sender_id
-        }]
+
+def delete_task(task_id: int, team_id: int):
+    index.delete(
+        ids=[f"task-{task_id}"],
+        namespace=f"team-{team_id}"
     )
 
 

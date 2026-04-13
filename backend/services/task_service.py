@@ -278,6 +278,9 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, authorization: 
     task.is_deleted = True
     db.commit()
 
+    from utils.vector_db_handler import delete_task
+    delete_task(task_id=task.id, team_id=task.team_id)
+
     return {"message": "Task deleted successfully"}
 
 

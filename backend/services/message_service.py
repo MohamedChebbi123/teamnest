@@ -615,14 +615,6 @@ async def send_messages_realtime(
                 db.commit()
                 db.refresh(new_message)
 
-                from utils.vector_db_handler import upsert_message
-                upsert_message(
-                    message_id=new_message.message_id,
-                    content=new_message.message_content,
-                    channel_id=channel_id,
-                    sender_id=user_id
-                )
-
                 sender = db.query(Users).filter(Users.user_id == user_id).first()
                 mention_tags = get_user_tag(new_message.message_content)
                 mentioned_users = resolve_mentioned_users(db, org_id, mention_tags, user_id)
