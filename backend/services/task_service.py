@@ -123,6 +123,14 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, autho
     db.commit()
     db.refresh(new_task)
 
+    from utils.vector_db_handler import upsert_task
+    upsert_task(
+        task_id=new_task.id,
+        title=new_task.title,
+        description=new_task.description,
+        team_id=new_task.team_id
+    )
+
     return task_to_dict(new_task)
 
 
