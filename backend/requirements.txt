@@ -11,3 +11,5 @@ pydantic[email]
 pinecone
 groq
 llama-index
+camelot-py[base]
+ghostscript

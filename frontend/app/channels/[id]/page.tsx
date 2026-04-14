@@ -1119,6 +1119,13 @@ export default function ChannelPage() {
 
     if (!selectedFile || !channel || isUploadingFile) return
 
+    if (!selectedFile.name.toLowerCase().endsWith(".pdf")) {
+      toast.error("Unsupported file type", {
+        description: "Only PDF files are supported. Please upload a .pdf file."
+      })
+      return
+    }
+
     const MAX_FREE_BYTES = 10 * 1024 * 1024
     if (selectedFile.size > MAX_FREE_BYTES) {
       setUpgradeModal({
@@ -1768,6 +1775,7 @@ export default function ChannelPage() {
                             <input
                               ref={fileInputRef}
                               type="file"
+                              accept=".pdf"
                               className="hidden"
                               onChange={handleFileSelected}
                             />

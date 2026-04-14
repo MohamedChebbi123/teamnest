@@ -1,9 +1,10 @@
 import os
 import tempfile
 import httpx
+import camelot
 from dotenv import load_dotenv
 from pinecone import Pinecone
-from llama_index.core import SimpleDirectoryReader
+from llama_index.core import SimpleDirectoryReader, Document
 from llama_index.core.node_parser import SentenceSplitter
 
 load_dotenv()
@@ -25,6 +26,25 @@ if not pc.has_index(doc_index_name):
 doc_index = pc.Index(doc_index_name)
 
 
+def extract_tables_from_pdf(file_path: str):
+    """Extract tables from a PDF using Camelot and return them as text."""
+    try:
+        tables = camelot.read_pdf(file_path, pages="all", flavor="lattice")
+        if not tables or tables.n == 0:
+            tables = camelot.read_pdf(file_path, pages="all", flavor="stream")
+
+        table_texts = []
+        for i, table in enumerate(tables):
+            df = table.df
+            table_text = f"Table {i + 1}:\n{df.to_string(index=False)}"
+            table_texts.append(table_text)
+
+        return table_texts
+    except Exception as e:
+        print(f"[TABLE EXTRACT] Camelot extraction failed: {e}")
+        return []
+
+
 def load_document(file_url: str, file_name: str):
     with tempfile.TemporaryDirectory() as tmp_dir:
         response = httpx.get(file_url, follow_redirects=True)
@@ -35,6 +55,11 @@ def load_document(file_url: str, file_name: str):
             f.write(response.content)
 
         docs = SimpleDirectoryReader(tmp_dir).load_data()
+
+        if file_name.lower().endswith(".pdf"):
+            table_texts = extract_tables_from_pdf(file_path)
+            for table_text in table_texts:
+                docs.append(Document(text=table_text))
 
     return docs
 

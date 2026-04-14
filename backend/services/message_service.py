@@ -12,6 +12,7 @@ from models.Users import Users
 from models.Notifications import Notifications
 from models.PInned_messages import Pinned_messages
 from models.Organization import Organization
+from models.Teams import Teams
 from models.Team_association import Team_association
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
@@ -147,6 +148,14 @@ async def send_file_realtime_service(
         })
         return
 
+    ext = os.path.splitext(file_name)[1].lower()
+    if ext != ".pdf":
+        await websocket.send_json({
+            "type": "error",
+            "detail": "Only PDF files are supported. Please upload a .pdf file."
+        })
+        return
+
     try:
         file_size = int(file_size)
     except (TypeError, ValueError):
@@ -180,6 +189,13 @@ async def send_file_realtime_service(
             await websocket.send_json({
                 "type": "error",
                 "detail": exc.detail
+            })
+            return
+        except Exception as e:
+            print(f"[CLOUDINARY ERROR] {file_name}: {e}")
+            await websocket.send_json({
+                "type": "error",
+                "detail": f"Failed to upload file: {str(e)}"
             })
             return
 
@@ -628,18 +644,28 @@ async def send_messages_realtime(
                 db.commit()
                 db.refresh(new_message)
 
+                sender = db.query(Users).filter(Users.user_id == user_id).first()
+
                 try:
+                    team = db.query(Teams).filter(Teams.team_id == channel.team_id).first() if channel.team_id else None
+                    org = db.query(Organization).filter(Organization.organization_id == org_id).first()
                     upsert_message(
                         message_id=new_message.message_id,
                         team_id=channel.team_id if channel.team_id is not None else 0,
-                        title=content,
                         org_id=org_id,
-                        description=content
+                        content=content,
+                        channel_id=channel_id,
+                        channel_name=channel.channel_name,
+                        sender_id=user_id,
+                        sender_first_name=sender.first_name if sender else "",
+                        sender_last_name=sender.last_name if sender else "",
+                        sent_at=new_message.sent_at.isoformat(),
+                        team_name=team.team_name if team else "",
+                        org_name=org.organization_name if org else "",
+                        parent_id=new_message.parent_id
                     )
                 except Exception as e:
                     print(f"Failed to upsert message to Pinecone: {e}")
-
-                sender = db.query(Users).filter(Users.user_id == user_id).first()
                 mention_tags = get_user_tag(new_message.message_content)
                 mentioned_users = resolve_mentioned_users(db, org_id, mention_tags, user_id)
                 mentions_payload = [
@@ -725,14 +751,21 @@ async def send_messages_realtime(
                 }
                 await manager.broadcast(channel_id, typing_data, exclude=websocket)
             elif data.get("type") == "send_file":
-                await send_file_realtime_service(
-                    data=data,
-                    websocket=websocket,
-                    channel_id=channel_id,
-                    user_id=user_id,
-                    channel=channel,
-                    db=db,
-                )
+                try:
+                    await send_file_realtime_service(
+                        data=data,
+                        websocket=websocket,
+                        channel_id=channel_id,
+                        user_id=user_id,
+                        channel=channel,
+                        db=db,
+                    )
+                except Exception as e:
+                    print(f"[FILE UPLOAD ERROR] {e}")
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": f"File upload failed: {str(e)}"
+                    })
             else:
                 await manager.broadcast(channel_id, data)
                 

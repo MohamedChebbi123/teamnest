@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
 from pinecone import Pinecone
 load_dotenv()
@@ -22,18 +23,51 @@ if not pc.has_index(index_name):
 
 index = pc.Index(index_name)
 
-def upsert_message(message_id: int, team_id: int, title: str, org_id: int, description: str):
-    chunk_text = f"Message: {title}. Description: {description}"
+def _format_date(iso_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return dt.strftime("%b %d, %Y at %I:%M %p")
+    except Exception:
+        return iso_str
+
+
+def upsert_message(
+    message_id: int,
+    team_id: int,
+    org_id: int,
+    content: str,
+    channel_id: int,
+    channel_name: str,
+    sender_id: int,
+    sender_first_name: str,
+    sender_last_name: str,
+    sent_at: str,
+    team_name: str = "",
+    org_name: str = "",
+    parent_id: int = None
+):
+    chunk_text = f"{sender_first_name} {sender_last_name}: {content}"
+    record = {
+        "_id": f"message-{message_id}",
+        "chunk_text": chunk_text,
+        "type": "message",
+        "message_id": message_id,
+        "team_id": team_id,
+        "team_name": team_name,
+        "organization_id": org_id,
+        "organization_name": org_name,
+        "channel_id": channel_id,
+        "channel_name": channel_name,
+        "sender_id": sender_id,
+        "sender_first_name": sender_first_name,
+        "sender_last_name": sender_last_name,
+        "sent_at": _format_date(sent_at),
+    }
+    if parent_id is not None:
+        record["parent_id"] = parent_id
     index.upsert_records(
         namespace=f"team-{team_id}",
-        records=[{
-            "_id": f"message-{message_id}",
-            "chunk_text": chunk_text,
-            "type": "message",
-            "message_id": message_id,
-            "team_id": team_id,
-            "organization_id": org_id
-        }]
+        records=[record]
     )
 
 
