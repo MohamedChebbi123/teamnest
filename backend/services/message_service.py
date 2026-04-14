@@ -19,6 +19,7 @@ from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManage
 from utils.cloudinary_handler import upload_chat_file_from_base64
 from utils.plan_limits import get_file_size_limit
 from utils.document_handler import embed_document
+from utils.messages_handler import upsert_message
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
@@ -626,6 +627,17 @@ async def send_messages_realtime(
                 db.add(new_message)
                 db.commit()
                 db.refresh(new_message)
+
+                try:
+                    upsert_message(
+                        message_id=new_message.message_id,
+                        team_id=channel.team_id if channel.team_id is not None else 0,
+                        title=content,
+                        org_id=org_id,
+                        description=content
+                    )
+                except Exception as e:
+                    print(f"Failed to upsert message to Pinecone: {e}")
 
                 sender = db.query(Users).filter(Users.user_id == user_id).first()
                 mention_tags = get_user_tag(new_message.message_content)

@@ -8,7 +8,7 @@ load_dotenv()
 pc = Pinecone(api_key=os.getenv("YOUR_KEY"))
 
 
-index_name = "fyp_messages"
+index_name = "fyp-messages"
 if not pc.has_index(index_name):
     pc.create_index_for_model(
         name=index_name,
