@@ -716,7 +716,7 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
     db.commit()
     db.refresh(new_channel)
 
-    create_log(db, org_id=org_id, actor_id=user_id, action="channel_created", target_id=new_channel.channel_id, target_type="channel", metadata={"channel_name": new_channel.channel_name, "team_id": team_id})
+    create_log(db, org_id=org_id, actor_id=user_id, action="channel_created", target_id=new_channel.channel_id, target_type="channel", metadata={"channel_name": new_channel.channel_name, "team_id": team_id, "team_name": team.team_name})
 
     return {
         "message": "Channel created successfully",

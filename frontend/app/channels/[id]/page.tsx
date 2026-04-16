@@ -433,6 +433,11 @@ export default function ChannelPage() {
             } else if (data.type === 'message_deleted') {
               // Remove deleted message
               setMessages(prev => prev.filter(msg => msg.message_id !== data.message_id))
+            } else if (data.type === 'error') {
+              toast.error("Upload failed", {
+                description: data.detail || "Something went wrong"
+              })
+              setIsUploadingFile(false)
             } else if (data.type === 'typing' && data.user) {
               updateTypingUser({
                 user_id: data.user.user_id,

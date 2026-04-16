@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle, Activity } from "lucide-react"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle, Activity, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -46,6 +46,7 @@ interface LogEntry {
   target_type: string | null
   metadata: Record<string, any> | null
   created_at: string | null
+  reversible: boolean
   actor: {
     user_id: number
     first_name: string
@@ -126,6 +127,7 @@ export default function OrganizationPage() {
   // Logs states
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loadingLogs, setLoadingLogs] = useState(false)
+  const [undoingLogId, setUndoingLogId] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchOrganizationDetails = async () => {
@@ -867,9 +869,9 @@ export default function OrganizationPage() {
         const perm = meta.permission === "all" ? "all permissions" : (meta.permission || "permissions").replace(/^can_/, "").replace(/_/g, " ")
         return `${actor} revoked ${perm} from ${revokedMember}`
       }
-      case "channel_created": return `${actor} created channel "${meta.channel_name || ""}"`
-      case "channel_updated": return `${actor} updated channel "${meta.channel_name || ""}"`
-      case "channel_deleted": return `${actor} deleted channel "${meta.channel_name || ""}"`
+      case "channel_created": return `${actor} created channel "${meta.channel_name || ""}"${meta.team_name ? ` in team "${meta.team_name}"` : ""}`
+      case "channel_updated": return `${actor} updated channel "${meta.channel_name || ""}"${meta.team_name ? ` in team "${meta.team_name}"` : ""}`
+      case "channel_deleted": return `${actor} deleted channel "${meta.channel_name || ""}"${meta.team_name ? ` from team "${meta.team_name}"` : ""}`
       case "task_created": return `${actor} created task "${meta.title || ""}"`
       case "task_updated": return `${actor} updated task "${meta.title || ""}"`
       case "task_deleted": return `${actor} deleted task "${meta.title || ""}"`
@@ -879,6 +881,41 @@ export default function OrganizationPage() {
       case "message_pinned": return `${actor} pinned a message`
       case "message_unpinned": return `${actor} unpinned a message`
       default: return `${actor} performed ${log.action.replace(/_/g, " ")}`
+    }
+  }
+
+  const handleUndoLog = async (logId: number) => {
+    if (!organizationId) return
+    setUndoingLogId(logId)
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/logs/${logId}/undo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success("Action undone", { description: data.message })
+        // Refresh logs
+        const logsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/logs`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        if (logsResponse.ok) {
+          setLogs(await logsResponse.json())
+        }
+      } else {
+        const data = await response.json()
+        toast.error("Failed to undo", { description: data.detail || "Please try again" })
+      }
+    } catch {
+      toast.error("Error", { description: "Failed to undo action" })
+    } finally {
+      setUndoingLogId(null)
     }
   }
 
@@ -1352,6 +1389,22 @@ export default function OrganizationPage() {
                             {log.created_at ? new Date(log.created_at).toLocaleString() : ""}
                           </p>
                         </div>
+                        {isOwner && log.reversible && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 h-7 px-2 text-muted-foreground hover:text-destructive"
+                            disabled={undoingLogId === log.id}
+                            onClick={() => handleUndoLog(log.id)}
+                          >
+                            {undoingLogId === log.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Undo2 className="h-3.5 w-3.5" />
+                            )}
+                            <span className="ml-1 text-xs">Undo</span>
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>

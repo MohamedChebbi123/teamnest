@@ -113,20 +113,16 @@ async def push_mention_notification(
     )
 
 
-def _resolve_unique_file_name(db: Session, file_name: str) -> str:
+def _check_duplicate_file(db: Session, file_name: str) -> str | None:
+    """Returns an error message if a file with the same name already exists, None otherwise."""
     normalized_file_name = file_name.strip()
     if not normalized_file_name:
-        raise HTTPException(status_code=400, detail="file_name is required")
+        return "file_name is required"
 
-    candidate = normalized_file_name
-    base_name, extension = os.path.splitext(normalized_file_name)
-    counter = 1
-
-    while db.query(Files).filter(Files.file_name == candidate).first():
-        candidate = f"{base_name}_{counter}{extension}"
-        counter += 1
-
-    return candidate
+    existing = db.query(Files).filter(Files.file_name == normalized_file_name).first()
+    if existing:
+        return f"A file named '{normalized_file_name}' has already been uploaded. Please rename your file or use the existing one."
+    return None
 
 
 async def send_file_realtime_service(
@@ -183,6 +179,15 @@ async def send_file_realtime_service(
         })
         return
 
+    stored_file_name = file_name.strip()
+    duplicate_error = _check_duplicate_file(db, stored_file_name)
+    if duplicate_error:
+        await websocket.send_json({
+            "type": "error",
+            "detail": duplicate_error
+        })
+        return
+
     file_url = provided_file_url
     if file_base64:
         try:
@@ -215,8 +220,6 @@ async def send_file_realtime_service(
             "detail": "Sender not found"
         })
         return
-
-    stored_file_name = _resolve_unique_file_name(db, file_name)
 
     new_file = Files(
         file_name=stored_file_name,

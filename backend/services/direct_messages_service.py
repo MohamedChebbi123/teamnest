@@ -233,6 +233,25 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
         ):
             raise HTTPException(status_code=400, detail="Reply target is not in this conversation")
 
+    existing_file_msg = db.query(Direct_messages).filter(
+        Direct_messages.is_deleted == False,
+        Direct_messages.content.like(DM_FILE_PREFIX + "%"),
+        or_(
+            and_(Direct_messages.sender_id == user_id, Direct_messages.receiver_id == receiver_id),
+            and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id),
+        )
+    ).all()
+    for msg in existing_file_msg:
+        try:
+            payload = json.loads(msg.content[len(DM_FILE_PREFIX):])
+            if payload.get("file_name") == file_name:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A file named '{file_name}' has already been uploaded in this conversation. Please rename your file or use the existing one."
+                )
+        except (json.JSONDecodeError, KeyError):
+            continue
+
     file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)
 
     file_payload = {
@@ -837,6 +856,30 @@ async def send_direct_messages_realtime(
                                 "detail": "Reply target is not in this conversation"
                             })
                             continue
+
+                    existing_file_msgs = op_db.query(Direct_messages).filter(
+                        Direct_messages.is_deleted == False,
+                        Direct_messages.content.like(DM_FILE_PREFIX + "%"),
+                        or_(
+                            and_(Direct_messages.sender_id == user_id, Direct_messages.receiver_id == receiver_id),
+                            and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id),
+                        )
+                    ).all()
+                    is_duplicate = False
+                    for msg in existing_file_msgs:
+                        try:
+                            p = json.loads(msg.content[len(DM_FILE_PREFIX):])
+                            if p.get("file_name") == file_name:
+                                is_duplicate = True
+                                break
+                        except (json.JSONDecodeError, KeyError):
+                            continue
+                    if is_duplicate:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": f"A file named '{file_name}' has already been uploaded in this conversation. Please rename your file or use the existing one."
+                        })
+                        continue
 
                     try:
                         file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)

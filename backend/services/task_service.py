@@ -494,6 +494,16 @@ def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachmen
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    existing_attachment = db.query(Task_attachments).filter(
+        Task_attachments.task_id == task_id,
+        Task_attachments.file_name == data.file_name
+    ).first()
+    if existing_attachment:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A file named '{data.file_name}' has already been uploaded to this task. Please rename your file or use the existing one."
+        )
+
     # Estimate file size from base64 payload and enforce plan limit
     raw_b64 = data.file_base64.split(",", 1)[-1]  # strip data URI prefix if present
     estimated_bytes = len(raw_b64) * 3 // 4
