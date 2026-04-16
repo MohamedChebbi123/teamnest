@@ -14,6 +14,7 @@ from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
 from schemas.Channels_input import Channels_input
 from utils.plan_limits import get_channel_limit
+from utils.log_handler import create_log
 
 
 
@@ -71,7 +72,9 @@ def create_team(data:team_creation,authorization: str, db: Session):
     db.add(new_team)
     db.commit()
     db.refresh(new_team)
-    
+
+    create_log(db, org_id=data.org_id, actor_id=user_id, action="team_created", target_id=new_team.team_id, target_type="team", metadata={"team_name": new_team.team_name})
+
     return {
         "message": "Team created successfully",
         "team_id": new_team.team_id,
@@ -162,9 +165,11 @@ def delete_team_service(team_id: int, authorization: str, db: Session):
             detail="Only organization owner or admin can delete teams"
         )
     
+    create_log(db, org_id=team.org_id, actor_id=user_id, action="team_deleted", target_id=team_id, target_type="team", metadata={"team_name": team.team_name})
+
     db.delete(team)
     db.commit()
-    
+
     return {
         "message": "Team deleted successfully",
         "team_id": team_id
@@ -219,10 +224,12 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
     team.team_name = data.team_name
     team.team_size = data.team_size
     team.description = data.description
-    
+
     db.commit()
     db.refresh(team)
-    
+
+    create_log(db, org_id=team.org_id, actor_id=user_id, action="team_updated", target_id=team.team_id, target_type="team", metadata={"team_name": team.team_name})
+
     return {
         "message": "Team updated successfully",
         "team_id": team.team_id,
@@ -317,7 +324,11 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
     db.commit()
     db.refresh(new_team_member)
     db.refresh(new_role)
-    
+
+    added_user = db.query(Users).filter(Users.user_id == data.user_id).first()
+    added_name = f"{added_user.first_name} {added_user.last_name}" if added_user else str(data.user_id)
+    create_log(db, org_id=team.org_id, actor_id=user_id, action="team_member_added", target_id=data.user_id, target_type="user", metadata={"team_id": team_id, "team_name": team.team_name, "role": data.role, "member_name": added_name})
+
     return {
         "message": "Member added successfully",
         "user_id": data.user_id,
@@ -466,6 +477,17 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
     if not member_role:
         raise HTTPException(status_code=404, detail="Member role not found")
     
+    old_permissions = {
+        "role": member_role.role,
+        "can_create_channels": member_role.can_create_channels,
+        "can_send_messages": member_role.can_send_messages,
+        "can_delete_messages": member_role.can_delete_messages,
+        "can_manage_roles": member_role.can_manage_roles,
+        "can_kick_members": member_role.can_kick_members,
+        "can_make_announcement": member_role.can_make_announcement,
+        "can_manage_tasks": member_role.can_manage_tasks,
+    }
+
     member_role.role = data.role
     member_role.can_create_channels = data.can_create_channels
     member_role.can_send_messages = data.can_send_messages
@@ -477,7 +499,25 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
 
     db.commit()
     db.refresh(member_role)
-    
+
+    new_permissions = {
+        "role": member_role.role,
+        "can_create_channels": member_role.can_create_channels,
+        "can_send_messages": member_role.can_send_messages,
+        "can_delete_messages": member_role.can_delete_messages,
+        "can_manage_roles": member_role.can_manage_roles,
+        "can_kick_members": member_role.can_kick_members,
+        "can_make_announcement": member_role.can_make_announcement,
+        "can_manage_tasks": member_role.can_manage_tasks,
+    }
+
+    changes = {k: {"from": old_permissions[k], "to": new_permissions[k]} for k in old_permissions if old_permissions[k] != new_permissions[k]}
+
+    target_user = db.query(Users).filter(Users.user_id == member_user_id).first()
+    member_name = f"{target_user.first_name} {target_user.last_name}" if target_user else str(member_user_id)
+
+    create_log(db, org_id=team.org_id, actor_id=user_id, action="team_member_permissions_updated", target_id=member_user_id, target_type="user", metadata={"team_id": team_id, "team_name": team.team_name, "role": member_role.role, "member_name": member_name, "changes": changes})
+
     return {
         "message": "Member permissions updated successfully",
         "user_id": member_user_id,
@@ -507,15 +547,15 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
     
     user_id = int(payload["sub"])
     
-    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
-    
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
-    
+
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == team.org_id).first()
+
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
     
     is_owner = found_organization.owner_id == user_id
     
@@ -556,12 +596,16 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
         Team_roles.user_id == member_user_id
     ).first()
     
+    kicked_user = db.query(Users).filter(Users.user_id == member_user_id).first()
+    kicked_name = f"{kicked_user.first_name} {kicked_user.last_name}" if kicked_user else str(member_user_id)
+    create_log(db, org_id=found_organization.organization_id, actor_id=user_id, action="team_member_kicked", target_id=member_user_id, target_type="user", metadata={"team_id": team_id, "team_name": team.team_name, "member_name": kicked_name})
+
     if member_role:
         db.delete(member_role)
-    
+
     db.delete(target_member)
     db.commit()
-    
+
     return {
         "message": "Member kicked successfully",
         "user_id": member_user_id,
@@ -671,7 +715,9 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
     db.add(new_channel)
     db.commit()
     db.refresh(new_channel)
-    
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="channel_created", target_id=new_channel.channel_id, target_type="channel", metadata={"channel_name": new_channel.channel_name, "team_id": team_id})
+
     return {
         "message": "Channel created successfully",
         "channel_id": new_channel.channel_id,
@@ -917,6 +963,11 @@ def revoke_permissions_from_team_memebers(team_id: int, user_id: int, authorizat
 
     db.commit()
     db.refresh(target_role)
+
+    target_user = db.query(Users).filter(Users.user_id == target_user_id).first()
+    member_name = f"{target_user.first_name} {target_user.last_name}" if target_user else str(target_user_id)
+
+    create_log(db, org_id=found_organization.organization_id, actor_id=requester_user_id, action="team_member_permissions_revoked", target_id=target_user_id, target_type="user", metadata={"team_id": team_id, "team_name": team.team_name, "member_name": member_name, "permission": permission_name if permission_name else "all"})
 
     return {
         "message": "Member permissions revoked successfully",

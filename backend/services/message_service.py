@@ -21,6 +21,8 @@ from utils.cloudinary_handler import upload_chat_file_from_base64
 from utils.plan_limits import get_file_size_limit
 from utils.document_handler import embed_document
 from utils.messages_handler import upsert_message
+from utils.log_handler import create_log
+from database.connection import SessionLocal
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
@@ -591,166 +593,181 @@ async def send_messages_realtime(
     if not channel:
         await websocket.close(code=1008, reason="Channel not found")
         return
-    
+
+    channel_name = channel.channel_name
+    channel_team_id = channel.team_id
+
+    db.close()
+
     await manager.connect(channel_id, websocket)
-    
+
     try:
         while True:
             data = await websocket.receive_json()
-            
+
             if data.get("type") == "send_message":
-                parent_message = None
-                parent_id = data.get("parent_id")
-                content = str(data.get("message_content") or "").strip()
-
-                if not content:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Message content cannot be empty"
-                    })
-                    continue
-
-                if parent_id is not None:
-                    try:
-                        parent_id = int(parent_id)
-                    except (TypeError, ValueError):
-                        await websocket.send_json({
-                            "type": "error",
-                            "detail": "Invalid parent_id"
-                        })
-                        continue
-
-                    parent_message = db.query(Messages).filter(
-                        Messages.message_id == parent_id,
-                        Messages.channel_id == channel_id,
-                        Messages.is_deleted == False
-                    ).first()
-
-                    if not parent_message:
-                        await websocket.send_json({
-                            "type": "error",
-                            "detail": "Reply target not found"
-                        })
-                        continue
-
-                new_message = Messages(
-                    message_content=content,
-                    sender_id=user_id,
-                    channel_id=channel_id,
-                    parent_id=parent_message.message_id if parent_message else None
-                )
-                
-                db.add(new_message)
-                db.commit()
-                db.refresh(new_message)
-
-                sender = db.query(Users).filter(Users.user_id == user_id).first()
-
+                msg_db = SessionLocal()
                 try:
-                    team = db.query(Teams).filter(Teams.team_id == channel.team_id).first() if channel.team_id else None
-                    org = db.query(Organization).filter(Organization.organization_id == org_id).first()
-                    upsert_message(
-                        message_id=new_message.message_id,
-                        team_id=channel.team_id if channel.team_id is not None else 0,
-                        org_id=org_id,
-                        content=content,
-                        channel_id=channel_id,
-                        channel_name=channel.channel_name,
+                    parent_message = None
+                    parent_id = data.get("parent_id")
+                    content = str(data.get("message_content") or "").strip()
+
+                    if not content:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Message content cannot be empty"
+                        })
+                        continue
+
+                    if parent_id is not None:
+                        try:
+                            parent_id = int(parent_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "Invalid parent_id"
+                            })
+                            continue
+
+                        parent_message = msg_db.query(Messages).filter(
+                            Messages.message_id == parent_id,
+                            Messages.channel_id == channel_id,
+                            Messages.is_deleted == False
+                        ).first()
+
+                        if not parent_message:
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "Reply target not found"
+                            })
+                            continue
+
+                    new_message = Messages(
+                        message_content=content,
                         sender_id=user_id,
-                        sender_first_name=sender.first_name if sender else "",
-                        sender_last_name=sender.last_name if sender else "",
-                        sent_at=new_message.sent_at.isoformat(),
-                        team_name=team.team_name if team else "",
-                        org_name=org.organization_name if org else "",
-                        parent_id=new_message.parent_id
+                        channel_id=channel_id,
+                        parent_id=parent_message.message_id if parent_message else None
                     )
-                except Exception as e:
-                    print(f"Failed to upsert message to Pinecone: {e}")
-                mention_tags = get_user_tag(new_message.message_content)
-                mentioned_users = resolve_mentioned_users(db, org_id, mention_tags, user_id)
-                mentions_payload = [
-                    {
-                        "user_id": mentioned.user_id,
-                        "first_name": mentioned.first_name,
-                        "last_name": mentioned.last_name,
-                        "user_tag": mentioned.user_tag,
-                    }
-                    for mentioned in mentioned_users
-                ]
 
-                try:
-                    create_mention_notifications(db, mentioned_users, new_message.message_id)
-                except Exception:
-                    db.rollback()
+                    msg_db.add(new_message)
+                    msg_db.commit()
+                    msg_db.refresh(new_message)
 
-                for mentioned in mentioned_users:
+                    sender = msg_db.query(Users).filter(Users.user_id == user_id).first()
+
                     try:
-                        await push_mention_notification(
-                            receiver_id=mentioned.user_id,
-                            sender_id=user_id,
+                        team = msg_db.query(Teams).filter(Teams.team_id == channel_team_id).first() if channel_team_id else None
+                        org = msg_db.query(Organization).filter(Organization.organization_id == org_id).first()
+                        upsert_message(
                             message_id=new_message.message_id,
-                            channel_id=channel_id,
+                            team_id=channel_team_id if channel_team_id is not None else 0,
                             org_id=org_id,
+                            content=content,
+                            channel_id=channel_id,
+                            channel_name=channel_name,
+                            sender_id=user_id,
                             sender_first_name=sender.first_name if sender else "",
                             sender_last_name=sender.last_name if sender else "",
-                            sender_avatar_url=sender.avatar_url if sender else None,
-                            sender_user_tag=sender.user_tag if sender else None,
-                            channel_name=channel.channel_name if channel else "",
+                            sent_at=new_message.sent_at.isoformat(),
+                            team_name=team.team_name if team else "",
+                            org_name=org.organization_name if org else "",
+                            parent_id=new_message.parent_id
                         )
-                    except Exception:
-                        continue
+                    except Exception as e:
+                        print(f"Failed to upsert message to Pinecone: {e}")
+                    mention_tags = get_user_tag(new_message.message_content)
+                    mentioned_users = resolve_mentioned_users(msg_db, org_id, mention_tags, user_id)
+                    mentions_payload = [
+                        {
+                            "user_id": mentioned.user_id,
+                            "first_name": mentioned.first_name,
+                            "last_name": mentioned.last_name,
+                            "user_tag": mentioned.user_tag,
+                        }
+                        for mentioned in mentioned_users
+                    ]
 
-                reply_to = None
-                if parent_message:
-                    parent_sender = db.query(Users).filter(Users.user_id == parent_message.sender_id).first()
-                    if parent_sender:
-                        reply_to = {
-                            "message_id": parent_message.message_id,
-                            "message_content": parent_message.message_content,
+                    try:
+                        create_mention_notifications(msg_db, mentioned_users, new_message.message_id)
+                    except Exception:
+                        msg_db.rollback()
+
+                    for mentioned in mentioned_users:
+                        try:
+                            await push_mention_notification(
+                                receiver_id=mentioned.user_id,
+                                sender_id=user_id,
+                                message_id=new_message.message_id,
+                                channel_id=channel_id,
+                                org_id=org_id,
+                                sender_first_name=sender.first_name if sender else "",
+                                sender_last_name=sender.last_name if sender else "",
+                                sender_avatar_url=sender.avatar_url if sender else None,
+                                sender_user_tag=sender.user_tag if sender else None,
+                                channel_name=channel_name,
+                            )
+                        except Exception:
+                            continue
+
+                    reply_to = None
+                    if parent_message:
+                        parent_sender = msg_db.query(Users).filter(Users.user_id == parent_message.sender_id).first()
+                        if parent_sender:
+                            reply_to = {
+                                "message_id": parent_message.message_id,
+                                "message_content": parent_message.message_content,
+                                "sender": {
+                                    "user_id": parent_sender.user_id,
+                                    "first_name": parent_sender.first_name,
+                                    "last_name": parent_sender.last_name,
+                                    "avatar_url": parent_sender.avatar_url,
+                                    "user_tag": parent_sender.user_tag
+                                }
+                            }
+
+                    message_data = {
+                        "type": "new_message",
+                        "message": {
+                            "message_id": new_message.message_id,
+                            "message_content": new_message.message_content,
+                            "mentions": mentions_payload,
+                            "parent_id": new_message.parent_id,
+                            "reply_to": reply_to,
+                            "sent_at": new_message.sent_at.isoformat(),
+                            "edited_at": new_message.edited_at.isoformat(),
                             "sender": {
-                                "user_id": parent_sender.user_id,
-                                "first_name": parent_sender.first_name,
-                                "last_name": parent_sender.last_name,
-                                "avatar_url": parent_sender.avatar_url,
-                                "user_tag": parent_sender.user_tag
+                                "user_id": sender.user_id,
+                                "first_name": sender.first_name,
+                                "last_name": sender.last_name,
+                                "avatar_url": sender.avatar_url,
+                                "user_tag": sender.user_tag
                             }
                         }
-                
-                message_data = {
-                    "type": "new_message",
-                    "message": {
-                        "message_id": new_message.message_id,
-                        "message_content": new_message.message_content,
-                        "mentions": mentions_payload,
-                        "parent_id": new_message.parent_id,
-                        "reply_to": reply_to,
-                        "sent_at": new_message.sent_at.isoformat(),
-                        "edited_at": new_message.edited_at.isoformat(),
-                        "sender": {
-                            "user_id": sender.user_id,
-                            "first_name": sender.first_name,
-                            "last_name": sender.last_name,
-                            "avatar_url": sender.avatar_url,
-                            "user_tag": sender.user_tag
-                        }
                     }
-                }
-                await manager.broadcast(channel_id, message_data)
+                    await manager.broadcast(channel_id, message_data)
+                finally:
+                    msg_db.close()
             elif data.get("type") == "typing":
-                typing_data = {
-                    "type": "typing",
-                    "channel_id": channel_id,
-                    "user": {
-                        "user_id": user.user_id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "avatar_url": user.avatar_url,
-                        "user_tag": user.user_tag,
-                    },
-                    "is_typing": bool(data.get("is_typing", False)),
-                }
-                await manager.broadcast(channel_id, typing_data, exclude=websocket)
+                typing_db = SessionLocal()
+                try:
+                    user_obj = typing_db.query(Users).filter(Users.user_id == user_id).first()
+                    typing_data = {
+                        "type": "typing",
+                        "channel_id": channel_id,
+                        "user": {
+                            "user_id": user_obj.user_id,
+                            "first_name": user_obj.first_name,
+                            "last_name": user_obj.last_name,
+                            "avatar_url": user_obj.avatar_url,
+                            "user_tag": user_obj.user_tag,
+                        },
+                        "is_typing": bool(data.get("is_typing", False)),
+                    }
+                    await manager.broadcast(channel_id, typing_data, exclude=websocket)
+                finally:
+                    typing_db.close()
             elif data.get("type") == "send_file":
+                file_db = SessionLocal()
                 try:
                     await send_file_realtime_service(
                         data=data,
@@ -758,7 +775,7 @@ async def send_messages_realtime(
                         channel_id=channel_id,
                         user_id=user_id,
                         channel=channel,
-                        db=db,
+                        db=file_db,
                     )
                 except Exception as e:
                     print(f"[FILE UPLOAD ERROR] {e}")
@@ -766,9 +783,11 @@ async def send_messages_realtime(
                         "type": "error",
                         "detail": f"File upload failed: {str(e)}"
                     })
+                finally:
+                    file_db.close()
             else:
                 await manager.broadcast(channel_id, data)
-                
+
     except WebSocketDisconnect:
         manager.disconnect(channel_id, websocket)
 
@@ -799,6 +818,8 @@ async def notifications_ws_endpoint(
     if not user:
         await websocket.close(code=1008, reason="User not found")
         return
+
+    db.close()
 
     await notification_manager.connect(user_id, websocket)
 
@@ -866,6 +887,8 @@ async def voice_websocket_endpoint(
         "avatar_url": user.avatar_url,
         "user_tag": user.user_tag,
     }
+
+    db.close()
 
     await voice_manager.connect(channel_id, websocket, participant=participant)
 
@@ -1034,6 +1057,8 @@ def pin_message_service(message_id: int, org_id: int, authorization: str, db: Se
     db.commit()
     db.refresh(pinned)
 
+    create_log(db, org_id=org_id, actor_id=user_id, action="message_pinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})
+
     return {
         "id": pinned.id,
         "message_id": pinned.message_id,
@@ -1100,6 +1125,8 @@ def unpin_message_service(message_id: int, org_id: int, authorization: str, db: 
 
     db.delete(pinned)
     db.commit()
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="message_unpinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})
 
     return {"detail": "Message unpinned successfully"}
 

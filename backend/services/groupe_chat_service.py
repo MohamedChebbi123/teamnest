@@ -11,6 +11,7 @@ from models.Group_chat_messages import Group_chat_messages
 from models.Users import Users
 from models.Friends import Friends
 from utils.Websocket_manager import group_chat_ws_manager
+from database.connection import SessionLocal
 from typing import List
 
 
@@ -440,6 +441,17 @@ async def group_chat_websocket_service(
         await websocket.close(code=1008, reason="Not a member of this group chat")
         return
 
+    user_info = {
+        "user_id": user.user_id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "avatar_url": user.avatar_url,
+        "user_tag": user.user_tag,
+    }
+    group_owner_id = group.owned_by
+
+    db.close()
+
     await group_chat_ws_manager.connect(group_chat_id, websocket)
 
     def _msg_payload(message: Group_chat_messages) -> dict:
@@ -452,13 +464,7 @@ async def group_chat_websocket_service(
             "is_deleted": message.is_deleted,
             "sent_at": message.sent_at.isoformat() if message.sent_at else None,
             "edited_at": message.edited_at.isoformat() if message.edited_at else None,
-            "sender": {
-                "user_id": user.user_id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "avatar_url": user.avatar_url,
-                "user_tag": user.user_tag,
-            },
+            "sender": user_info,
         }
 
     try:
@@ -467,44 +473,48 @@ async def group_chat_websocket_service(
             message_type = data.get("type")
 
             if message_type == "send_message":
-                content = str(data.get("content", "")).strip()
-                parent_id = data.get("parent_id")
+                op_db = SessionLocal()
+                try:
+                    content = str(data.get("content", "")).strip()
+                    parent_id = data.get("parent_id")
 
-                if not content:
-                    await websocket.send_json({"type": "error", "detail": "Message content cannot be empty"})
+                    if not content:
+                        await websocket.send_json({"type": "error", "detail": "Message content cannot be empty"})
+                        continue
+
+                    if parent_id is not None:
+                        try:
+                            parent_id = int(parent_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({"type": "error", "detail": "parent_id must be a valid integer"})
+                            continue
+
+                        parent_msg = op_db.query(Group_chat_messages).filter(
+                            Group_chat_messages.id == parent_id,
+                            Group_chat_messages.group_chat_id == group_chat_id,
+                            Group_chat_messages.is_deleted == False,
+                        ).first()
+                        if not parent_msg:
+                            await websocket.send_json({"type": "error", "detail": "Reply target not found"})
+                            continue
+
+                    new_message = Group_chat_messages(
+                        group_chat_id=group_chat_id,
+                        sender_id=user_id,
+                        content=content,
+                        parent_id=parent_id,
+                    )
+                    op_db.add(new_message)
+                    op_db.commit()
+                    op_db.refresh(new_message)
+
+                    await group_chat_ws_manager.broadcast(group_chat_id, {
+                        "type": "new_group_message",
+                        "message": _msg_payload(new_message),
+                    })
                     continue
-
-                if parent_id is not None:
-                    try:
-                        parent_id = int(parent_id)
-                    except (TypeError, ValueError):
-                        await websocket.send_json({"type": "error", "detail": "parent_id must be a valid integer"})
-                        continue
-
-                    parent_msg = db.query(Group_chat_messages).filter(
-                        Group_chat_messages.id == parent_id,
-                        Group_chat_messages.group_chat_id == group_chat_id,
-                        Group_chat_messages.is_deleted == False,
-                    ).first()
-                    if not parent_msg:
-                        await websocket.send_json({"type": "error", "detail": "Reply target not found"})
-                        continue
-
-                new_message = Group_chat_messages(
-                    group_chat_id=group_chat_id,
-                    sender_id=user_id,
-                    content=content,
-                    parent_id=parent_id,
-                )
-                db.add(new_message)
-                db.commit()
-                db.refresh(new_message)
-
-                await group_chat_ws_manager.broadcast(group_chat_id, {
-                    "type": "new_group_message",
-                    "message": _msg_payload(new_message),
-                })
-                continue
+                finally:
+                    op_db.close()
 
             if message_type == "typing":
                 await group_chat_ws_manager.broadcast(group_chat_id, {
@@ -512,82 +522,84 @@ async def group_chat_websocket_service(
                     "group_chat_id": group_chat_id,
                     "sender_id": user_id,
                     "is_typing": bool(data.get("is_typing", False)),
-                    "sender": {
-                        "user_id": user.user_id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "avatar_url": user.avatar_url,
-                        "user_tag": user.user_tag,
-                    },
+                    "sender": user_info,
                 }, exclude=websocket)
                 continue
 
             if message_type == "edit_message":
-                message_id = data.get("message_id")
-                content = str(data.get("content", "")).strip()
-
+                op_db = SessionLocal()
                 try:
-                    message_id = int(message_id)
-                except (TypeError, ValueError):
-                    await websocket.send_json({"type": "error", "detail": "message_id must be a valid integer"})
-                    continue
+                    message_id = data.get("message_id")
+                    content = str(data.get("content", "")).strip()
 
-                message = db.query(Group_chat_messages).filter(
-                    Group_chat_messages.id == message_id,
-                    Group_chat_messages.group_chat_id == group_chat_id,
-                    Group_chat_messages.is_deleted == False,
-                ).first()
-                if not message:
-                    await websocket.send_json({"type": "error", "detail": "Message not found"})
-                    continue
-                if message.sender_id != user_id:
-                    await websocket.send_json({"type": "error", "detail": "You can only edit your own messages"})
-                    continue
-                if not content:
-                    await websocket.send_json({"type": "error", "detail": "Message content cannot be empty"})
-                    continue
+                    try:
+                        message_id = int(message_id)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({"type": "error", "detail": "message_id must be a valid integer"})
+                        continue
 
-                message.content = content
-                message.edited_at = datetime.now(UTC)
-                db.commit()
-                db.refresh(message)
+                    message = op_db.query(Group_chat_messages).filter(
+                        Group_chat_messages.id == message_id,
+                        Group_chat_messages.group_chat_id == group_chat_id,
+                        Group_chat_messages.is_deleted == False,
+                    ).first()
+                    if not message:
+                        await websocket.send_json({"type": "error", "detail": "Message not found"})
+                        continue
+                    if message.sender_id != user_id:
+                        await websocket.send_json({"type": "error", "detail": "You can only edit your own messages"})
+                        continue
+                    if not content:
+                        await websocket.send_json({"type": "error", "detail": "Message content cannot be empty"})
+                        continue
 
-                await group_chat_ws_manager.broadcast(group_chat_id, {
-                    "type": "group_message_edited",
-                    "message": _msg_payload(message),
-                })
-                continue
+                    message.content = content
+                    message.edited_at = datetime.now(UTC)
+                    op_db.commit()
+                    op_db.refresh(message)
+
+                    await group_chat_ws_manager.broadcast(group_chat_id, {
+                        "type": "group_message_edited",
+                        "message": _msg_payload(message),
+                    })
+                    continue
+                finally:
+                    op_db.close()
 
             if message_type == "delete_message":
-                message_id = data.get("message_id")
-
+                op_db = SessionLocal()
                 try:
-                    message_id = int(message_id)
-                except (TypeError, ValueError):
-                    await websocket.send_json({"type": "error", "detail": "message_id must be a valid integer"})
-                    continue
+                    message_id = data.get("message_id")
 
-                message = db.query(Group_chat_messages).filter(
-                    Group_chat_messages.id == message_id,
-                    Group_chat_messages.group_chat_id == group_chat_id,
-                    Group_chat_messages.is_deleted == False,
-                ).first()
-                if not message:
-                    await websocket.send_json({"type": "error", "detail": "Message not found"})
-                    continue
-                if message.sender_id != user_id and group.owned_by != user_id:
-                    await websocket.send_json({"type": "error", "detail": "You can only delete your own messages"})
-                    continue
+                    try:
+                        message_id = int(message_id)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({"type": "error", "detail": "message_id must be a valid integer"})
+                        continue
 
-                message.is_deleted = True
-                db.commit()
+                    message = op_db.query(Group_chat_messages).filter(
+                        Group_chat_messages.id == message_id,
+                        Group_chat_messages.group_chat_id == group_chat_id,
+                        Group_chat_messages.is_deleted == False,
+                    ).first()
+                    if not message:
+                        await websocket.send_json({"type": "error", "detail": "Message not found"})
+                        continue
+                    if message.sender_id != user_id and group_owner_id != user_id:
+                        await websocket.send_json({"type": "error", "detail": "You can only delete your own messages"})
+                        continue
 
-                await group_chat_ws_manager.broadcast(group_chat_id, {
-                    "type": "group_message_deleted",
-                    "message_id": message_id,
-                    "group_chat_id": group_chat_id,
-                })
-                continue
+                    message.is_deleted = True
+                    op_db.commit()
+
+                    await group_chat_ws_manager.broadcast(group_chat_id, {
+                        "type": "group_message_deleted",
+                        "message_id": message_id,
+                        "group_chat_id": group_chat_id,
+                    })
+                    continue
+                finally:
+                    op_db.close()
 
             await websocket.send_json({"type": "error", "detail": "Unsupported message type"})
 

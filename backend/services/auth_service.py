@@ -13,6 +13,7 @@ from utils.jwt_handler import create_access_token,create_refresh_token
 from utils.jwt_handler import verify_token
 from utils.Websocket_manager import connectivity_manager
 from models.Friends import Friends
+from database.connection import SessionLocal
 
 ConnectivityManager=connectivity_manager
 
@@ -513,25 +514,25 @@ async def get_user_info_by_id_service(user_id:int,authorization: str,db: Session
 
 
 async def check_connectivity(websocket, authorization: str, db: Session):
-    
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
+
     token = authorization.split(" ")[1]
-    
+
     payload = verify_token(token, "access")
-    
+
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
+
     user_id = int(payload["sub"])
-    
+
     user = db.query(Users).filter(Users.user_id == user_id).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    
+
+
     from sqlalchemy import or_
     user_friends = db.query(Friends).filter(
         or_(Friends.user_id == user_id, Friends.friend_id == user_id)
@@ -541,6 +542,8 @@ async def check_connectivity(websocket, authorization: str, db: Session):
         found_friend.friend_id if found_friend.user_id == user_id else found_friend.user_id
         for found_friend in user_friends
     ]
+
+    db.close()
 
     await ConnectivityManager.connect(user_id, websocket)
     await ConnectivityManager.broadcast(friend_ids, {"type": "user_online", "user_id": user_id})

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle } from "lucide-react"
+import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle, Activity } from "lucide-react"
 import { toast } from "sonner"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -37,6 +37,22 @@ interface Team {
   description?: string
   org_id: number
   created_at: string
+}
+
+interface LogEntry {
+  id: number
+  action: string
+  target_id: number | null
+  target_type: string | null
+  metadata: Record<string, any> | null
+  created_at: string | null
+  actor: {
+    user_id: number
+    first_name: string
+    last_name: string
+    avatar_url: string | null
+    user_tag: string | null
+  }
 }
 
 interface PendingJoinRequest {
@@ -106,6 +122,10 @@ export default function OrganizationPage() {
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
   const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
+
+  // Logs states
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [loadingLogs, setLoadingLogs] = useState(false)
 
   useEffect(() => {
     const fetchOrganizationDetails = async () => {
@@ -262,6 +282,37 @@ export default function OrganizationPage() {
 
     fetchTeams()
   }, [organizationId])
+
+  // Fetch logs
+  useEffect(() => {
+    const fetchLogs = async () => {
+      if (!organizationId) return
+      if (!["OWNER", "ADMIN"].includes(currentUserRole)) return
+
+      setLoadingLogs(true)
+      try {
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/logs`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setLogs(data)
+        }
+      } catch (error) {
+        console.error('Error fetching logs:', error)
+      } finally {
+        setLoadingLogs(false)
+      }
+    }
+
+    fetchLogs()
+  }, [organizationId, currentUserRole])
 
   // Listen for add member dialog event from navbar
   useEffect(() => {
@@ -776,6 +827,61 @@ export default function OrganizationPage() {
     }
   }
 
+  const formatLogAction = (log: LogEntry): string => {
+    const actor = `${log.actor.first_name} ${log.actor.last_name}`
+    const meta = log.metadata || {}
+    switch (log.action) {
+      case "member_added": return `${actor} added a member (${meta.role || "MEMBER"})`
+      case "org_updated": return `${actor} updated the organization`
+      case "org_deleted": return `${actor} deleted the organization`
+      case "join_request_sent": return `${actor} sent a join request`
+      case "join_request_accepted": return `${actor} accepted a join request (${meta.role || "MEMBER"})`
+      case "join_request_rejected": return `${actor} rejected a join request`
+      case "plan_upgraded": return `${actor} upgraded the plan to ${meta.plan || "PRO"}`
+      case "subscription_cancelled": return `${actor} cancelled the subscription`
+      case "team_created": return `${actor} created team "${meta.team_name || ""}"`
+      case "team_updated": return `${actor} updated team "${meta.team_name || ""}"`
+      case "team_deleted": return `${actor} deleted team "${meta.team_name || ""}"`
+      case "team_member_added": return `${actor} added ${meta.member_name || "a member"} to team "${meta.team_name || ""}" (${meta.role || "MEMBER"})`
+      case "team_member_kicked": return `${actor} kicked ${meta.member_name || "a member"} from team "${meta.team_name || ""}"`
+      case "team_member_permissions_updated": {
+        const memberName = meta.member_name || "a member"
+        const changes = meta.changes || {}
+        const granted: string[] = []
+        const revoked: string[] = []
+        Object.keys(changes).forEach((key) => {
+          if (key === "role") return
+          const label = key.replace(/^can_/, "").replace(/_/g, " ")
+          if (changes[key].to === true) granted.push(label)
+          else if (changes[key].to === false) revoked.push(label)
+        })
+        const parts: string[] = []
+        if (granted.length > 0) parts.push(`granted ${granted.join(", ")}`)
+        if (revoked.length > 0) parts.push(`revoked ${revoked.join(", ")}`)
+        const roleChange = changes.role ? ` role → ${changes.role.to}` : ""
+        const permText = parts.length > 0 ? ` (${parts.join(" | ")})` : ""
+        return `${actor} updated permissions for ${memberName}${roleChange}${permText}`
+      }
+      case "team_member_permissions_revoked": {
+        const revokedMember = meta.member_name || "a member"
+        const perm = meta.permission === "all" ? "all permissions" : (meta.permission || "permissions").replace(/^can_/, "").replace(/_/g, " ")
+        return `${actor} revoked ${perm} from ${revokedMember}`
+      }
+      case "channel_created": return `${actor} created channel "${meta.channel_name || ""}"`
+      case "channel_updated": return `${actor} updated channel "${meta.channel_name || ""}"`
+      case "channel_deleted": return `${actor} deleted channel "${meta.channel_name || ""}"`
+      case "task_created": return `${actor} created task "${meta.title || ""}"`
+      case "task_updated": return `${actor} updated task "${meta.title || ""}"`
+      case "task_deleted": return `${actor} deleted task "${meta.title || ""}"`
+      case "task_status_updated": return `${actor} changed task status to ${meta.status || ""}`
+      case "task_review_accepted": return `${actor} accepted a task review`
+      case "task_review_rejected": return `${actor} rejected a task review`
+      case "message_pinned": return `${actor} pinned a message`
+      case "message_unpinned": return `${actor} unpinned a message`
+      default: return `${actor} performed ${log.action.replace(/_/g, " ")}`
+    }
+  }
+
   const isOwner = organization?.owner_id === currentUserId
 
   if (loading) {
@@ -1204,6 +1310,55 @@ export default function OrganizationPage() {
               )}
             </div>
           </div>
+
+          {/* ── Activity Log ── */}
+          {["OWNER", "ADMIN"].includes(currentUserRole) && (
+            <Card className="rounded-xl">
+              <CardHeader className="px-6 py-5 flex flex-row items-center justify-between space-y-0 border-b">
+                <div>
+                  <CardTitle className="text-base font-semibold">Activity Log</CardTitle>
+                  <CardDescription className="mt-0.5">Recent actions in {organization.organization_name}</CardDescription>
+                </div>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingLogs ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-16 text-center px-6">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                      <Activity className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">No activity yet</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Actions will appear here as they happen</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {logs.slice(0, 20).map((log) => (
+                      <div key={log.id} className="flex items-start gap-3 px-6 py-3">
+                        <Avatar className="h-7 w-7 mt-0.5 shrink-0">
+                          <AvatarImage src={log.actor.avatar_url || undefined} />
+                          <AvatarFallback className="text-[10px]">
+                            {log.actor.first_name?.[0]}{log.actor.last_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm leading-snug">{formatLogAction(log)}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {log.created_at ? new Date(log.created_at).toLocaleString() : ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

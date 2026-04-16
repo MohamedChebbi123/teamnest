@@ -9,6 +9,7 @@ from models.Teams import Teams
 from models.Team_roles import Team_roles
 from sqlalchemy.orm import Session
 from utils.plan_limits import get_channel_limit
+from utils.log_handler import create_log
 
 
 def create_channel_service(data:Channels_input,org_id: int,authorization: str,db: Session):
@@ -82,7 +83,9 @@ def create_channel_service(data:Channels_input,org_id: int,authorization: str,db
     db.add(new_channel)
     db.commit()
     db.refresh(new_channel)
-    
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="channel_created", target_id=new_channel.channel_id, target_type="channel", metadata={"channel_name": new_channel.channel_name})
+
     return {
         "message": "Channel created successfully",
         "channel": {
@@ -275,10 +278,12 @@ def update_channel_service(channel_id: int, data: Channels_input, authorization:
     channel.channel_mode = data.channel_mode
     channel.channel_category = data.channel_category
     channel.description = data.description
-    
+
     db.commit()
     db.refresh(channel)
-    
+
+    create_log(db, org_id=channel.org_id, actor_id=user_id, action="channel_updated", target_id=channel.channel_id, target_type="channel", metadata={"channel_name": channel.channel_name})
+
     return {
         "message": "Channel updated successfully",
         "channel": {
@@ -348,9 +353,11 @@ def delete_channel_service(channel_id: int, authorization: str, db: Session):
                 detail="You don't have permission to delete channels in this team"
             )
     
+    create_log(db, org_id=channel.org_id, actor_id=user_id, action="channel_deleted", target_id=channel_id, target_type="channel", metadata={"channel_name": channel.channel_name})
+
     db.delete(channel)
     db.commit()
-    
+
     return {
         "message": "Channel deleted successfully",
         "channel_id": channel_id

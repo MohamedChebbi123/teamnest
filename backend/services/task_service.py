@@ -12,6 +12,7 @@ from schemas.Task_input import Task_input, Task_update, Task_status_update
 from schemas.Task_attachment_input import Task_attachment_input
 from models.Teams import Teams
 from utils.plan_limits import get_file_size_limit
+from utils.log_handler import create_log
 
 
 def task_to_dict(task):
@@ -131,6 +132,8 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, autho
         team_id=new_task.team_id
     )
 
+    create_log(db, org_id=org_id, actor_id=user_id, action="task_created", target_id=new_task.id, target_type="task", metadata={"title": new_task.title, "team_id": team_id})
+
     return task_to_dict(new_task)
 
 
@@ -233,6 +236,8 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
     db.commit()
     db.refresh(task)
 
+    create_log(db, org_id=org_id, actor_id=user_id, action="task_updated", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
+
     return task_to_dict(task)
 
 
@@ -280,6 +285,8 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, authorization: 
 
     from utils.vector_db_handler import delete_task
     delete_task(task_id=task.id, team_id=task.team_id)
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="task_deleted", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
 
     return {"message": "Task deleted successfully"}
 
@@ -397,6 +404,8 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
     db.commit()
     db.refresh(task)
 
+    create_log(db, org_id=org_id, actor_id=user_id, action="task_status_updated", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
+
     return task_to_dict(task)
 
 
@@ -457,6 +466,8 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authoriza
     task.status = "done" if action == "accept" else "in_progress"
     db.commit()
     db.refresh(task)
+
+    create_log(db, org_id=org_id, actor_id=user_id, action=f"task_review_{action}ed", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
 
     return task_to_dict(task)
 

@@ -15,6 +15,7 @@ from schemas.Join_org import Join_org
 from models.Pending_members_org import Pending_members_org
 from models.Organization_payments import Organization_payments
 from utils.plan_limits import get_member_limit
+from utils.log_handler import create_log
 def create_organization_service(
     organization_name:str,
     organization_description:str,
@@ -185,6 +186,8 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, authorization: 
     org.organization_plan = "PRO"
     db.commit()
 
+    create_log(db, org_id=org_id, actor_id=user_id, action="plan_upgraded", target_id=org_id, target_type="organization", metadata={"plan": "PRO"})
+
     return {"message": "Upgraded"}
 
 def cancel_subscription_service(org_id: int, authorization: str, db: Session):
@@ -226,6 +229,8 @@ def cancel_subscription_service(org_id: int, authorization: str, db: Session):
     payment.status = "cancelled"
     org.organization_plan = "FREE"
     db.commit()
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="subscription_cancelled", target_id=org_id, target_type="organization")
 
     return {"message": "Subscription cancelled. Your organization has been downgraded to the Free plan."}
 
@@ -326,6 +331,8 @@ def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization:
     db.commit()
     db.refresh(new_member)
 
+    create_log(db, org_id=org_id, actor_id=user_id, action="member_added", target_id=member_to_add.user_id, target_type="user", metadata={"role": valid.role_user})
+
     return {
         "msg":"member has been added sucessfully",
         "user_id":member_to_add.user_id
@@ -389,7 +396,9 @@ def update_organization_service(
     
     db.commit()
     db.refresh(organization)
-    
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="org_updated", target_id=org_id, target_type="organization")
+
     return {
         "msg": "Organization updated successfully",
         "organization": {
@@ -425,11 +434,13 @@ def delete_organization_service(
     if organization.owner_id != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can delete this organization")
     
+    create_log(db, org_id=org_id, actor_id=user_id, action="org_deleted", target_id=org_id, target_type="organization")
+
     db.query(Organization_members).filter(Organization_members.org_id == org_id).delete()
-    
+
     db.delete(organization)
     db.commit()
-    
+
     return {"msg": "Organization deleted successfully"}
 
 def fetch_org_members(org_id: int,authorization: str,db: Session):
@@ -525,6 +536,8 @@ def join_org_service(data:Join_org,authorization: str,db: Session):
     db.commit()
     db.refresh(new_invite)
 
+    create_log(db, org_id=found_org.organization_id, actor_id=user_id, action="join_request_sent", target_id=user_id, target_type="user")
+
     return {
         "msg": "Join request sent successfully",
         "request_id": new_invite.id,
@@ -619,6 +632,7 @@ def accept_or_reject_service(
     if action == "reject":
         db.delete(pending_request)
         db.commit()
+        create_log(db, org_id=org_id, actor_id=requester_user_id, action="join_request_rejected", target_id=pending_request.user_id, target_type="user")
         return {
             "msg": "Join request rejected successfully",
             "request_id": request_id,
@@ -660,6 +674,8 @@ def accept_or_reject_service(
     db.delete(pending_request)
     db.commit()
     db.refresh(new_member)
+
+    create_log(db, org_id=org_id, actor_id=requester_user_id, action="join_request_accepted", target_id=new_member.memmber_id, target_type="user", metadata={"role": role_user})
 
     return {
         "msg": "Join request accepted successfully",

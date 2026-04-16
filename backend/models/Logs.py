@@ -7,7 +7,7 @@ from database.connection import Base
 class Logs(Base):
     __tablename__="logs"
     id=Column(Integer,primary_key=True)
-    org_id=Column(Integer,ForeignKey("organizations.id"),nullable=False)
+    org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)
     actor_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     action=Column(String,nullable=False)
     target_id=Column(Integer,nullable=True)

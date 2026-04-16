@@ -12,6 +12,7 @@ from models.Notifications import Notifications
 from models.Users import Users
 from utils.Websocket_manager import DMWebSocketManager, notification_manager
 from utils.plan_limits import FREE_MAX_FILE_SIZE_BYTES, FREE_MAX_FILE_SIZE_MB
+from database.connection import SessionLocal
 
 dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
@@ -587,6 +588,16 @@ async def send_direct_messages_realtime(
         await websocket.close(code=1008, reason="User not found")
         return
 
+    user_info = {
+        "user_id": user.user_id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "avatar_url": user.avatar_url,
+        "user_tag": user.user_tag,
+    }
+
+    db.close()
+
     await dm_manager.connect(user_id, websocket)
 
     try:
@@ -596,122 +607,120 @@ async def send_direct_messages_realtime(
             message_type = data.get("type")
 
             if message_type == "send_message":
-                receiver_id = data.get("receiver_id")
-                content = data.get("content", "")
-                parent_id = data.get("parent_id")
-
+                op_db = SessionLocal()
                 try:
-                    receiver_id = int(receiver_id)
-                except (TypeError, ValueError):
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "receiver_id must be a valid integer"
-                    })
-                    continue
+                    receiver_id = data.get("receiver_id")
+                    content = data.get("content", "")
+                    parent_id = data.get("parent_id")
 
-                if receiver_id == user_id:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Cannot send direct message to yourself"
-                    })
-                    continue
-
-                receiver = db.query(Users).filter(Users.user_id == receiver_id).first()
-                if not receiver:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Receiver not found"
-                    })
-                    continue
-
-                message_content = str(content).strip()
-                if not message_content:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Message content cannot be empty"
-                    })
-                    continue
-
-                if parent_id is not None:
                     try:
-                        parent_id = int(parent_id)
+                        receiver_id = int(receiver_id)
                     except (TypeError, ValueError):
                         await websocket.send_json({
                             "type": "error",
-                            "detail": "parent_id must be a valid integer"
+                            "detail": "receiver_id must be a valid integer"
                         })
                         continue
 
-                    parent_message = db.query(Direct_messages).filter(
-                        Direct_messages.id == parent_id,
-                        Direct_messages.is_deleted == False,
-                    ).first()
-
-                    if not parent_message:
+                    if receiver_id == user_id:
                         await websocket.send_json({
                             "type": "error",
-                            "detail": "Reply target not found"
+                            "detail": "Cannot send direct message to yourself"
                         })
                         continue
 
-                    if not (
-                        (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
-                        or
-                        (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
-                    ):
+                    receiver = op_db.query(Users).filter(Users.user_id == receiver_id).first()
+                    if not receiver:
                         await websocket.send_json({
                             "type": "error",
-                            "detail": "Reply target is not in this conversation"
+                            "detail": "Receiver not found"
                         })
                         continue
 
-                new_message = Direct_messages(
-                    sender_id=user_id,
-                    receiver_id=receiver_id,
-                    content=message_content,
-                    parent_id=parent_id,
-                )
+                    message_content = str(content).strip()
+                    if not message_content:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Message content cannot be empty"
+                        })
+                        continue
 
-                db.add(new_message)
-                db.commit()
-                db.refresh(new_message)
+                    if parent_id is not None:
+                        try:
+                            parent_id = int(parent_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "parent_id must be a valid integer"
+                            })
+                            continue
 
-                try:
-                    create_direct_message_notification(db, receiver_id, new_message.id)
-                except Exception:
-                    db.rollback()
+                        parent_message = op_db.query(Direct_messages).filter(
+                            Direct_messages.id == parent_id,
+                            Direct_messages.is_deleted == False,
+                        ).first()
 
-                await _push_direct_message_notification(
-                    receiver_id=receiver_id,
-                    sender_id=user_id,
-                    message_id=new_message.id,
-                )
+                        if not parent_message:
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "Reply target not found"
+                            })
+                            continue
 
-                message_data = {
-                    "type": "new_direct_message",
-                    "message": {
-                        "message_id": new_message.id,
-                        "sender_id": new_message.sender_id,
-                        "receiver_id": new_message.receiver_id,
-                        "parent_id": new_message.parent_id,
-                        "content": new_message.content,
-                        "is_file": False,
-                        "file_attachment": None,
-                        "is_deleted": new_message.is_deleted,
-                        "sent_at": new_message.sent_at.isoformat() if new_message.sent_at else None,
-                        "edited_at": new_message.edited_at.isoformat() if new_message.edited_at else None,
-                        "sender": {
-                            "user_id": user.user_id,
-                            "first_name": user.first_name,
-                            "last_name": user.last_name,
-                            "avatar_url": user.avatar_url,
-                            "user_tag": user.user_tag,
+                        if not (
+                            (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
+                            or
+                            (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
+                        ):
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "Reply target is not in this conversation"
+                            })
+                            continue
+
+                    new_message = Direct_messages(
+                        sender_id=user_id,
+                        receiver_id=receiver_id,
+                        content=message_content,
+                        parent_id=parent_id,
+                    )
+
+                    op_db.add(new_message)
+                    op_db.commit()
+                    op_db.refresh(new_message)
+
+                    try:
+                        create_direct_message_notification(op_db, receiver_id, new_message.id)
+                    except Exception:
+                        op_db.rollback()
+
+                    await _push_direct_message_notification(
+                        receiver_id=receiver_id,
+                        sender_id=user_id,
+                        message_id=new_message.id,
+                    )
+
+                    message_data = {
+                        "type": "new_direct_message",
+                        "message": {
+                            "message_id": new_message.id,
+                            "sender_id": new_message.sender_id,
+                            "receiver_id": new_message.receiver_id,
+                            "parent_id": new_message.parent_id,
+                            "content": new_message.content,
+                            "is_file": False,
+                            "file_attachment": None,
+                            "is_deleted": new_message.is_deleted,
+                            "sent_at": new_message.sent_at.isoformat() if new_message.sent_at else None,
+                            "edited_at": new_message.edited_at.isoformat() if new_message.edited_at else None,
+                            "sender": user_info
                         }
                     }
-                }
 
-                await dm_manager.send_to_users([user_id, receiver_id], message_data)
-                continue
+                    await dm_manager.send_to_users([user_id, receiver_id], message_data)
+                    continue
+                finally:
+                    op_db.close()
 
             if message_type == "typing":
                 receiver_id = data.get("receiver_id")
@@ -730,293 +739,287 @@ async def send_direct_messages_realtime(
 
                 typing_payload = {
                     "type": "direct_typing",
-                    "sender_id": user.user_id,
+                    "sender_id": user_info["user_id"],
                     "receiver_id": receiver_id,
                     "is_typing": bool(data.get("is_typing", False)),
-                    "sender": {
-                        "user_id": user.user_id,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "avatar_url": user.avatar_url,
-                        "user_tag": user.user_tag,
-                    }
+                    "sender": user_info
                 }
 
                 await dm_manager.send_to_user(receiver_id, typing_payload)
                 continue
 
             if message_type == "send_file":
-                receiver_id = data.get("receiver_id")
-                file_name = data.get("file_name")
-                file_size = data.get("file_size")
-                file_base64 = data.get("file_base64")
-                mime_type = data.get("mime_type")
-                parent_id = data.get("parent_id")
-
+                op_db = SessionLocal()
                 try:
-                    receiver_id = int(receiver_id)
-                except (TypeError, ValueError):
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "receiver_id must be a valid integer"
-                    })
-                    continue
+                    receiver_id = data.get("receiver_id")
+                    file_name = data.get("file_name")
+                    file_size = data.get("file_size")
+                    file_base64 = data.get("file_base64")
+                    mime_type = data.get("mime_type")
+                    parent_id = data.get("parent_id")
 
-                receiver = db.query(Users).filter(Users.user_id == receiver_id).first()
-                if not receiver:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Receiver not found"
-                    })
-                    continue
-
-                if not file_name or not file_base64:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "file_name and file_base64 are required"
-                    })
-                    continue
-
-                try:
-                    file_size = int(file_size)
-                except (TypeError, ValueError):
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "file_size must be a valid integer"
-                    })
-                    continue
-
-                if file_size <= 0:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "file_size must be greater than 0"
-                    })
-                    continue
-
-                if file_size > FREE_MAX_FILE_SIZE_BYTES:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": f"File size exceeds the {FREE_MAX_FILE_SIZE_MB} MB limit."
-                    })
-                    continue
-
-                if parent_id is not None:
                     try:
-                        parent_id = int(parent_id)
+                        receiver_id = int(receiver_id)
                     except (TypeError, ValueError):
                         await websocket.send_json({
                             "type": "error",
-                            "detail": "parent_id must be a valid integer"
+                            "detail": "receiver_id must be a valid integer"
                         })
                         continue
 
-                    parent_message = db.query(Direct_messages).filter(
-                        Direct_messages.id == parent_id,
-                        Direct_messages.is_deleted == False,
-                    ).first()
-
-                    if not parent_message:
+                    receiver = op_db.query(Users).filter(Users.user_id == receiver_id).first()
+                    if not receiver:
                         await websocket.send_json({
                             "type": "error",
-                            "detail": "Reply target not found"
+                            "detail": "Receiver not found"
                         })
                         continue
 
-                    if not (
-                        (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
-                        or
-                        (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
-                    ):
+                    if not file_name or not file_base64:
                         await websocket.send_json({
                             "type": "error",
-                            "detail": "Reply target is not in this conversation"
+                            "detail": "file_name and file_base64 are required"
                         })
                         continue
 
-                try:
-                    file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)
-                except HTTPException as exc:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": exc.detail
-                    })
-                    continue
+                    try:
+                        file_size = int(file_size)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "file_size must be a valid integer"
+                        })
+                        continue
 
-                file_payload = {
-                    "file_name": file_name,
-                    "file_url": file_url,
-                    "file_size": file_size,
-                }
+                    if file_size <= 0:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "file_size must be greater than 0"
+                        })
+                        continue
 
-                new_message = Direct_messages(
-                    sender_id=user_id,
-                    receiver_id=receiver_id,
-                    content=DM_FILE_PREFIX + json.dumps(file_payload),
-                    parent_id=parent_id,
-                )
+                    if file_size > FREE_MAX_FILE_SIZE_BYTES:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": f"File size exceeds the {FREE_MAX_FILE_SIZE_MB} MB limit."
+                        })
+                        continue
 
-                db.add(new_message)
-                db.commit()
-                db.refresh(new_message)
+                    if parent_id is not None:
+                        try:
+                            parent_id = int(parent_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "parent_id must be a valid integer"
+                            })
+                            continue
 
-                try:
-                    create_direct_message_notification(db, receiver_id, new_message.id)
-                except Exception:
-                    db.rollback()
+                        parent_message = op_db.query(Direct_messages).filter(
+                            Direct_messages.id == parent_id,
+                            Direct_messages.is_deleted == False,
+                        ).first()
 
-                await _push_direct_message_notification(
-                    receiver_id=receiver_id,
-                    sender_id=user_id,
-                    message_id=new_message.id,
-                )
+                        if not parent_message:
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "Reply target not found"
+                            })
+                            continue
 
-                message_data = {
-                    "type": "new_direct_message",
-                    "message": {
-                        "message_id": new_message.id,
-                        "sender_id": new_message.sender_id,
-                        "receiver_id": new_message.receiver_id,
-                        "parent_id": new_message.parent_id,
-                        "content": "",
-                        "is_file": True,
-                        "file_attachment": file_payload,
-                        "is_deleted": new_message.is_deleted,
-                        "sent_at": new_message.sent_at.isoformat() if new_message.sent_at else None,
-                        "edited_at": new_message.edited_at.isoformat() if new_message.edited_at else None,
-                        "sender": {
-                            "user_id": user.user_id,
-                            "first_name": user.first_name,
-                            "last_name": user.last_name,
-                            "avatar_url": user.avatar_url,
-                            "user_tag": user.user_tag,
+                        if not (
+                            (parent_message.sender_id == user_id and parent_message.receiver_id == receiver_id)
+                            or
+                            (parent_message.sender_id == receiver_id and parent_message.receiver_id == user_id)
+                        ):
+                            await websocket.send_json({
+                                "type": "error",
+                                "detail": "Reply target is not in this conversation"
+                            })
+                            continue
+
+                    try:
+                        file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)
+                    except HTTPException as exc:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": exc.detail
+                        })
+                        continue
+
+                    file_payload = {
+                        "file_name": file_name,
+                        "file_url": file_url,
+                        "file_size": file_size,
+                    }
+
+                    new_message = Direct_messages(
+                        sender_id=user_id,
+                        receiver_id=receiver_id,
+                        content=DM_FILE_PREFIX + json.dumps(file_payload),
+                        parent_id=parent_id,
+                    )
+
+                    op_db.add(new_message)
+                    op_db.commit()
+                    op_db.refresh(new_message)
+
+                    try:
+                        create_direct_message_notification(op_db, receiver_id, new_message.id)
+                    except Exception:
+                        op_db.rollback()
+
+                    await _push_direct_message_notification(
+                        receiver_id=receiver_id,
+                        sender_id=user_id,
+                        message_id=new_message.id,
+                    )
+
+                    message_data = {
+                        "type": "new_direct_message",
+                        "message": {
+                            "message_id": new_message.id,
+                            "sender_id": new_message.sender_id,
+                            "receiver_id": new_message.receiver_id,
+                            "parent_id": new_message.parent_id,
+                            "content": "",
+                            "is_file": True,
+                            "file_attachment": file_payload,
+                            "is_deleted": new_message.is_deleted,
+                            "sent_at": new_message.sent_at.isoformat() if new_message.sent_at else None,
+                            "edited_at": new_message.edited_at.isoformat() if new_message.edited_at else None,
+                            "sender": user_info
                         }
                     }
-                }
 
-                await dm_manager.send_to_users([user_id, receiver_id], message_data)
-                continue
+                    await dm_manager.send_to_users([user_id, receiver_id], message_data)
+                    continue
+                finally:
+                    op_db.close()
 
             if message_type == "edit_message":
-                message_id = data.get("message_id")
-                content = str(data.get("content", ""))
-
+                op_db = SessionLocal()
                 try:
-                    message_id = int(message_id)
-                except (TypeError, ValueError):
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "message_id must be a valid integer"
-                    })
-                    continue
+                    message_id = data.get("message_id")
+                    content = str(data.get("content", ""))
 
-                message = db.query(Direct_messages).filter(
-                    Direct_messages.id == message_id,
-                    Direct_messages.is_deleted == False
-                ).first()
+                    try:
+                        message_id = int(message_id)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "message_id must be a valid integer"
+                        })
+                        continue
 
-                if not message:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Message not found"
-                    })
-                    continue
+                    message = op_db.query(Direct_messages).filter(
+                        Direct_messages.id == message_id,
+                        Direct_messages.is_deleted == False
+                    ).first()
 
-                if message.sender_id != user_id:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "You can only edit your own messages"
-                    })
-                    continue
+                    if not message:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Message not found"
+                        })
+                        continue
 
-                if message.content and message.content.startswith(DM_FILE_PREFIX):
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "File messages cannot be edited"
-                    })
-                    continue
+                    if message.sender_id != user_id:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "You can only edit your own messages"
+                        })
+                        continue
 
-                new_content = content.strip()
-                if not new_content:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Message content cannot be empty"
-                    })
-                    continue
+                    if message.content and message.content.startswith(DM_FILE_PREFIX):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "File messages cannot be edited"
+                        })
+                        continue
 
-                message.content = new_content
-                message.edited_at = datetime.now(UTC)
-                db.commit()
-                db.refresh(message)
+                    new_content = content.strip()
+                    if not new_content:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Message content cannot be empty"
+                        })
+                        continue
 
-                edited_payload = {
-                    "type": "direct_message_edited",
-                    "message": {
-                        "message_id": message.id,
-                        "sender_id": message.sender_id,
-                        "receiver_id": message.receiver_id,
-                        "parent_id": message.parent_id,
-                        "content": message.content,
-                        "is_file": False,
-                        "file_attachment": None,
-                        "is_deleted": message.is_deleted,
-                        "sent_at": message.sent_at.isoformat() if message.sent_at else None,
-                        "edited_at": message.edited_at.isoformat() if message.edited_at else None,
-                        "sender": {
-                            "user_id": user.user_id,
-                            "first_name": user.first_name,
-                            "last_name": user.last_name,
-                            "avatar_url": user.avatar_url,
-                            "user_tag": user.user_tag,
+                    message.content = new_content
+                    message.edited_at = datetime.now(UTC)
+                    op_db.commit()
+                    op_db.refresh(message)
+
+                    edited_payload = {
+                        "type": "direct_message_edited",
+                        "message": {
+                            "message_id": message.id,
+                            "sender_id": message.sender_id,
+                            "receiver_id": message.receiver_id,
+                            "parent_id": message.parent_id,
+                            "content": message.content,
+                            "is_file": False,
+                            "file_attachment": None,
+                            "is_deleted": message.is_deleted,
+                            "sent_at": message.sent_at.isoformat() if message.sent_at else None,
+                            "edited_at": message.edited_at.isoformat() if message.edited_at else None,
+                            "sender": user_info
                         }
                     }
-                }
 
-                other_user_id = message.receiver_id if message.sender_id == user_id else message.sender_id
-                await dm_manager.send_to_users([user_id, other_user_id], edited_payload)
-                continue
+                    other_user_id = message.receiver_id if message.sender_id == user_id else message.sender_id
+                    await dm_manager.send_to_users([user_id, other_user_id], edited_payload)
+                    continue
+                finally:
+                    op_db.close()
 
             if message_type == "delete_message":
-                message_id = data.get("message_id")
-
+                op_db = SessionLocal()
                 try:
-                    message_id = int(message_id)
-                except (TypeError, ValueError):
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "message_id must be a valid integer"
-                    })
+                    message_id = data.get("message_id")
+
+                    try:
+                        message_id = int(message_id)
+                    except (TypeError, ValueError):
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "message_id must be a valid integer"
+                        })
+                        continue
+
+                    message = op_db.query(Direct_messages).filter(
+                        Direct_messages.id == message_id,
+                        Direct_messages.is_deleted == False
+                    ).first()
+
+                    if not message:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Message not found"
+                        })
+                        continue
+
+                    if message.sender_id != user_id:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "You can only delete your own messages"
+                        })
+                        continue
+
+                    message.is_deleted = True
+                    op_db.commit()
+
+                    deleted_payload = {
+                        "type": "direct_message_deleted",
+                        "message_id": message_id,
+                    }
+
+                    other_user_id = message.receiver_id if message.sender_id == user_id else message.sender_id
+                    await dm_manager.send_to_users([user_id, other_user_id], deleted_payload)
                     continue
-
-                message = db.query(Direct_messages).filter(
-                    Direct_messages.id == message_id,
-                    Direct_messages.is_deleted == False
-                ).first()
-
-                if not message:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "Message not found"
-                    })
-                    continue
-
-                if message.sender_id != user_id:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": "You can only delete your own messages"
-                    })
-                    continue
-
-                message.is_deleted = True
-                db.commit()
-
-                deleted_payload = {
-                    "type": "direct_message_deleted",
-                    "message_id": message_id,
-                }
-
-                other_user_id = message.receiver_id if message.sender_id == user_id else message.sender_id
-                await dm_manager.send_to_users([user_id, other_user_id], deleted_payload)
-                continue
+                finally:
+                    op_db.close()
 
             await websocket.send_json({
                 "type": "error",
