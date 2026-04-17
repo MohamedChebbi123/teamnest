@@ -24,6 +24,7 @@ import {
 import {
   Hash,
   Volume2,
+  Megaphone,
   Loader2,
   Send,
   Info,
@@ -1296,7 +1297,8 @@ export default function ChannelPage() {
   }
 
   const isVoiceChannel = (channel.channel_category || "").toLowerCase() === "voice"
-  const ChannelIcon = isVoiceChannel ? Volume2 : Hash
+  const isAnnouncementChannel = (channel.channel_mode || "").toLowerCase() === "announcement"
+  const ChannelIcon = isAnnouncementChannel ? Megaphone : isVoiceChannel ? Volume2 : Hash
 
   return (
     <>
@@ -1466,7 +1468,7 @@ export default function ChannelPage() {
                     <div className="relative mb-6">
                       <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
                       <div className="relative bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl p-6 shadow-lg border border-primary/10">
-                        <Hash className="h-16 w-16 text-primary" />
+                        <ChannelIcon className="h-16 w-16 text-primary" />
                       </div>
                     </div>
                     <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">

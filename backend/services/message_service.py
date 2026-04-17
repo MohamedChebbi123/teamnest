@@ -14,6 +14,7 @@ from models.PInned_messages import Pinned_messages
 from models.Organization import Organization
 from models.Teams import Teams
 from models.Team_association import Team_association
+from models.Team_roles import Team_roles
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
 from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
@@ -26,6 +27,26 @@ from database.connection import SessionLocal
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
+
+
+def user_can_announce(db: Session, user_id: int, channel_team_id: int | None, org_id: int) -> bool:
+    org = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if org and org.owner_id == user_id:
+        return True
+
+    if channel_team_id is not None:
+        role = db.query(Team_roles).filter(
+            Team_roles.team_id == channel_team_id,
+            Team_roles.user_id == user_id
+        ).first()
+        return bool(role and role.can_make_announcement)
+
+    admin = db.query(Organization_members).filter(
+        Organization_members.org_id == org_id,
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+    return admin is not None
 
 
 def get_user_tag(content:str):
@@ -78,6 +99,88 @@ def create_mention_notifications(db: Session, mentioned_users: list[Users], mess
         db.add(Notifications(**notification_kwargs))
 
     db.commit()
+
+
+def get_announcement_recipients(db: Session, channel_team_id: int | None, org_id: int, sender_id: int) -> list[Users]:
+    if channel_team_id is not None:
+        return db.query(Users).join(
+            Team_association,
+            Team_association.user_id == Users.user_id
+        ).filter(
+            Team_association.team_id == channel_team_id,
+            Users.user_id != sender_id
+        ).all()
+
+    recipients = db.query(Users).join(
+        Organization_members,
+        Organization_members.memmber_id == Users.user_id
+    ).filter(
+        Organization_members.org_id == org_id,
+        Users.user_id != sender_id
+    ).all()
+
+    org = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if org and org.owner_id != sender_id and not any(u.user_id == org.owner_id for u in recipients):
+        owner = db.query(Users).filter(Users.user_id == org.owner_id).first()
+        if owner:
+            recipients.append(owner)
+
+    return recipients
+
+
+def create_announcement_notifications(db: Session, recipients: list[Users], message_id: int):
+    if not recipients:
+        return
+
+    for user in recipients:
+        notification_kwargs = {
+            "user_id": user.user_id,
+            "type": "channel_announcement",
+            "message_id": message_id,
+            "created_at": datetime.now(UTC),
+        }
+
+        if hasattr(Notifications, "is_seen"):
+            notification_kwargs["is_seen"] = False
+        elif hasattr(Notifications, "is_read"):
+            notification_kwargs["is_read"] = False
+
+        db.add(Notifications(**notification_kwargs))
+
+    db.commit()
+
+
+async def push_announcement_notification(
+    receiver_id: int,
+    sender_id: int,
+    message_id: int,
+    channel_id: int,
+    org_id: int,
+    sender_first_name: str = "",
+    sender_last_name: str = "",
+    sender_avatar_url: str | None = None,
+    sender_user_tag: str | None = None,
+    channel_name: str = "",
+):
+    await notification_manager.send(
+        receiver_id,
+        {
+            "type": "new_notification",
+            "notification": {
+                "type": "channel_announcement",
+                "message_id": message_id,
+                "sender_id": sender_id,
+                "channel_id": channel_id,
+                "org_id": org_id,
+                "created_at": datetime.now(UTC).isoformat(),
+                "sender_first_name": sender_first_name,
+                "sender_last_name": sender_last_name,
+                "sender_avatar_url": sender_avatar_url,
+                "sender_user_tag": sender_user_tag,
+                "channel_name": channel_name,
+            },
+        },
+    )
 
 
 async def push_mention_notification(
@@ -599,6 +702,7 @@ async def send_messages_realtime(
 
     channel_name = channel.channel_name
     channel_team_id = channel.team_id
+    channel_mode = channel.channel_mode
 
     db.close()
 
@@ -619,6 +723,18 @@ async def send_messages_realtime(
                         await websocket.send_json({
                             "type": "error",
                             "detail": "Message content cannot be empty"
+                        })
+                        continue
+
+                    if channel_mode == "announcement" and not user_can_announce(msg_db, user_id, channel_team_id, org_id):
+                        detail = (
+                            "Only members with announcement permission can post in this channel"
+                            if channel_team_id is not None
+                            else "Only the organization owner and admins can post in this channel"
+                        )
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": detail
                         })
                         continue
 
@@ -712,6 +828,35 @@ async def send_messages_realtime(
                         except Exception:
                             continue
 
+                    if channel_mode == "announcement":
+                        mentioned_ids = {m.user_id for m in mentioned_users}
+                        announcement_recipients = [
+                            r for r in get_announcement_recipients(msg_db, channel_team_id, org_id, user_id)
+                            if r.user_id not in mentioned_ids
+                        ]
+
+                        try:
+                            create_announcement_notifications(msg_db, announcement_recipients, new_message.message_id)
+                        except Exception:
+                            msg_db.rollback()
+
+                        for recipient in announcement_recipients:
+                            try:
+                                await push_announcement_notification(
+                                    receiver_id=recipient.user_id,
+                                    sender_id=user_id,
+                                    message_id=new_message.message_id,
+                                    channel_id=channel_id,
+                                    org_id=org_id,
+                                    sender_first_name=sender.first_name if sender else "",
+                                    sender_last_name=sender.last_name if sender else "",
+                                    sender_avatar_url=sender.avatar_url if sender else None,
+                                    sender_user_tag=sender.user_tag if sender else None,
+                                    channel_name=channel_name,
+                                )
+                            except Exception:
+                                continue
+
                     reply_to = None
                     if parent_message:
                         parent_sender = msg_db.query(Users).filter(Users.user_id == parent_message.sender_id).first()
@@ -772,6 +917,17 @@ async def send_messages_realtime(
             elif data.get("type") == "send_file":
                 file_db = SessionLocal()
                 try:
+                    if channel_mode == "announcement" and not user_can_announce(file_db, user_id, channel_team_id, org_id):
+                        detail = (
+                            "Only members with announcement permission can post in this channel"
+                            if channel_team_id is not None
+                            else "Only the organization owner and admins can post in this channel"
+                        )
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": detail
+                        })
+                        continue
                     await send_file_realtime_service(
                         data=data,
                         websocket=websocket,

@@ -35,6 +35,7 @@ import {
   Mic,
   Video,
   Paperclip,
+  Megaphone,
 } from "lucide-react"
 import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
@@ -789,6 +790,7 @@ export default function TeamPage() {
     switch (mode) {
       case "voice": return <Mic className="h-4 w-4" />
       case "video": return <Video className="h-4 w-4" />
+      case "announcement": return <Megaphone className="h-4 w-4" />
       default: return <Hash className="h-4 w-4" />
     }
   }

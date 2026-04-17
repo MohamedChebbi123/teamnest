@@ -51,6 +51,7 @@ import {
   Hash,
   Volume2,
   VolumeX,
+  Megaphone,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -116,7 +117,10 @@ interface LiveNotification {
   read: boolean
 }
 
-const getChannelIcon = (category: string, className: string) => {
+const getChannelIcon = (mode: string, category: string, className: string) => {
+  if ((mode || "").toLowerCase() === "announcement") {
+    return <Megaphone className={className} />
+  }
   const isVoiceChannel = (category || "").toLowerCase() === "voice"
   return isVoiceChannel ? <Volume2 className={className} /> : <Hash className={className} />
 }
@@ -443,6 +447,12 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
             const channelName = channel ? `#${channel.channel_name}` : "a channel"
             toast.info(`${senderName} mentioned you`, { description: `In ${channelName}` })
+          } else if (nextNotification.type === "channel_announcement") {
+            const sender = members.find((m) => m.user_id === nextNotification.sender_id)
+            const channel = channels.find((c) => c.channel_id === nextNotification.channel_id)
+            const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
+            const channelName = channel ? `#${channel.channel_name}` : "an announcement channel"
+            toast.info(`New announcement from ${senderName}`, { description: `In ${channelName}` })
           } else {
             toast.info("New notification", { description: "You received a new direct message" })
           }
@@ -484,7 +494,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
     const openedChannelId = Number(channelMatch[1])
     setLiveNotifications((prev) => prev.map((item) => {
-      if (item.type === "channel_mention" && item.channel_id === openedChannelId) {
+      if ((item.type === "channel_mention" || item.type === "channel_announcement") && item.channel_id === openedChannelId) {
         return { ...item, read: true }
       }
       return item
@@ -529,7 +539,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const unreadNotificationsCount = liveNotifications.filter((item) => !item.read).length
   const unreadMentionChannelIds = new Set(
     liveNotifications
-      .filter((item) => !item.read && item.type === "channel_mention" && typeof item.channel_id === "number")
+      .filter((item) => !item.read && (item.type === "channel_mention" || item.type === "channel_announcement") && typeof item.channel_id === "number")
       .map((item) => item.channel_id as number)
   )
 
@@ -753,6 +763,13 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       const channelName = channel ? `#${channel.channel_name}` : "a channel"
       return { title: `${senderName} mentioned you`, subtitle: `In ${channelName}` }
     }
+    if (notification.type === "channel_announcement") {
+      const sender = members.find((m) => m.user_id === notification.sender_id)
+      const channel = channels.find((c) => c.channel_id === notification.channel_id)
+      const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
+      const channelName = channel ? `#${channel.channel_name}` : "an announcement channel"
+      return { title: `New announcement from ${senderName}`, subtitle: `In ${channelName}` }
+    }
     return {
       title: "New message",
       subtitle: notification.sender_id ? `From user #${notification.sender_id}` : "Direct message notification",
@@ -772,7 +789,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             key={notification.id}
             className={cn("cursor-pointer px-3 py-2.5 gap-2.5", !notification.read && "bg-primary/5")}
             onClick={() => {
-              if (notification.type === "channel_mention" && notification.channel_id) {
+              if ((notification.type === "channel_mention" || notification.type === "channel_announcement") && notification.channel_id) {
                 router.push(`/channels/${notification.channel_id}`)
                 return
               }
@@ -781,10 +798,17 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
               }
             }}
           >
-            <div className={cn("mt-0.5 rounded-full p-1.5 flex-shrink-0", notification.type === "channel_mention" ? "bg-purple-500/10" : "bg-blue-500/10")}>
+            <div className={cn(
+              "mt-0.5 rounded-full p-1.5 flex-shrink-0",
+              notification.type === "channel_mention" ? "bg-purple-500/10"
+                : notification.type === "channel_announcement" ? "bg-amber-500/10"
+                : "bg-blue-500/10"
+            )}>
               {notification.type === "channel_mention"
                 ? <Hash className="h-3 w-3 text-purple-500" />
-                : <MessageCircle className="h-3 w-3 text-blue-500" />
+                : notification.type === "channel_announcement"
+                  ? <Megaphone className="h-3 w-3 text-amber-500" />
+                  : <MessageCircle className="h-3 w-3 text-blue-500" />
               }
             </div>
             <div className="flex-1 min-w-0">
@@ -1148,7 +1172,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                           onClick={() => router.push(`/channels/${channel.channel_id}`)}
                         >
                           <span className="relative inline-flex flex-shrink-0">
-                            {getChannelIcon(channel.channel_category, "h-3.5 w-3.5")}
+                            {getChannelIcon(channel.channel_mode, channel.channel_category, "h-3.5 w-3.5")}
                             {unreadMentionChannelIds.has(channel.channel_id) && (
                               <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-destructive" />
                             )}
@@ -1188,7 +1212,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                             onClick={() => router.push(`/channels/${channel.channel_id}`)}
                           >
                             <span className="relative inline-flex">
-                              {getChannelIcon(channel.channel_category, "h-3.5 w-3.5")}
+                              {getChannelIcon(channel.channel_mode, channel.channel_category, "h-3.5 w-3.5")}
                               {unreadMentionChannelIds.has(channel.channel_id) && (
                                 <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-destructive" />
                               )}
@@ -1276,7 +1300,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                                     onClick={() => router.push(`/channels/${channel.channel_id}`)}
                                   >
                                     <span className="relative inline-flex flex-shrink-0">
-                                      {getChannelIcon(channel.channel_category, "h-3 w-3")}
+                                      {getChannelIcon(channel.channel_mode, channel.channel_category, "h-3 w-3")}
                                       {unreadMentionChannelIds.has(channel.channel_id) && (
                                         <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-destructive" />
                                       )}
