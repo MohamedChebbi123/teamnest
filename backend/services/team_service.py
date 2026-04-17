@@ -1065,3 +1065,51 @@ def fetch_files_for_team_channel_service(
             for file_record, sender in files
         ]
     }
+
+
+def view_pdf(org_id: int, team_id: int, file_id: int, authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    if team.org_id != org_id:
+        raise HTTPException(status_code=400, detail="Team does not belong to this organization")
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_owner = found_organization.owner_id == user_id
+    is_org_admin = db.query(Organization_members).filter(
+        Organization_members.org_id == org_id,
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+
+    if not is_owner and not is_org_admin and not is_team_member:
+        raise HTTPException(status_code=403, detail="You don't have access to this file")
+
+    file = db.query(Files).filter(
+        Files.id == file_id,
+        Files.team_id == team_id,
+        Files.is_deleted == False
+    ).first()
+
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return {"file_url": file.file_url, "file_name": file.file_name}
