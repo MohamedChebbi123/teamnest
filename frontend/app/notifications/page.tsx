@@ -22,6 +22,7 @@ import {
   BellOff,
   AtSign,
   Hash,
+  Megaphone,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +35,7 @@ interface UserData {
   profile_completed?: boolean
 }
 
-type TabType = "all" | "friend_requests" | "mentions" | "messages" | "system"
+type TabType = "all" | "friend_requests" | "mentions" | "announcements" | "messages" | "system"
 
 const formatTime = (dateStr: string) => {
   if (!dateStr) return ""
@@ -53,7 +54,13 @@ export default function NotificationsPage() {
   const router = useRouter()
   const { notifications: friendRequestNotifs, markAllRead: markFriendRequestsRead, dismiss } = useFriendRequests()
   const { unreadDmCount, dmNotifications, markDmsRead, dismissDm } = useDirectMessageNotifications()
-  const { mentions, unreadCount: mentionUnread, markAllRead: markMentionsRead, dismiss: dismissMention } = useMentionNotifications()
+  const {
+    mentions,
+    announcements,
+    markAllRead: markMentionsRead,
+    dismiss: dismissMention,
+    dismissAnnouncement,
+  } = useMentionNotifications()
   const [user, setUser] = useState<UserData | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>("all")
 
@@ -99,25 +106,29 @@ export default function NotificationsPage() {
 
   const unreadDmNotifs = dmNotifications.filter((n) => !n.read)
   const unreadMentions = mentions.filter((m) => !m.read)
+  const unreadAnnouncements = announcements.filter((a) => !a.read)
 
   const counts = {
     friend_requests: friendRequestNotifs.length,
     mentions: unreadMentions.length,
+    announcements: unreadAnnouncements.length,
     messages: unreadDmNotifs.length,
     system: systemNotifications.length,
   }
-  const totalCount = counts.friend_requests + counts.mentions + counts.messages + counts.system
+  const totalCount = counts.friend_requests + counts.mentions + counts.announcements + counts.messages + counts.system
 
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: "all", label: "All", count: totalCount },
     { key: "friend_requests", label: "Friend Requests", count: counts.friend_requests },
     { key: "mentions", label: "Mentions", count: counts.mentions },
+    { key: "announcements", label: "Announcements", count: counts.announcements },
     { key: "messages", label: "Messages", count: counts.messages },
     { key: "system", label: "System", count: counts.system },
   ]
 
   const showFriendRequests = activeTab === "all" || activeTab === "friend_requests"
   const showMentions = activeTab === "all" || activeTab === "mentions"
+  const showAnnouncements = activeTab === "all" || activeTab === "announcements"
   const showMessages = activeTab === "all" || activeTab === "messages"
   const showSystem = activeTab === "all" || activeTab === "system"
 
@@ -125,6 +136,7 @@ export default function NotificationsPage() {
     activeTab === "all" ? totalCount
     : activeTab === "friend_requests" ? counts.friend_requests
     : activeTab === "mentions" ? counts.mentions
+    : activeTab === "announcements" ? counts.announcements
     : activeTab === "messages" ? counts.messages
     : counts.system
 
@@ -138,6 +150,7 @@ export default function NotificationsPage() {
     friendRequestNotifs.forEach((n) => dismiss(n.id))
     markDmsRead()
     mentions.forEach((m) => dismissMention(m.id))
+    announcements.forEach((a) => dismissAnnouncement(a.id))
   }
 
   return (
@@ -356,6 +369,82 @@ export default function NotificationsPage() {
                           variant="ghost"
                           className="h-8 w-8 text-muted-foreground hover:text-foreground"
                           onClick={(e) => { e.stopPropagation(); dismissMention(mention.id) }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Announcements Section */}
+            {showAnnouncements && unreadAnnouncements.length > 0 && (
+              <section>
+                {activeTab === "all" && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Megaphone className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Announcements
+                    </span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.announcements}</Badge>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {unreadAnnouncements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all cursor-pointer border-l-4 border-l-amber-500"
+                      onClick={() => {
+                        dismissAnnouncement(announcement.id)
+                        router.push(`/channels/${announcement.channel_id}`)
+                      }}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-11 w-11">
+                          <AvatarImage src={announcement.sender_avatar_url ?? undefined} />
+                          <AvatarFallback className="bg-amber-500/10 text-amber-600 font-semibold">
+                            {announcement.sender_first_name[0]}{announcement.sender_last_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-amber-500/10 border-2 border-background flex items-center justify-center">
+                          <Megaphone className="h-2.5 w-2.5 text-amber-500" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {announcement.sender_first_name} {announcement.sender_last_name}
+                          <span className="font-normal text-muted-foreground"> posted an announcement in </span>
+                          <span className="text-amber-600">
+                            <Megaphone className="h-3 w-3 inline-block mr-0.5" />
+                            {announcement.channel_name || "a channel"}
+                          </span>
+                        </p>
+                        {announcement.sender_user_tag && (
+                          <p className="text-xs text-muted-foreground mt-0.5">@{announcement.sender_user_tag}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-0.5">{formatTime(announcement.created_at)}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            dismissAnnouncement(announcement.id)
+                            router.push(`/channels/${announcement.channel_id}`)
+                          }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => { e.stopPropagation(); dismissAnnouncement(announcement.id) }}
                         >
                           <X className="h-4 w-4" />
                         </Button>

@@ -5,7 +5,7 @@
     update_channel_service,
     delete_channel_service
 )
-from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime, notifications_ws_endpoint, pin_message_service, unpin_message_service, fetch_pinned_messages_service, search_messages_service
+from services.message_service import  fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime, notifications_ws_endpoint, pin_message_service, unpin_message_service, fetch_pinned_messages_service, search_messages_service, fetch_user_notifications_service, mark_notifications_seen_service
 from fastapi import APIRouter, Depends, Header, Query, WebSocket
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
@@ -153,6 +153,23 @@ async def websocket_handler(
 ):
 
     return await send_messages_realtime(websocket, channel_id, token, org_id, db)
+
+
+@router.get("/user/notifications")
+async def get_user_notifications(
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return fetch_user_notifications_service(authorization, db)
+
+
+@router.post("/user/notifications/seen")
+async def mark_notifications_seen(
+    notification_ids: list[int] | None = None,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return mark_notifications_seen_service(authorization, db, notification_ids)
 
 
 @router.websocket("/ws/notifications")

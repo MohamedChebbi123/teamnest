@@ -15,6 +15,7 @@ from models.Organization import Organization
 from models.Teams import Teams
 from models.Team_association import Team_association
 from models.Team_roles import Team_roles
+from models.Direct_messages import Direct_messages
 from schemas.Message_input import Message_input
 from schemas.Message_edit_input import Message_edit_input
 from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager
@@ -181,6 +182,136 @@ async def push_announcement_notification(
             },
         },
     )
+
+
+def fetch_user_notifications_service(authorization: str, db: Session):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    rows = db.query(
+        Notifications, Messages, Channels, Users
+    ).join(
+        Messages, Notifications.message_id == Messages.message_id
+    ).join(
+        Channels, Messages.channel_id == Channels.channel_id
+    ).join(
+        Users, Messages.sender_id == Users.user_id
+    ).filter(
+        Notifications.user_id == user_id,
+        Notifications.type.in_(["channel_mention", "channel_announcement"]),
+        Messages.is_deleted == False,
+    ).order_by(Notifications.created_at.desc()).limit(100).all()
+
+    mentions = []
+    announcements = []
+
+    for notification, message, channel, sender in rows:
+        item = {
+            "id": notification.id,
+            "message_id": message.message_id,
+            "channel_id": channel.channel_id,
+            "channel_name": channel.channel_name,
+            "org_id": channel.org_id,
+            "sender_id": sender.user_id,
+            "sender_first_name": sender.first_name or "",
+            "sender_last_name": sender.last_name or "",
+            "sender_avatar_url": sender.avatar_url,
+            "sender_user_tag": sender.user_tag,
+            "created_at": notification.created_at.isoformat() if notification.created_at else None,
+            "is_seen": bool(notification.is_seen),
+        }
+        if notification.type == "channel_mention":
+            mentions.append(item)
+        else:
+            announcements.append(item)
+
+    dm_rows = db.query(
+        Notifications, Direct_messages, Users
+    ).join(
+        Direct_messages, Notifications.dm_message_id == Direct_messages.id
+    ).join(
+        Users, Direct_messages.sender_id == Users.user_id
+    ).filter(
+        Notifications.user_id == user_id,
+        Notifications.type == "direct_message",
+        Notifications.is_seen == False,
+        Direct_messages.is_deleted == False,
+    ).order_by(Notifications.created_at.desc()).limit(200).all()
+
+    dm_by_sender: dict[int, dict] = {}
+    for notification, dm, sender in dm_rows:
+        sender_id = sender.user_id
+        is_file = bool(dm.content and dm.content.startswith("__FILE__::"))
+        preview = "Sent a file" if is_file else (dm.content or "")
+        sent_at = dm.sent_at.isoformat() if dm.sent_at else (
+            notification.created_at.isoformat() if notification.created_at else ""
+        )
+
+        if sender_id in dm_by_sender:
+            entry = dm_by_sender[sender_id]
+            entry["count"] += 1
+            if sent_at and sent_at > (entry["latest_at"] or ""):
+                entry["latest_at"] = sent_at
+                entry["last_message_preview"] = preview
+            entry["notification_ids"].append(notification.id)
+        else:
+            dm_by_sender[sender_id] = {
+                "id": f"dm-{sender_id}",
+                "sender_id": sender_id,
+                "sender_first_name": sender.first_name or "",
+                "sender_last_name": sender.last_name or "",
+                "sender_avatar_url": sender.avatar_url,
+                "sender_user_tag": sender.user_tag,
+                "last_message_preview": preview,
+                "count": 1,
+                "latest_at": sent_at,
+                "notification_ids": [notification.id],
+            }
+
+    direct_messages = sorted(
+        dm_by_sender.values(),
+        key=lambda x: x["latest_at"] or "",
+        reverse=True,
+    )
+
+    return {
+        "mentions": mentions,
+        "announcements": announcements,
+        "direct_messages": direct_messages,
+    }
+
+
+def mark_notifications_seen_service(authorization: str, db: Session, notification_ids: list[int] | None = None):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.split(" ")[1]
+    payload = verify_token(token, "access")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = int(payload["sub"])
+
+    query = db.query(Notifications).filter(
+        Notifications.user_id == user_id,
+        Notifications.is_seen == False,
+    )
+    if notification_ids:
+        query = query.filter(Notifications.id.in_(notification_ids))
+
+    query.update({Notifications.is_seen: True}, synchronize_session=False)
+    db.commit()
+
+    return {"detail": "Notifications marked as seen"}
 
 
 async def push_mention_notification(

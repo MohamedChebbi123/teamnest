@@ -17,22 +17,61 @@ export interface MentionNotification {
   read: boolean
 }
 
+export interface AnnouncementNotification extends MentionNotification {}
+
 interface MentionNotificationContextType {
   mentions: MentionNotification[]
+  announcements: AnnouncementNotification[]
   unreadCount: number
+  unreadAnnouncementCount: number
   markAllRead: () => void
   dismiss: (id: string) => void
+  dismissAnnouncement: (id: string) => void
 }
 
 const MentionNotificationContext = createContext<MentionNotificationContextType>({
   mentions: [],
+  announcements: [],
   unreadCount: 0,
+  unreadAnnouncementCount: 0,
   markAllRead: () => {},
   dismiss: () => {},
+  dismissAnnouncement: () => {},
+})
+
+type ServerNotification = {
+  id: number
+  message_id: number
+  sender_id: number
+  channel_id: number
+  org_id: number
+  channel_name: string | null
+  sender_first_name: string | null
+  sender_last_name: string | null
+  sender_avatar_url: string | null
+  sender_user_tag: string | null
+  created_at: string
+  is_seen: boolean
+}
+
+const mapServerNotification = (n: ServerNotification): MentionNotification => ({
+  id: `srv-${n.id}`,
+  message_id: n.message_id,
+  sender_id: n.sender_id,
+  channel_id: n.channel_id,
+  org_id: n.org_id,
+  channel_name: n.channel_name || "",
+  sender_first_name: n.sender_first_name || "",
+  sender_last_name: n.sender_last_name || "",
+  sender_avatar_url: n.sender_avatar_url ?? null,
+  sender_user_tag: n.sender_user_tag ?? null,
+  created_at: n.created_at,
+  read: !!n.is_seen,
 })
 
 export function MentionNotificationProvider({ children }: { children: React.ReactNode }) {
   const [mentions, setMentions] = useState<MentionNotification[]>([])
+  const [announcements, setAnnouncements] = useState<AnnouncementNotification[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectDelayRef = useRef(3000)
@@ -43,6 +82,24 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
     if (!token) return
 
     unmountedRef.current = false
+
+    const loadStored = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const mapped = {
+          mentions: (data.mentions || []).map(mapServerNotification),
+          announcements: (data.announcements || []).map(mapServerNotification),
+        }
+        setMentions((prev) => mergeUnique(mapped.mentions, prev))
+        setAnnouncements((prev) => mergeUnique(mapped.announcements, prev))
+      } catch {}
+    }
+
+    loadStored()
 
     const connect = () => {
       if (unmountedRef.current) return
@@ -61,9 +118,9 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
           const data = JSON.parse(event.data)
           if (data.type !== "new_notification") return
           const notif = data.notification
-          if (notif?.type !== "channel_mention") return
+          if (notif?.type !== "channel_mention" && notif?.type !== "channel_announcement") return
 
-          const mention: MentionNotification = {
+          const entry: MentionNotification = {
             id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             message_id: notif.message_id,
             sender_id: notif.sender_id,
@@ -78,7 +135,11 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
             read: false,
           }
 
-          setMentions((prev) => [mention, ...prev].slice(0, 50))
+          if (notif.type === "channel_mention") {
+            setMentions((prev) => [entry, ...prev].slice(0, 100))
+          } else {
+            setAnnouncements((prev) => [entry, ...prev].slice(0, 100))
+          }
         } catch {}
       }
 
@@ -101,14 +162,52 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
   }, [])
 
   const unreadCount = mentions.filter((m) => !m.read).length
-  const markAllRead = () => setMentions((prev) => prev.map((m) => ({ ...m, read: true })))
+  const unreadAnnouncementCount = announcements.filter((a) => !a.read).length
+
+  const markAllRead = () => {
+    setMentions((prev) => prev.map((m) => ({ ...m, read: true })))
+    setAnnouncements((prev) => prev.map((a) => ({ ...a, read: true })))
+
+    const token = localStorage.getItem("access_token")
+    if (!token) return
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/notifications/seen`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(null),
+    }).catch(() => {})
+  }
+
   const dismiss = (id: string) => setMentions((prev) => prev.filter((m) => m.id !== id))
+  const dismissAnnouncement = (id: string) => setAnnouncements((prev) => prev.filter((a) => a.id !== id))
 
   return (
-    <MentionNotificationContext.Provider value={{ mentions, unreadCount, markAllRead, dismiss }}>
+    <MentionNotificationContext.Provider value={{
+      mentions,
+      announcements,
+      unreadCount,
+      unreadAnnouncementCount,
+      markAllRead,
+      dismiss,
+      dismissAnnouncement,
+    }}>
       {children}
     </MentionNotificationContext.Provider>
   )
+}
+
+function mergeUnique(incoming: MentionNotification[], existing: MentionNotification[]): MentionNotification[] {
+  const existingIds = new Set(existing.map((e) => e.id))
+  const existingMessageIds = new Set(existing.map((e) => e.message_id))
+  const merged = [...existing]
+  for (const item of incoming) {
+    if (existingIds.has(item.id) || existingMessageIds.has(item.message_id)) continue
+    merged.push(item)
+  }
+  merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  return merged.slice(0, 100)
 }
 
 export const useMentionNotifications = () => useContext(MentionNotificationContext)

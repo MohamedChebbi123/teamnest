@@ -48,6 +48,55 @@ export function DirectMessageNotificationProvider({ children }: { children: Reac
 
     unmountedRef.current = false
 
+    const loadStored = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const stored: DmNotification[] = (data.direct_messages || []).map((d: {
+          id: string
+          sender_id: number
+          sender_first_name: string
+          sender_last_name: string
+          sender_avatar_url: string | null
+          sender_user_tag: string | null
+          last_message_preview: string
+          count: number
+          latest_at: string
+        }) => ({
+          id: d.id,
+          sender_id: d.sender_id,
+          sender_first_name: d.sender_first_name || "",
+          sender_last_name: d.sender_last_name || "",
+          sender_avatar_url: d.sender_avatar_url ?? null,
+          sender_user_tag: d.sender_user_tag ?? null,
+          last_message_preview: d.last_message_preview || "",
+          count: d.count || 1,
+          latest_at: d.latest_at || new Date().toISOString(),
+          read: false,
+        }))
+        setDmNotifications((prev) => {
+          const bySender = new Map<number, DmNotification>()
+          for (const item of stored) bySender.set(item.sender_id, item)
+          for (const item of prev) {
+            const existing = bySender.get(item.sender_id)
+            if (!existing) {
+              bySender.set(item.sender_id, item)
+            } else if ((item.latest_at || "") > (existing.latest_at || "")) {
+              bySender.set(item.sender_id, item)
+            }
+          }
+          return Array.from(bySender.values())
+            .sort((a, b) => new Date(b.latest_at).getTime() - new Date(a.latest_at).getTime())
+            .slice(0, 30)
+        })
+      } catch {}
+    }
+
+    loadStored()
+
     const connect = () => {
       if (unmountedRef.current) return
 
