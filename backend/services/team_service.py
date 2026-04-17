@@ -1,4 +1,6 @@
-﻿from fastapi import HTTPException
+﻿import httpx
+from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from models.Users import Users
 from models.Organization import Organization
@@ -1112,4 +1114,25 @@ def view_pdf(org_id: int, team_id: int, file_id: int, authorization: str, db: Se
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    return {"file_url": file.file_url, "file_name": file.file_name}
+    try:
+        upstream = httpx.get(file.file_url, follow_redirects=True, timeout=30.0)
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
+
+    if upstream.status_code != 200:
+        raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
+
+    content = upstream.content
+    media_type = upstream.headers.get("content-type", "application/octet-stream")
+
+    def iterator():
+        yield content
+
+    return StreamingResponse(
+        iterator(),
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{file.file_name}"',
+            "Content-Length": str(len(content)),
+        },
+    )

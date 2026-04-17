@@ -40,6 +40,7 @@ import { toast } from "sonner"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import UpgradeModal from "@/components/UpgradeModal"
+import PdfViewerModal from "@/components/PdfViewerModal"
 import Sidebar from "@/components/Sidebar/page"
 import {
   Select,
@@ -180,6 +181,7 @@ export default function TeamPage() {
   const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
   const [channels, setChannels] = useState<Channel[]>([])
   const [teamChannelFiles, setTeamChannelFiles] = useState<TeamChannelFile[]>([])
+  const [pdfViewer, setPdfViewer] = useState<{ fileId: number; fileUrl: string; fileName: string } | null>(null)
 
 
   const formatFileSize = (bytes: number) => {
@@ -997,12 +999,11 @@ export default function TeamPage() {
                 </div>
               ) : (
                 teamChannelFiles.slice(0, 12).map((file) => (
-                  <a
+                  <button
                     key={`${file.channel_id}-${file.id}`}
-                    href={file.file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-muted/70"
+                    type="button"
+                    onClick={() => setPdfViewer({ fileId: file.id, fileUrl: file.file_url, fileName: file.file_name })}
+                    className="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-muted/70"
                   >
                     <div className="min-w-0 flex items-center gap-3">
                       <span className="text-muted-foreground"><Paperclip className="h-4 w-4" /></span>
@@ -1017,7 +1018,7 @@ export default function TeamPage() {
                       <p>{formatFileSize(file.file_size)}</p>
                       <p>{new Date(file.sent_at).toLocaleDateString()}</p>
                     </div>
-                  </a>
+                  </button>
                 ))
               )}
             </CardContent>
@@ -1475,6 +1476,16 @@ export default function TeamPage() {
         description={upgradeModal?.description ?? ""}
         upgradeUrl={`/organization/${organizationId}/upgrade`}
       />
+      {pdfViewer && (
+        <PdfViewerModal
+          open={!!pdfViewer}
+          onOpenChange={(v) => { if (!v) setPdfViewer(null) }}
+          fileId={pdfViewer.fileId}
+          fileUrl={pdfViewer.fileUrl}
+          fileName={pdfViewer.fileName}
+          contentUrl={`/organization/${organizationId}/team/${teamId}/file/${pdfViewer.fileId}/content`}
+        />
+      )}
     </div>
   )
 }

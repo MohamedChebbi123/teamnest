@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Document, Page, pdfjs } from "react-pdf"
 import "react-pdf/dist/Page/AnnotationLayer.css"
 import "react-pdf/dist/Page/TextLayer.css"
@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Download, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Download, Loader2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
@@ -22,12 +22,13 @@ interface PdfViewerModalProps {
   fileUrl: string
   fileName: string
   source?: "chat" | "task"
+  contentUrl?: string
 }
 
-export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fileName, source = "chat" }: PdfViewerModalProps) {
+export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fileName, source = "chat", contentUrl }: PdfViewerModalProps) {
   const [numPages, setNumPages] = useState<number>(0)
   const [pageNumber, setPageNumber] = useState(1)
-  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null)
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
@@ -40,16 +41,25 @@ export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fi
     const token = localStorage.getItem("access_token")
     if (!token) return
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/file/${fileId}/content?source=${source}`, {
+    const url = contentUrl
+      ? `${process.env.NEXT_PUBLIC_API_URL}${contentUrl}`
+      : `${process.env.NEXT_PUBLIC_API_URL}/file/${fileId}/content?source=${source}`
+
+    fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch")
         return res.arrayBuffer()
       })
-      .then((buf) => setPdfData(buf))
+      .then((buf) => setPdfData(new Uint8Array(buf)))
       .catch(() => setLoadError(true))
-  }, [open, fileId, source])
+  }, [open, fileId, source, contentUrl])
+
+  const documentFile = useMemo(
+    () => (pdfData ? { data: new Uint8Array(pdfData) } : null),
+    [pdfData]
+  )
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages)
@@ -90,6 +100,22 @@ export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fi
                   </Button>
                 </div>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title="Open in new tab"
+                disabled={!pdfData}
+                onClick={() => {
+                  if (!pdfData) return
+                  const blob = new Blob([new Uint8Array(pdfData)], { type: "application/pdf" })
+                  const url = URL.createObjectURL(blob)
+                  window.open(url, "_blank", "noopener,noreferrer")
+                  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                }}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
               <a href={fileUrl} target="_blank" rel="noreferrer" download>
                 <Button variant="ghost" size="icon" className="h-8 w-8" title="Download">
                   <Download className="h-4 w-4" />
@@ -113,9 +139,9 @@ export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fi
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
-          {open && pdfData && (
+          {open && documentFile && (
             <Document
-              file={{ data: pdfData }}
+              file={documentFile}
               onLoadSuccess={onDocumentLoadSuccess}
               loading={
                 <div className="flex items-center justify-center h-full">

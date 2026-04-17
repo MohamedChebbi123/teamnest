@@ -2,11 +2,11 @@ from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
 from schemas.Channels_input import Channels_input
 from services.team_service import (
-    create_team, 
-    fetch_teams_service, 
-    delete_team_service, 
-    update_team_service, 
-    add_memebers_to_teams, 
+    create_team,
+    fetch_teams_service,
+    delete_team_service,
+    update_team_service,
+    add_memebers_to_teams,
     fetch_team_members_service,
     update_member_permissions_service,
     kick_member_service,
@@ -15,7 +15,8 @@ from services.team_service import (
     fetch_channels_for_teams_service,
     fetch_members_info,
     revoke_permissions_from_team_memebers,
-    fetch_files_for_team_channel_service
+    fetch_files_for_team_channel_service,
+    view_pdf
 )
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
@@ -155,3 +156,14 @@ async def get_team_channel_files(
     db: Session = Depends(connect_databse)
 ):
     return fetch_files_for_team_channel_service(org_id, team_id, channel_id, authorization, db)
+
+
+@router.get("/organization/{org_id}/team/{team_id}/file/{file_id}/content")
+async def view_team_file_content(
+    org_id: int,
+    team_id: int,
+    file_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(connect_databse)
+):
+    return view_pdf(org_id, team_id, file_id, authorization, db)
