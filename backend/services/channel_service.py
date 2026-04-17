@@ -353,7 +353,12 @@ def delete_channel_service(channel_id: int, authorization: str, db: Session):
                 detail="You don't have permission to delete channels in this team"
             )
     
-    channel_meta = {"channel_name": channel.channel_name}
+    channel_meta = {
+        "channel_name": channel.channel_name,
+        "channel_mode": channel.channel_mode,
+        "channel_category": channel.channel_category,
+        "description": channel.description,
+    }
     if channel.team_id:
         channel_team = db.query(Teams).filter(Teams.team_id == channel.team_id).first()
         if channel_team:

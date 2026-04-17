@@ -26,7 +26,7 @@ def _hit_to_dict(hit):
     return {**metadata, **fields}
 
 
-def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: str, db: Session):
+def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: str, db: Session, document_id: int | None = None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -49,11 +49,14 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: 
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    task_results = search(query=query.strip(), namespace=f"team-{team_id}", top_k=5)
-    doc_results = search_documents(query=query.strip(), team_id=team_id, top_k=5)
-    message_results = search_messages(query=query.strip(), team_id=team_id, top_k=5)
-
-    all_hits = _extract_hits(task_results) + _extract_hits(doc_results) + _extract_hits(message_results)
+    if document_id is not None:
+        doc_results = search_documents(query=query.strip(), team_id=team_id, top_k=8, document_id=str(document_id))
+        all_hits = _extract_hits(doc_results)
+    else:
+        task_results = search(query=query.strip(), namespace=f"team-{team_id}", top_k=5)
+        doc_results = search_documents(query=query.strip(), team_id=team_id, top_k=5)
+        message_results = search_messages(query=query.strip(), team_id=team_id, top_k=5)
+        all_hits = _extract_hits(task_results) + _extract_hits(doc_results) + _extract_hits(message_results)
 
     context = [{"metadata": _hit_to_dict(hit)} for hit in all_hits]
 

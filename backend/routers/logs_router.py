@@ -20,6 +20,7 @@ router = APIRouter()
 
 REVERSIBLE_ACTIONS = {
     "channel_created",
+    "channel_deleted",
     "team_created",
     "team_member_added",
     "team_member_kicked",
@@ -138,6 +139,55 @@ async def undo_log_action(
         db.commit()
         create_log(db, org_id=org_id, actor_id=user_id, action="channel_deleted", target_id=log.target_id, target_type="channel", metadata=undo_meta)
         return {"message": f"Channel \"{channel_name}\" has been deleted (undo)"}
+
+    # ── channel_deleted → recreate the channel ──
+    if log.action == "channel_deleted":
+        channel_name = meta.get("channel_name")
+        team_id = meta.get("team_id")
+        channel_mode = meta.get("channel_mode") or ("teambased" if team_id else "orgbased")
+        channel_category = meta.get("channel_category") or "text"
+        description = meta.get("description")
+
+        if not channel_name:
+            raise HTTPException(status_code=400, detail="Missing channel info in log")
+
+        if team_id:
+            conflict = db.query(Channels).filter(
+                Channels.team_id == team_id,
+                Channels.channel_name == channel_name
+            ).first()
+            if not db.query(Teams).filter(Teams.team_id == team_id).first():
+                raise HTTPException(status_code=404, detail="Team no longer exists")
+        else:
+            conflict = db.query(Channels).filter(
+                Channels.org_id == org_id,
+                Channels.team_id.is_(None),
+                Channels.channel_name == channel_name
+            ).first()
+
+        if conflict:
+            raise HTTPException(status_code=400, detail=f"A channel named \"{channel_name}\" already exists")
+
+        restored = Channels(
+            channel_name=channel_name,
+            channel_mode=channel_mode,
+            channel_category=channel_category,
+            description=description,
+            org_id=org_id,
+            team_id=team_id,
+        )
+        db.add(restored)
+        db.commit()
+        db.refresh(restored)
+
+        undo_meta = {"channel_name": channel_name}
+        if team_id:
+            undo_meta["team_id"] = team_id
+            undo_meta["team_name"] = meta.get("team_name")
+        undo_meta["undone"] = True
+
+        create_log(db, org_id=org_id, actor_id=user_id, action="channel_created", target_id=restored.channel_id, target_type="channel", metadata=undo_meta)
+        return {"message": f"Channel \"{channel_name}\" has been restored (undo)"}
 
     # ── team_created → delete the team ──
     if log.action == "team_created":

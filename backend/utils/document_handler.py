@@ -111,13 +111,17 @@ def delete_document(document_id: str, team_id: int, total_chunks: int):
     )
 
 
-def search_documents(query: str, team_id: int, top_k: int = 5):
+def search_documents(query: str, team_id: int, top_k: int = 5, document_id: str | None = None):
+    query_payload = {
+        "top_k": top_k,
+        "inputs": {"text": query}
+    }
+    if document_id is not None:
+        query_payload["filter"] = {"document_id": {"$eq": str(document_id)}}
+
     results = doc_index.search(
         namespace=f"team-{team_id}",
-        query={
-            "top_k": top_k,
-            "inputs": {"text": query}
-        }
+        query=query_payload
     )
     return results
 

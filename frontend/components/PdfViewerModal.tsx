@@ -23,9 +23,10 @@ interface PdfViewerModalProps {
   fileName: string
   source?: "chat" | "task"
   contentUrl?: string
+  fullPageUrl?: string
 }
 
-export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fileName, source = "chat", contentUrl }: PdfViewerModalProps) {
+export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fileName, source = "chat", contentUrl, fullPageUrl }: PdfViewerModalProps) {
   const [numPages, setNumPages] = useState<number>(0)
   const [pageNumber, setPageNumber] = useState(1)
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
@@ -100,22 +101,17 @@ export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fi
                   </Button>
                 </div>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title="Open in new tab"
-                disabled={!pdfData}
-                onClick={() => {
-                  if (!pdfData) return
-                  const blob = new Blob([new Uint8Array(pdfData)], { type: "application/pdf" })
-                  const url = URL.createObjectURL(blob)
-                  window.open(url, "_blank", "noopener,noreferrer")
-                  setTimeout(() => URL.revokeObjectURL(url), 60_000)
-                }}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
+              {fullPageUrl && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title="Open with AI assistant"
+                  onClick={() => window.open(fullPageUrl, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              )}
               <a href={fileUrl} target="_blank" rel="noreferrer" download>
                 <Button variant="ghost" size="icon" className="h-8 w-8" title="Download">
                   <Download className="h-4 w-4" />

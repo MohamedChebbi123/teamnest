@@ -1484,6 +1484,7 @@ export default function TeamPage() {
           fileUrl={pdfViewer.fileUrl}
           fileName={pdfViewer.fileName}
           contentUrl={`/organization/${organizationId}/team/${teamId}/file/${pdfViewer.fileId}/content`}
+          fullPageUrl={`/organization/${organizationId}/${teamId}/file/${pdfViewer.fileId}?name=${encodeURIComponent(pdfViewer.fileName)}&url=${encodeURIComponent(pdfViewer.fileUrl)}`}
         />
       )}
     </div>
