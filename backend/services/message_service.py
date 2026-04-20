@@ -460,6 +460,7 @@ async def send_file_realtime_service(
         file_url=file_url,
         sender_id=user_id,
         team_id=channel.team_id,
+        org_id=channel.org_id,
         file_size=file_size,
     )
 
@@ -678,11 +679,9 @@ def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Sessi
             Users
         ).join(
             Users, Files.sender_id == Users.user_id
-        ).join(
-            Organization_members,
-            (Organization_members.memmber_id == Files.sender_id) & (Organization_members.org_id == org_id)
         ).filter(
             Files.team_id == None,
+            Files.org_id == org_id,
             Files.is_deleted == False
         ).all()
 

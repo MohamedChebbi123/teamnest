@@ -11,6 +11,7 @@ class Files(Base):
     file_url=Column(String,nullable=False)
     sender_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=True)
+    org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False,index=True)
     file_size=Column(Integer,nullable=False)
     is_deleted=Column(Boolean,default=False)
     sent_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))

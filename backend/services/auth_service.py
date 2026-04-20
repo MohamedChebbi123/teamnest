@@ -139,8 +139,7 @@ async def login_user_service(validator:Logininput,db: Session):
         raise HTTPException(status_code=401,detail="wrong password")
     
     access_token=create_access_token({"sub": str(found_user.user_id)})
-    print(access_token)
-    
+
     return{
         "message":"user logged in successfully",
         "access_token":access_token
