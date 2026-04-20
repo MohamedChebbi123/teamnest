@@ -576,9 +576,9 @@ export default function TasksPage() {
   const canCreate = userRole === "OWNER" || canManageTasks
 
   const parentTasks = tasks.filter(t => t.parent_task_id === null)
-  const filteredTasks = filterPriority === "all"
-    ? tasks
-    : tasks.filter(t => t.priotrity === filterPriority)
+  const filteredTasks = (filterPriority === "all"
+    ? parentTasks
+    : parentTasks.filter(t => t.priotrity === filterPriority))
 
   const tasksForColumn = (status: string) => filteredTasks.filter(t => t.status === status)
 

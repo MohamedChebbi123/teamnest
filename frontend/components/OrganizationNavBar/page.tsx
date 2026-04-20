@@ -1112,7 +1112,6 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                             <SelectContent>
                               <SelectItem value="announcement">Announcement</SelectItem>
                               <SelectItem value="orgbased">Organization Based</SelectItem>
-                              <SelectItem value="teambased">Team Based</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

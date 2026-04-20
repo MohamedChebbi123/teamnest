@@ -1419,19 +1419,6 @@ export default function TeamPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="channel_category">Channel Category *</Label>
-                <Select value={channelCategory} onValueChange={(value: "teambased" | "orgbased" | "announcement") => setChannelCategory(value)}>
-                  <SelectTrigger id="channel_category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="teambased">Team Based</SelectItem>
-                    <SelectItem value="orgbased">Organization Based</SelectItem>
-                    <SelectItem value="announcement">Announcement</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="channel_description">Description</Label>
                 <Textarea
                   id="channel_description"

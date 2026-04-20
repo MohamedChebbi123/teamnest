@@ -1,12 +1,15 @@
 from dotenv import load_dotenv
 import os
+import logging
 from datetime import datetime
 
 from pinecone import Pinecone
 load_dotenv()
 
+logger = logging.getLogger(__name__)
 
-pc = Pinecone(api_key=os.getenv("YOUR_KEY"))
+
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 
 index_name = "fyp-messages"
@@ -27,7 +30,8 @@ def _format_date(iso_str: str) -> str:
     try:
         dt = datetime.fromisoformat(iso_str)
         return dt.strftime("%b %d, %Y at %I:%M %p")
-    except Exception:
+    except (ValueError, TypeError) as e:
+        logger.warning("Failed to parse date %r: %s", iso_str, e)
         return iso_str
 
 

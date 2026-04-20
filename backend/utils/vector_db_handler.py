@@ -5,7 +5,7 @@ from pinecone import Pinecone
 load_dotenv()
 
 
-pc = Pinecone(api_key=os.getenv("YOUR_KEY"))
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 index_name = "fyp"
 if not pc.has_index(index_name):

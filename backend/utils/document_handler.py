@@ -9,7 +9,7 @@ from llama_index.core.node_parser import SentenceSplitter
 
 load_dotenv()
 
-pc = Pinecone(api_key=os.getenv("YOUR_KEY"))
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 doc_index_name = "fyp-documents"
 if not pc.has_index(doc_index_name):
@@ -48,6 +48,7 @@ def extract_tables_from_pdf(file_path: str):
 def load_document(file_url: str, file_name: str):
     with tempfile.TemporaryDirectory() as tmp_dir:
         response = httpx.get(file_url, follow_redirects=True)
+        response.raise_for_status()
         print(f"[EMBED DEBUG] URL: {file_url}, status: {response.status_code}, size: {len(response.content)} bytes")
         file_path = os.path.join(tmp_dir, file_name)
 
@@ -103,10 +104,9 @@ def embed_document(file_url: str, file_name: str, document_id: str, user_id: str
     )
 
 
-def delete_document(document_id: str, team_id: int, total_chunks: int):
-    ids = [f"doc-{document_id}-chunk-{i}" for i in range(total_chunks)]
+def delete_document(document_id: str, team_id: int):
     doc_index.delete(
-        ids=ids,
+        filter={"document_id": {"$eq": str(document_id)}},
         namespace=f"team-{team_id}"
     )
 

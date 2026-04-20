@@ -31,7 +31,7 @@ def format_context(context: list[dict]) -> str:
         doc_type = metadata.get("type", "unknown")
 
         if chunk:
-            formatted.append(f"- {chunk}")
+            formatted.append(f"- [{doc_type}] {chunk}")
 
     return "\n".join(formatted)
 
