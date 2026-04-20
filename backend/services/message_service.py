@@ -347,14 +347,22 @@ async def push_mention_notification(
     )
 
 
-def _check_duplicate_file(db: Session, file_name: str) -> str | None:
-    """Returns an error message if a file with the same name already exists, None otherwise."""
+def _check_duplicate_file(db: Session, file_name: str, org_id: int, team_id: int | None) -> str | None:
+    """Returns an error message if a file with the same name already exists in the same scope, None otherwise."""
     normalized_file_name = file_name.strip()
     if not normalized_file_name:
         return "file_name is required"
 
-    existing = db.query(Files).filter(Files.file_name == normalized_file_name).first()
-    if existing:
+    query = db.query(Files).filter(
+        Files.file_name == normalized_file_name,
+        Files.is_deleted == False,
+    )
+    if team_id is not None:
+        query = query.filter(Files.team_id == team_id)
+    else:
+        query = query.filter(Files.team_id == None, Files.org_id == org_id)
+
+    if query.first():
         return f"A file named '{normalized_file_name}' has already been uploaded. Please rename your file or use the existing one."
     return None
 
@@ -442,7 +450,7 @@ async def send_file_realtime_service(
         return
 
     stored_file_name = file_name.strip()
-    duplicate_error = _check_duplicate_file(db, stored_file_name)
+    duplicate_error = _check_duplicate_file(db, stored_file_name, channel.org_id, channel.team_id)
     if duplicate_error:
         await websocket.send_json({
             "type": "error",

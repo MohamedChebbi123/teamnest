@@ -7,7 +7,7 @@ from database.connection import Base
 class Files(Base):
     __tablename__="files"
     id=Column(Integer,primary_key=True)
-    file_name=Column(String,unique=True,index=True)
+    file_name=Column(String,nullable=False,index=True)
     file_url=Column(String,nullable=False)
     sender_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=True)

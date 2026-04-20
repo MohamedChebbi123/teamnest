@@ -6,7 +6,7 @@ from utils.cloudinary_handler import upload_user_profile_image
 from utils.email_sender import simple_send, send_password_reset_code
 from datetime import datetime, timedelta, UTC
 import re
-import random
+import secrets
 from schemas.Logininput import Logininput
 from utils.hasher import verify_password
 from utils.jwt_handler import create_access_token,create_refresh_token
@@ -58,7 +58,7 @@ async def register_user_service(
         last_name=last_name,
         email=email,
         password_hashed=hash_password(password),
-        user_tag=str(random.randint(1, 100000)),
+        user_tag=str(secrets.randbelow(9_000_000) + 1_000_000),
     )
 
     db.add(new_user)
@@ -110,7 +110,7 @@ async def resend_verification_service(
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
     
-    verification_code = str(random.randint(100000, 999999))
+    verification_code = str(secrets.randbelow(900_000) + 100_000)
     verification_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
     
     user.verification_code = verification_code
@@ -365,7 +365,7 @@ async def send_password_reset_code_service(email: str, db: Session):
     if not user:
         raise HTTPException(status_code=404, detail="User not found with this email")
     
-    reset_code = str(random.randint(100000, 999999))
+    reset_code = str(secrets.randbelow(900_000) + 100_000)
     reset_code_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
     
     user.reset_code = reset_code
