@@ -404,6 +404,34 @@ async def send_file_realtime_service(
         })
         return
 
+    if file_base64:
+        payload = file_base64.strip()
+        if payload.startswith("data:"):
+            comma_idx = payload.find(",")
+            if comma_idx == -1:
+                await websocket.send_json({
+                    "type": "error",
+                    "detail": "Invalid base64 file payload"
+                })
+                return
+            payload = payload[comma_idx + 1:]
+        payload = "".join(payload.split())
+        if not payload or len(payload) % 4 != 0:
+            await websocket.send_json({
+                "type": "error",
+                "detail": "Invalid base64 file payload"
+            })
+            return
+        padding = len(payload) - len(payload.rstrip("="))
+        actual_size = (len(payload) // 4) * 3 - padding
+        if actual_size <= 0:
+            await websocket.send_json({
+                "type": "error",
+                "detail": "file_size must be greater than 0"
+            })
+            return
+        file_size = actual_size
+
     org = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()
     file_size_limit = get_file_size_limit(org.organization_plan if org else None)
     if file_size_limit is not None and file_size > file_size_limit:
