@@ -50,19 +50,11 @@ export default function Register() {
     }))
     
     if (id === "first_name") {
-      if (value.length > 0 && value.length < 5) {
-        setNameErrors(prev => ({ ...prev, firstName: "First name must be at least 5 characters long" }))
-      } else {
-        setNameErrors(prev => ({ ...prev, firstName: "" }))
-      }
+      setNameErrors(prev => ({ ...prev, firstName: "" }))
     }
-    
+
     if (id === "last_name") {
-      if (value.length > 0 && value.length < 5) {
-        setNameErrors(prev => ({ ...prev, lastName: "Last name must be at least 5 characters long" }))
-      } else {
-        setNameErrors(prev => ({ ...prev, lastName: "" }))
-      }
+      setNameErrors(prev => ({ ...prev, lastName: "" }))
     }
     
     if (id === "email") {
@@ -87,16 +79,16 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (formData.firstName.length < 5) {
+    if (formData.firstName.trim().length < 1) {
       toast.error("Validation Error", {
-        description: "First name must be at least 5 characters long"
+        description: "First name is required"
       })
       return
     }
-    
-    if (formData.lastName.length < 5) {
+
+    if (formData.lastName.trim().length < 1) {
       toast.error("Validation Error", {
-        description: "Last name must be at least 5 characters long"
+        description: "Last name is required"
       })
       return
     }
@@ -207,11 +199,11 @@ export default function Register() {
                         className={cn(
                           "transition-all duration-200 pl-3",
                           nameErrors.firstName && "border-red-500 focus-visible:ring-red-500",
-                          formData.firstName.length >= 5 && "border-green-500 focus-visible:ring-green-500"
+                          formData.firstName.trim().length >= 1 && "border-green-500 focus-visible:ring-green-500"
                         )}
                         required
                       />
-                      {formData.firstName.length >= 5 && !nameErrors.firstName && (
+                      {formData.firstName.trim().length >= 1 && !nameErrors.firstName && (
                         <Check className="w-4 h-4 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />
                       )}
                     </div>
@@ -238,11 +230,11 @@ export default function Register() {
                         className={cn(
                           "transition-all duration-200 pl-3",
                           nameErrors.lastName && "border-red-500 focus-visible:ring-red-500",
-                          formData.lastName.length >= 5 && "border-green-500 focus-visible:ring-green-500"
+                          formData.lastName.trim().length >= 1 && "border-green-500 focus-visible:ring-green-500"
                         )}
                         required
                       />
-                      {formData.lastName.length >= 5 && !nameErrors.lastName && (
+                      {formData.lastName.trim().length >= 1 && !nameErrors.lastName && (
                         <Check className="w-4 h-4 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />
                       )}
                     </div>
@@ -376,10 +368,10 @@ export default function Register() {
                   type="submit" 
                   className="w-full h-11 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]" 
                   disabled={
-                    isLoading || 
-                    formData.firstName.length < 5 || 
-                    formData.lastName.length < 5 || 
-                    emailError !== "" || 
+                    isLoading ||
+                    formData.firstName.trim().length < 1 ||
+                    formData.lastName.trim().length < 1 ||
+                    emailError !== "" ||
                     formData.email.length === 0 ||
                     passwordStrengthScore < 4
                   }

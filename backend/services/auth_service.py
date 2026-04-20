@@ -25,12 +25,11 @@ async def register_user_service(
     db: Session
 ):
 
-    if len(first_name.strip()) < 5:
-        raise HTTPException(status_code=400, detail="First name must be at least 5 characters long")
-    
-   
-    if len(last_name.strip()) < 5:
-        raise HTTPException(status_code=400, detail="Last name must be at least 5 characters long")
+    if len(first_name.strip()) < 1:
+        raise HTTPException(status_code=400, detail="First name is required")
+
+    if len(last_name.strip()) < 1:
+        raise HTTPException(status_code=400, detail="Last name is required")
     
     email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
     if not re.match(email_regex, email):

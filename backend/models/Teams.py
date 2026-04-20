@@ -7,7 +7,7 @@ class Teams(Base):
     __tablename__="teams"
     team_id=Column(Integer,primary_key=True)
     team_name=Column(String,index=True,nullable=False)
-    team_size=Column(Integer,nullable=False)
+    team_size=Column(Integer,nullable=True)
     description=Column(Text,nullable=True)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)

@@ -55,7 +55,6 @@ interface TeamDetails {
   team_id: number
   team_name: string
   description: string
-  team_size: number
   org_id: number
   created_at: string
 }
@@ -136,7 +135,6 @@ export default function TeamPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editTeamName, setEditTeamName] = useState("")
   const [editTeamDescription, setEditTeamDescription] = useState("")
-  const [editTeamSize, setEditTeamSize] = useState("")
   const [isEditingTeam, setIsEditingTeam] = useState(false)
 
   // Add member dialog
@@ -354,7 +352,6 @@ export default function TeamPage() {
             setTeam(foundTeam)
             setEditTeamName(foundTeam.team_name)
             setEditTeamDescription(foundTeam.description || "")
-            setEditTeamSize(foundTeam.team_size.toString())
           } else {
             toast.error("Error", {
               description: "Team not found"
@@ -419,14 +416,6 @@ export default function TeamPage() {
       return
     }
 
-    const teamSize = parseInt(editTeamSize)
-    if (isNaN(teamSize) || teamSize < 1) {
-      toast.error("Error", {
-        description: "Team size must be at least 1"
-      })
-      return
-    }
-
     setIsEditingTeam(true)
     try {
       const token = localStorage.getItem('access_token')
@@ -445,8 +434,7 @@ export default function TeamPage() {
           },
           body: JSON.stringify({
             team_name: editTeamName,
-            description: editTeamDescription,
-            team_size: teamSize
+            description: editTeamDescription
           })
         }
       )
@@ -917,7 +905,7 @@ export default function TeamPage() {
               <CardHeader className="border-b py-4">
                 <CardTitle>Team Members</CardTitle>
                 <CardDescription>
-                  {teamMembers.length}/{team.team_size} seats filled
+                  {teamMembers.length} {teamMembers.length === 1 ? "member" : "members"}
                 </CardDescription>
               </CardHeader>
 
@@ -1052,16 +1040,6 @@ export default function TeamPage() {
                   value={editTeamDescription}
                   onChange={(e) => setEditTeamDescription(e.target.value)}
                   rows={3}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit_team_size">Max Team Size *</Label>
-                <Input
-                  id="edit_team_size"
-                  type="number"
-                  min="1"
-                  value={editTeamSize}
-                  onChange={(e) => setEditTeamSize(e.target.value)}
                 />
               </div>
             </div>

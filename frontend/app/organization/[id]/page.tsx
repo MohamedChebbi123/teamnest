@@ -33,7 +33,6 @@ interface OrganizationDetails {
 interface Team {
   team_id: number
   team_name: string
-  team_size: number
   description?: string
   org_id: number
   created_at: string
@@ -104,7 +103,6 @@ export default function OrganizationPage() {
   // Create team states
   const [createTeamDialogOpen, setCreateTeamDialogOpen] = useState(false)
   const [teamName, setTeamName] = useState("")
-  const [teamSize, setTeamSize] = useState("")
   const [teamDescription, setTeamDescription] = useState("")
   const [creatingTeam, setCreatingTeam] = useState(false)
   const [teams, setTeams] = useState<Team[]>([])
@@ -114,7 +112,6 @@ export default function OrganizationPage() {
   const [editTeamDialogOpen, setEditTeamDialogOpen] = useState(false)
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [editTeamName, setEditTeamName] = useState("")
-  const [editTeamSize, setEditTeamSize] = useState("")
   const [editTeamDescription, setEditTeamDescription] = useState("")
   const [isEditingTeam, setIsEditingTeam] = useState(false)
   
@@ -514,13 +511,6 @@ export default function OrganizationPage() {
       return
     }
 
-    if (!teamSize || parseInt(teamSize) < 1) {
-      toast.error("Invalid team size", {
-        description: "Please enter a valid team size (minimum 1)"
-      })
-      return
-    }
-
     setCreatingTeam(true)
     try {
       const token = localStorage.getItem('access_token')
@@ -538,7 +528,6 @@ export default function OrganizationPage() {
         },
         body: JSON.stringify({
           team_name: teamName,
-          team_size: parseInt(teamSize),
           description: teamDescription,
           org_id: parseInt(organizationId as string)
         })
@@ -551,7 +540,6 @@ export default function OrganizationPage() {
         })
         setCreateTeamDialogOpen(false)
         setTeamName("")
-        setTeamSize("")
         setTeamDescription("")
         
         // Refresh teams list
@@ -597,13 +585,6 @@ export default function OrganizationPage() {
       return
     }
 
-    if (!editTeamSize || parseInt(editTeamSize) < 1) {
-      toast.error("Invalid team size", {
-        description: "Please enter a valid team size (minimum 1)"
-      })
-      return
-    }
-
     setIsEditingTeam(true)
     try {
       const token = localStorage.getItem('access_token')
@@ -621,7 +602,6 @@ export default function OrganizationPage() {
         },
         body: JSON.stringify({
           team_name: editTeamName,
-          team_size: parseInt(editTeamSize),
           description: editTeamDescription,
           org_id: parseInt(organizationId as string)
         })
@@ -1181,10 +1161,6 @@ export default function OrganizationPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
-                            <Badge variant="secondary" className="text-xs gap-1">
-                              <Users className="h-3 w-3" />
-                              {team.team_size}
-                            </Badge>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1193,7 +1169,6 @@ export default function OrganizationPage() {
                                 e.stopPropagation()
                                 setEditingTeam(team)
                                 setEditTeamName(team.team_name)
-                                setEditTeamSize(team.team_size.toString())
                                 setEditTeamDescription(team.description || "")
                                 setEditTeamDialogOpen(true)
                               }}
@@ -1491,10 +1466,6 @@ export default function OrganizationPage() {
               <Input id="teamName" placeholder="Enter team name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="teamSize">Team Size <span className="text-destructive">*</span></Label>
-              <Input id="teamSize" type="number" min="1" placeholder="Maximum team size" value={teamSize} onChange={(e) => setTeamSize(e.target.value)} />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="teamDescription">Description</Label>
               <Textarea
                 id="teamDescription"
@@ -1508,7 +1479,7 @@ export default function OrganizationPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => { setCreateTeamDialogOpen(false); setTeamName(""); setTeamSize(""); setTeamDescription("") }}
+              onClick={() => { setCreateTeamDialogOpen(false); setTeamName(""); setTeamDescription("") }}
               disabled={creatingTeam}
             >
               Cancel
@@ -1531,10 +1502,6 @@ export default function OrganizationPage() {
             <div className="space-y-2">
               <Label htmlFor="editTeamName">Team Name <span className="text-destructive">*</span></Label>
               <Input id="editTeamName" placeholder="Enter team name" value={editTeamName} onChange={(e) => setEditTeamName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="editTeamSize">Team Size <span className="text-destructive">*</span></Label>
-              <Input id="editTeamSize" type="number" min="1" placeholder="Maximum team size" value={editTeamSize} onChange={(e) => setEditTeamSize(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="editTeamDescription">Description</Label>

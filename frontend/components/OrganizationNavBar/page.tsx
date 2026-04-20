@@ -101,7 +101,6 @@ interface Team {
   team_id: number
   team_name: string
   description?: string
-  team_size: number
   org_id: number
   created_at: string
 }

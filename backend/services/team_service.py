@@ -66,7 +66,6 @@ def create_team(data:team_creation,authorization: str, db: Session):
     
     new_team = Teams(
         team_name=data.team_name,
-        team_size=data.team_size,
         description=data.description,
         org_id=data.org_id
     )
@@ -81,7 +80,6 @@ def create_team(data:team_creation,authorization: str, db: Session):
         "message": "Team created successfully",
         "team_id": new_team.team_id,
         "team_name": new_team.team_name,
-        "team_size": new_team.team_size,
         "description": new_team.description,
         "org_id": new_team.org_id,
         "created_at": new_team.created_at
@@ -121,7 +119,6 @@ def fetch_teams_service(org_id:int,authorization: str, db: Session):
         {
             "team_id": team.team_id,
             "team_name": team.team_name,
-            "team_size": team.team_size,
             "description": team.description,
             "org_id": team.org_id,
             "created_at": team.created_at
@@ -224,7 +221,6 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
             raise HTTPException(status_code=400, detail="Team name already exists in this organization")
     
     team.team_name = data.team_name
-    team.team_size = data.team_size
     team.description = data.description
 
     db.commit()
@@ -236,7 +232,6 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
         "message": "Team updated successfully",
         "team_id": team.team_id,
         "team_name": team.team_name,
-        "team_size": team.team_size,
         "description": team.description,
         "org_id": team.org_id,
         "created_at": team.created_at
@@ -639,7 +634,6 @@ def fetch_user_team_service(authorization: str, db: Session):
             "team_id": team.team_id,
             "team_name": team.team_name,
             "description": team.description,
-            "team_size": team.team_size,
             "org_id": team.org_id,
             "created_at": team.created_at
         }
