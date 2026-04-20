@@ -12,18 +12,24 @@ load_dotenv()
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 doc_index_name = "fyp-documents"
-if not pc.has_index(doc_index_name):
-    pc.create_index_for_model(
-        name=doc_index_name,
-        cloud="aws",
-        region="us-east-1",
-        embed={
-            "model": "llama-text-embed-v2",
-            "field_map": {"text": "chunk_text"}
-        }
-    )
+_doc_index = None
 
-doc_index = pc.Index(doc_index_name)
+
+def _get_doc_index():
+    global _doc_index
+    if _doc_index is None:
+        if not pc.has_index(doc_index_name):
+            pc.create_index_for_model(
+                name=doc_index_name,
+                cloud="aws",
+                region="us-east-1",
+                embed={
+                    "model": "llama-text-embed-v2",
+                    "field_map": {"text": "chunk_text"}
+                }
+            )
+        _doc_index = pc.Index(doc_index_name)
+    return _doc_index
 
 
 def extract_tables_from_pdf(file_path: str):
@@ -98,14 +104,14 @@ def embed_document(file_url: str, file_name: str, document_id: str, user_id: str
             "source": "upload"
         })
 
-    doc_index.upsert_records(
+    _get_doc_index().upsert_records(
         namespace=f"team-{team_id}",
         records=records
     )
 
 
 def delete_document(document_id: str, team_id: int):
-    doc_index.delete(
+    _get_doc_index().delete(
         filter={"document_id": {"$eq": str(document_id)}},
         namespace=f"team-{team_id}"
     )
@@ -119,7 +125,7 @@ def search_documents(query: str, team_id: int, top_k: int = 5, document_id: str 
     if document_id is not None:
         query_payload["filter"] = {"document_id": {"$eq": str(document_id)}}
 
-    results = doc_index.search(
+    results = _get_doc_index().search(
         namespace=f"team-{team_id}",
         query=query_payload
     )

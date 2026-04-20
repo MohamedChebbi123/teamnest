@@ -8,23 +8,29 @@ load_dotenv()
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 index_name = "fyp"
-if not pc.has_index(index_name):
-    pc.create_index_for_model(
-        name=index_name,
-        cloud="aws",
-        region="us-east-1",
-        embed={
-            "model": "llama-text-embed-v2",
-            "field_map": {"text": "chunk_text"}
-        }
-    )
+_index = None
 
-index = pc.Index(index_name)
+
+def _get_index():
+    global _index
+    if _index is None:
+        if not pc.has_index(index_name):
+            pc.create_index_for_model(
+                name=index_name,
+                cloud="aws",
+                region="us-east-1",
+                embed={
+                    "model": "llama-text-embed-v2",
+                    "field_map": {"text": "chunk_text"}
+                }
+            )
+        _index = pc.Index(index_name)
+    return _index
 
 
 def upsert_task(task_id: int, title: str, description: str, team_id: int):
     chunk_text = f"Task: {title}. Description: {description}"
-    index.upsert_records(
+    _get_index().upsert_records(
         namespace=f"team-{team_id}",
         records=[{
             "_id": f"task-{task_id}",
@@ -38,14 +44,14 @@ def upsert_task(task_id: int, title: str, description: str, team_id: int):
 
 
 def delete_task(task_id: int, team_id: int):
-    index.delete(
+    _get_index().delete(
         ids=[f"task-{task_id}"],
         namespace=f"team-{team_id}"
     )
 
 
 def search(query: str, namespace: str, top_k: int = 5):
-    results = index.search(
+    results = _get_index().search(
         namespace=namespace,
         query={
             "top_k": top_k,

@@ -13,18 +13,24 @@ pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 
 index_name = "fyp-messages"
-if not pc.has_index(index_name):
-    pc.create_index_for_model(
-        name=index_name,
-        cloud="aws",
-        region="us-east-1",
-        embed={
-            "model": "llama-text-embed-v2",
-            "field_map": {"text": "chunk_text"}
-        }
-    )
+_index = None
 
-index = pc.Index(index_name)
+
+def _get_index():
+    global _index
+    if _index is None:
+        if not pc.has_index(index_name):
+            pc.create_index_for_model(
+                name=index_name,
+                cloud="aws",
+                region="us-east-1",
+                embed={
+                    "model": "llama-text-embed-v2",
+                    "field_map": {"text": "chunk_text"}
+                }
+            )
+        _index = pc.Index(index_name)
+    return _index
 
 def _format_date(iso_str: str) -> str:
     try:
@@ -69,21 +75,21 @@ def upsert_message(
     }
     if parent_id is not None:
         record["parent_id"] = parent_id
-    index.upsert_records(
+    _get_index().upsert_records(
         namespace=f"team-{team_id}",
         records=[record]
     )
 
 
 def delete_message(message_id: int, team_id: int):
-    index.delete(
+    _get_index().delete(
         ids=[f"message-{message_id}"],
         namespace=f"team-{team_id}"
     )
 
 
 def search_messages(query: str, team_id: int, top_k: int = 5):
-    results = index.search(
+    results = _get_index().search(
         namespace=f"team-{team_id}",
         query={
             "top_k": top_k,

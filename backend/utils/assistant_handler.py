@@ -1,8 +1,12 @@
 from dotenv import load_dotenv
 import os
-from groq import Groq
+import logging
+from fastapi import HTTPException
+from groq import Groq, GroqError
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 api_key = os.getenv("GROQ_KEY")
 client = Groq(api_key=api_key)
@@ -62,11 +66,18 @@ Question:
         }
     ]
 
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=messages,
-        temperature=0.3,
-        max_completion_tokens=1024,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.3,
+            max_completion_tokens=1024,
+        )
+    except GroqError as e:
+        logger.exception("Groq API call failed: %s", e)
+        raise HTTPException(status_code=502, detail="Assistant unavailable")
+    except Exception as e:
+        logger.exception("Unexpected error calling Groq: %s", e)
+        raise HTTPException(status_code=502, detail="Assistant unavailable")
 
     return completion.choices[0].message.content
