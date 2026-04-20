@@ -27,6 +27,16 @@ def _hit_to_dict(hit):
     return {**metadata, **fields}
 
 
+def _hit_score(hit):
+    if isinstance(hit, dict):
+        return hit.get("_score") or hit.get("score") or 0.0
+    return getattr(hit, "_score", None) or getattr(hit, "score", None) or 0.0
+
+
+MAX_CONTEXT_HITS = 10
+SCORE_THRESHOLD = 0.3
+
+
 def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: str, db: Session, document_id: int | None = None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
@@ -67,6 +77,10 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: 
         message_results = search_messages(query=query.strip(), team_id=team_id, top_k=5)
         all_hits = _extract_hits(task_results) + _extract_hits(doc_results) + _extract_hits(message_results)
 
+    all_hits = [h for h in all_hits if _hit_score(h) >= SCORE_THRESHOLD]
+    all_hits.sort(key=_hit_score, reverse=True)
+    all_hits = all_hits[:MAX_CONTEXT_HITS]
+
     context = [{"metadata": _hit_to_dict(hit)} for hit in all_hits]
 
     answer = ask_assistant(query=query.strip(), context=context)
@@ -74,10 +88,24 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: 
     sources = []
     for hit in all_hits:
         merged = _hit_to_dict(hit)
-        sources.append({
-            "type": merged.get("type"),
+        doc_type = merged.get("type")
+        source = {
+            "type": doc_type,
             "chunk_text": merged.get("chunk_text"),
-        })
+        }
+        if doc_type == "task":
+            source["task_id"] = merged.get("task_id")
+            source["team_id"] = merged.get("team_id")
+        elif doc_type == "document":
+            source["document_id"] = merged.get("document_id")
+        elif doc_type == "message":
+            source["message_id"] = merged.get("message_id")
+            source["channel_id"] = merged.get("channel_id")
+            source["channel_name"] = merged.get("channel_name")
+            source["sender_first_name"] = merged.get("sender_first_name")
+            source["sender_last_name"] = merged.get("sender_last_name")
+            source["sent_at"] = merged.get("sent_at")
+        sources.append(source)
 
     return {
         "answer": answer,
