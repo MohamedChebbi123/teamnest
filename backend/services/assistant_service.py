@@ -6,6 +6,7 @@ from utils.document_handler import search_documents
 from utils.messages_handler import search_messages
 from utils.assistant_handler import ask_assistant
 from models.Organization_members import Organization_members
+from models.Team_association import Team_association
 
 
 def _extract_hits(results):
@@ -45,6 +46,14 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: 
 
     if not member:
         raise HTTPException(status_code=403, detail="User is not a member of this organization")
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+
+    if not is_team_member:
+        raise HTTPException(status_code=403, detail="User is not a member of this team")
 
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
