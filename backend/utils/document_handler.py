@@ -94,14 +94,20 @@ def embed_document(file_url: str, file_name: str, document_id: str, user_id: str
     nodes = chunk_documents(docs, document_id, user_id)
 
     records = []
+    total = len(nodes)
     for i, node in enumerate(nodes):
+        body = node.get_content()
+        chunk_text = (
+            f"Document: {file_name} (part {i + 1} of {total}).\n{body}"
+        )
         records.append({
             "_id": f"doc-{document_id}-chunk-{i}",
-            "chunk_text": node.get_content(),
+            "chunk_text": chunk_text,
             "type": "document",
             "document_id": document_id,
             "user_id": user_id,
-            "source": "upload"
+            "source": "upload",
+            "file_name": file_name,
         })
 
     _get_doc_index().upsert_records(

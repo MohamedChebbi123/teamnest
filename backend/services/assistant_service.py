@@ -34,7 +34,29 @@ def _hit_score(hit):
 
 
 MAX_CONTEXT_HITS = 10
-SCORE_THRESHOLD = 0.3
+SCORE_THRESHOLD = 0.15
+NORMALIZED_THRESHOLD = 0.0
+
+
+def _normalize_hits(hits):
+    """Min-max normalize scores within a single source so scores from
+    different indexes become comparable before merging."""
+    if not hits:
+        return []
+
+    scores = [_hit_score(h) for h in hits]
+    mx = max(scores)
+    mn = min(scores)
+    spread = mx - mn
+
+    normalized = []
+    for hit, raw in zip(hits, scores):
+        if spread > 0:
+            norm = (raw - mn) / spread
+        else:
+            norm = 1.0 if mx > 0 else 0.0
+        normalized.append((hit, norm, raw))
+    return normalized
 
 
 def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: str, db: Session, document_id: int | None = None):
@@ -70,16 +92,26 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: 
 
     if document_id is not None:
         doc_results = search_documents(query=query.strip(), team_id=team_id, top_k=8, document_id=str(document_id))
-        all_hits = _extract_hits(doc_results)
+        doc_hits = _extract_hits(doc_results)
+        doc_hits.sort(key=_hit_score, reverse=True)
+        all_hits = doc_hits[:MAX_CONTEXT_HITS]
     else:
         task_results = search(query=query.strip(), namespace=f"team-{team_id}", top_k=5)
         doc_results = search_documents(query=query.strip(), team_id=team_id, top_k=5)
         message_results = search_messages(query=query.strip(), team_id=team_id, top_k=5)
-        all_hits = _extract_hits(task_results) + _extract_hits(doc_results) + _extract_hits(message_results)
 
-    all_hits = [h for h in all_hits if _hit_score(h) >= SCORE_THRESHOLD]
-    all_hits.sort(key=_hit_score, reverse=True)
-    all_hits = all_hits[:MAX_CONTEXT_HITS]
+        task_hits = [h for h in _extract_hits(task_results) if _hit_score(h) >= SCORE_THRESHOLD]
+        doc_hits = [h for h in _extract_hits(doc_results) if _hit_score(h) >= SCORE_THRESHOLD]
+        message_hits = [h for h in _extract_hits(message_results) if _hit_score(h) >= SCORE_THRESHOLD]
+
+        merged = (
+            _normalize_hits(task_hits)
+            + _normalize_hits(doc_hits)
+            + _normalize_hits(message_hits)
+        )
+
+        merged.sort(key=lambda item: item[1], reverse=True)
+        all_hits = [item[0] for item in merged[:MAX_CONTEXT_HITS]]
 
     context = [{"metadata": _hit_to_dict(hit)} for hit in all_hits]
 

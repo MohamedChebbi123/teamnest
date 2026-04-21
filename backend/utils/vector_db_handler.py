@@ -37,7 +37,8 @@ def upsert_task(task_id: int, title: str, description: str, team_id: int):
             "chunk_text": chunk_text,
             "type": "task",
             "task_id": task_id,
-            "team_id": team_id
+            "team_id": team_id,
+            "title": title,
         }]
     )
 

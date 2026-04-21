@@ -32,13 +32,12 @@ def _get_index():
         _index = pc.Index(index_name)
     return _index
 
-def _format_date(iso_str: str) -> str:
+def _to_epoch(iso_str: str) -> float | None:
     try:
-        dt = datetime.fromisoformat(iso_str)
-        return dt.strftime("%b %d, %Y at %I:%M %p")
+        return datetime.fromisoformat(iso_str).timestamp()
     except (ValueError, TypeError) as e:
         logger.warning("Failed to parse date %r: %s", iso_str, e)
-        return iso_str
+        return None
 
 
 def upsert_message(
@@ -71,8 +70,11 @@ def upsert_message(
         "sender_id": sender_id,
         "sender_first_name": sender_first_name,
         "sender_last_name": sender_last_name,
-        "sent_at": _format_date(sent_at),
+        "sent_at": sent_at,
     }
+    sent_at_ts = _to_epoch(sent_at)
+    if sent_at_ts is not None:
+        record["sent_at_ts"] = sent_at_ts
     if parent_id is not None:
         record["parent_id"] = parent_id
     _get_index().upsert_records(
