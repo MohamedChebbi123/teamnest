@@ -122,6 +122,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           onUserFetched?.(data);
         } else {
           localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
           router.push('/auth/login');
         }
       } catch (error) {
@@ -169,6 +170,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const handleLogout = () => {
     disconnect()
     localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     router.push('/auth/login');
   };
 

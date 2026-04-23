@@ -3,8 +3,12 @@ from fastapi import HTTPException
 from schemas.Channels_input import Channels_input
 from utils.jwt_handler import verify_token
 from models.Channels import Channels
+from models.Files import Files
+from models.Messages import Messages
 from models.Organization import Organization
 from models.Organization_members import Organization_members
+from models.PInned_messages import Pinned_messages
+from models.Notifications import Notifications
 from models.Teams import Teams
 from models.Team_roles import Team_roles
 from sqlalchemy.orm import Session
@@ -365,6 +369,15 @@ def delete_channel_service(channel_id: int, authorization: str, db: Session):
             channel_meta["team_id"] = channel.team_id
             channel_meta["team_name"] = channel_team.team_name
     create_log(db, org_id=channel.org_id, actor_id=user_id, action="channel_deleted", target_id=channel_id, target_type="channel", metadata=channel_meta)
+
+    channel_message_ids = [row[0] for row in db.query(Messages.message_id).filter(Messages.channel_id == channel_id).all()]
+    if channel_message_ids:
+        db.query(Pinned_messages).filter(Pinned_messages.channel_id == channel_id).delete(synchronize_session=False)
+        db.query(Notifications).filter(Notifications.message_id.in_(channel_message_ids)).delete(synchronize_session=False)
+        db.query(Messages).filter(Messages.parent_id.in_(channel_message_ids)).update({Messages.parent_id: None}, synchronize_session=False)
+        db.query(Messages).filter(Messages.channel_id == channel_id).delete(synchronize_session=False)
+
+    db.query(Files).filter(Files.channel_id == channel_id).delete(synchronize_session=False)
 
     db.delete(channel)
     db.commit()

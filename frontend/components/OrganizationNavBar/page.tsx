@@ -139,6 +139,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [expandedTeams, setExpandedTeams] = useState<Set<number>>(new Set())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreatingChannel, setIsCreatingChannel] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
   const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
   const [navbarWidth, setNavbarWidth] = useState(240)
   const [isResizing, setIsResizing] = useState(false)
@@ -317,7 +318,19 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
     if (organizationId) {
       fetchData()
     }
-  }, [organizationId, router])
+  }, [organizationId, router, refreshTick])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ organizationId?: string | number }>).detail
+      if (detail && detail.organizationId !== undefined) {
+        if (String(detail.organizationId) !== String(organizationId)) return
+      }
+      setRefreshTick((n) => n + 1)
+    }
+    window.addEventListener("org-sidebar-refresh", handler)
+    return () => window.removeEventListener("org-sidebar-refresh", handler)
+  }, [organizationId])
 
   useEffect(() => {
     return () => {

@@ -13,3 +13,4 @@ groq
 llama-index
 camelot-py[base]
 ghostscript
+python-jose[cryptography]

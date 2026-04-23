@@ -138,10 +138,34 @@ async def login_user_service(validator:Logininput,db: Session):
         raise HTTPException(status_code=401,detail="wrong password")
     
     access_token=create_access_token({"sub": str(found_user.user_id)})
+    refresh_token=create_refresh_token({"sub": str(found_user.user_id)})
 
     return{
         "message":"user logged in successfully",
-        "access_token":access_token
+        "access_token":access_token,
+        "refresh_token":refresh_token
+    }
+
+
+async def refresh_access_token_service(refresh_token: str, db: Session):
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token is required")
+
+    payload = verify_token(refresh_token, "refresh")
+
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user_id = int(payload["sub"])
+    user = db.query(Users).filter(Users.user_id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    access_token = create_access_token({"sub": str(user.user_id)})
+
+    return {
+        "access_token": access_token
     }
 
 
@@ -451,7 +475,8 @@ async def change_password_service(authorization: str, current_password: str, new
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = db.query(Users).filter(Users.email == payload["sub"]).first()
+    user_id = int(payload["sub"])
+    user = db.query(Users).filter(Users.user_id == user_id).first()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

@@ -496,6 +496,7 @@ async def send_file_realtime_service(
         file_url=file_url,
         sender_id=user_id,
         team_id=channel.team_id,
+        channel_id=channel.channel_id,
         org_id=channel.org_id,
         file_size=file_size,
     )

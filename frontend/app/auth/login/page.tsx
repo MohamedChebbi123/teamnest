@@ -97,6 +97,10 @@ export default function Login() {
       } else {
         throw new Error("Login succeeded but no access token was returned")
       }
+
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token)
+      }
       
       setTimeout(() => {
         window.location.replace("/home")

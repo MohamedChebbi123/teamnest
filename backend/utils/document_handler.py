@@ -33,7 +33,7 @@ def _get_doc_index():
 
 
 def extract_tables_from_pdf(file_path: str):
-    """Extract tables from a PDF using Camelot and return them as text."""
+    
     try:
         tables = camelot.read_pdf(file_path, pages="all", flavor="lattice")
         if not tables or tables.n == 0:

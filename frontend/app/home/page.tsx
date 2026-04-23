@@ -21,6 +21,12 @@ export default function Home() {
           },
         })
 
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem("access_token")
+          router.replace("/auth/login")
+          return
+        }
+
         if (response.ok) {
           const orgs = await response.json()
           if (orgs && orgs.length > 0) {

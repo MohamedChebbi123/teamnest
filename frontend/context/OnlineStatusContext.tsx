@@ -22,13 +22,23 @@ export function OnlineStatusProvider({ children }: { children: React.ReactNode }
   const unmountedRef = useRef(false)
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    if (!token) return
-
     unmountedRef.current = false
+
+    const isTokenUsable = (t: string | null): t is string => {
+      if (!t) return false
+      try {
+        const payload = JSON.parse(atob(t.split(".")[1]))
+        return typeof payload.exp === "number" && payload.exp * 1000 > Date.now()
+      } catch {
+        return false
+      }
+    }
 
     const connect = () => {
       if (unmountedRef.current) return
+
+      const token = localStorage.getItem("access_token")
+      if (!isTokenUsable(token)) return
 
       const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/connectivity?token=${token}`)
       wsRef.current = ws
@@ -75,8 +85,21 @@ export function OnlineStatusProvider({ children }: { children: React.ReactNode }
 
     connect()
 
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== "access_token") return
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
+      reconnectDelayRef.current = 3000
+      wsRef.current?.close()
+      connect()
+    }
+    window.addEventListener("storage", onStorage)
+
     return () => {
       unmountedRef.current = true
+      window.removeEventListener("storage", onStorage)
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
       wsRef.current?.close()
     }

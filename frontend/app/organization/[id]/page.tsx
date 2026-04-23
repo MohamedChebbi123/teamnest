@@ -282,35 +282,60 @@ export default function OrganizationPage() {
     fetchTeams()
   }, [organizationId])
 
-  // Fetch logs
+  // Fetch logs (initial + polling + focus/visibility triggers)
   useEffect(() => {
+    if (!organizationId) return
+    if (!["OWNER", "ADMIN"].includes(currentUserRole)) return
+
+    let cancelled = false
+    let isInitial = true
+
     const fetchLogs = async () => {
-      if (!organizationId) return
-      if (!["OWNER", "ADMIN"].includes(currentUserRole)) return
+      const token = localStorage.getItem('access_token')
+      if (!token) return
 
-      setLoadingLogs(true)
+      if (isInitial) setLoadingLogs(true)
       try {
-        const token = localStorage.getItem('access_token')
-        if (!token) return
-
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/logs`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         })
 
-        if (response.ok) {
+        if (response.ok && !cancelled) {
           const data = await response.json()
           setLogs(data)
         }
       } catch (error) {
         console.error('Error fetching logs:', error)
       } finally {
-        setLoadingLogs(false)
+        if (isInitial) {
+          setLoadingLogs(false)
+          isInitial = false
+        }
       }
     }
 
     fetchLogs()
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchLogs()
+    }, 8000)
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchLogs()
+    }
+    const onFocus = () => fetchLogs()
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", onFocus)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", onFocus)
+    }
   }, [organizationId, currentUserRole])
 
   // Listen for add member dialog event from navbar
@@ -888,6 +913,17 @@ export default function OrganizationPage() {
         if (logsResponse.ok) {
           setLogs(await logsResponse.json())
         }
+        // Refresh teams list on this page
+        const teamsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        if (teamsResponse.ok) {
+          setTeams(await teamsResponse.json())
+        }
+        // Tell the sidebar (OrganizationNavBar) to re-fetch teams + channels
+        window.dispatchEvent(
+          new CustomEvent("org-sidebar-refresh", { detail: { organizationId } })
+        )
       } else {
         const data = await response.json()
         toast.error("Failed to undo", { description: data.detail || "Please try again" })

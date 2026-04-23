@@ -38,3 +38,17 @@ app.include_router(logs_router.router)
 Base.metadata.create_all(bind=engine)
 
 
+def _ensure_files_channel_id_column():
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE files ADD COLUMN IF NOT EXISTS channel_id INTEGER REFERENCES channels(channel_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_files_channel_id ON files (channel_id)"
+        ))
+
+
+_ensure_files_channel_id_column()
+
+

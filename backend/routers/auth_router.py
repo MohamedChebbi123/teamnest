@@ -4,6 +4,7 @@ from services.auth_service import (
     verify_email_service,
     resend_verification_service,
     login_user_service,
+    refresh_access_token_service,
     view_profile_service,
     complete_profile_service,
     edit_avatar_username,
@@ -80,6 +81,14 @@ async def resend_verification(
 @router.post("/login")
 async def login_user_router(validator: Logininput, db: Session = Depends(connect_databse)):
     return await login_user_service(validator, db)
+
+
+@router.post("/refresh")
+async def refresh_access_token_router(
+    refresh_token: str = Form(...),
+    db: Session = Depends(connect_databse)
+):
+    return await refresh_access_token_service(refresh_token, db)
 
 
 @router.get("/profile")
