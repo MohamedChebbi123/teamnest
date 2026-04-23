@@ -243,6 +243,8 @@ export default function ChannelPage() {
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const isConnectingRef = useRef(false) // Prevent multiple simultaneous connections
+  const connectedChannelIdRef = useRef<string | null>(null) // Which channelId the live socket belongs to
+  const intentionalCloseRef = useRef(false) // Set during cleanup so onclose doesn't auto-reconnect
   const typingTimersRef = useRef<Record<number, NodeJS.Timeout>>({})
   const localTypingStopRef = useRef<NodeJS.Timeout | null>(null)
   const isTypingRef = useRef(false)
@@ -343,8 +345,17 @@ export default function ChannelPage() {
   useEffect(() => {
     if (!channel || !channelId) return
 
+    // Guard against React Strict Mode double-invoke: if we've already connected
+    // for this channelId, skip re-running the setup. Legitimate channel
+    // switches still change channelId and fall through.
+    if (connectedChannelIdRef.current === String(channelId)) {
+      return
+    }
+    connectedChannelIdRef.current = String(channelId)
+    intentionalCloseRef.current = false
+
     const connectWebSocket = () => {
-      
+
       if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
         return
       }
@@ -362,10 +373,14 @@ export default function ChannelPage() {
 
       try {
         // Note: Backend has endpoint /mesages/{channel_id} (typo in backend)
-        const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
+        const wsBase = process.env.NEXT_PUBLIC_WS_URL
+        const wsUrl = `${wsBase}/mesages/${channelId}?token=${token}&org_id=${channel.org_id}`
+        const scrubbedUrl = `${wsBase}/mesages/${channelId}?token=***&org_id=${channel.org_id}`
+        console.log('[WS] connecting to', scrubbedUrl, { wsBaseDefined: Boolean(wsBase) })
         const ws = new WebSocket(wsUrl)
 
         ws.onopen = () => {
+          console.log('[WS] open', { readyState: ws.readyState })
           setIsConnected(true)
           isConnectingRef.current = false
           toast.success("Connected", {
@@ -459,17 +474,37 @@ export default function ChannelPage() {
         }
 
         ws.onerror = (error) => {
-          console.error('WebSocket error:', error)
+          if (intentionalCloseRef.current) return
+          // Browsers intentionally hide details on WebSocket error events.
+          // The useful info lands in onclose (code + reason) — log both.
+          console.error('[WS] error event', {
+            type: (error as Event)?.type,
+            readyState: ws.readyState,
+            url: scrubbedUrl,
+          })
           isConnectingRef.current = false
           toast.error("Connection Error", {
             description: "Failed to establish real-time connection"
           })
         }
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
           setIsConnected(false)
           isConnectingRef.current = false
-          
+
+          if (intentionalCloseRef.current) {
+            // We closed on purpose (effect cleanup / channel switch). Don't
+            // log as an error and don't auto-reconnect.
+            return
+          }
+
+          console.error('[WS] close', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+            readyState: ws.readyState,
+          })
+
           // Attempt to reconnect after 3 seconds
           reconnectTimeoutRef.current = setTimeout(() => {
             connectWebSocket()
@@ -478,7 +513,10 @@ export default function ChannelPage() {
 
         wsRef.current = ws
       } catch (error) {
-        console.error('Error creating WebSocket connection:', error)
+        console.error('[WS] construction threw', {
+          name: (error as Error)?.name,
+          message: (error as Error)?.message,
+        })
         isConnectingRef.current = false
       }
     }
@@ -487,6 +525,8 @@ export default function ChannelPage() {
 
     // Cleanup on unmount
     return () => {
+      intentionalCloseRef.current = true
+      connectedChannelIdRef.current = null
       isConnectingRef.current = false
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
@@ -498,8 +538,18 @@ export default function ChannelPage() {
       Object.values(typingTimersRef.current).forEach((timer) => clearTimeout(timer))
       typingTimersRef.current = {}
       if (wsRef.current) {
-        wsRef.current.close()
+        const ws = wsRef.current
         wsRef.current = null
+        // Detach handlers so the soon-to-fire onerror/onclose from this
+        // socket can't leak into the next mount (React Strict Mode reopens
+        // the effect with intentionalCloseRef reset to false).
+        ws.onopen = null
+        ws.onmessage = null
+        ws.onerror = null
+        ws.onclose = null
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close()
+        }
       }
     }
   }, [channel, channelId])

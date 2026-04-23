@@ -823,10 +823,14 @@ def delete_message_service(message_id: int, authorization: str, db: Session):
 async def send_messages_realtime(
     websocket: WebSocket,
     channel_id: int,
-    authorization: str, 
+    authorization: str,
     org_id: int ,
     db: Session
 ):
+    print(f"[WS /mesages] handler entered channel_id={channel_id} org_id={org_id} token_len={len(authorization) if authorization else 0}")
+    await websocket.accept()
+    print(f"[WS /mesages] accepted channel_id={channel_id}")
+
     if not authorization:
         await websocket.close(code=1008, reason="Invalid authorization header")
         return
@@ -841,16 +845,16 @@ async def send_messages_realtime(
     if not payload or "sub" not in payload:
         await websocket.close(code=1008, reason="Invalid or expired token")
         return
-    
+
     user_id = int(payload["sub"])
-    
+
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
         Organization_members.org_id == org_id
     ).first()
-    
+
     if not member:
-        await websocket.close(code=1008)
+        await websocket.close(code=1008, reason="Not a member of this organization")
         return
 
     user = db.query(Users).filter(Users.user_id == user_id).first()
@@ -1123,6 +1127,8 @@ async def notifications_ws_endpoint(
     authorization: str,
     db: Session,
 ):
+    await websocket.accept()
+
     if not authorization:
         await websocket.close(code=1008, reason="Invalid authorization header")
         return

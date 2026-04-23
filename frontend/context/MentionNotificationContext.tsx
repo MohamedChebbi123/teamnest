@@ -76,8 +76,12 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectDelayRef = useRef(3000)
   const unmountedRef = useRef(false)
+  const hasInitializedRef = useRef(false)
 
   useEffect(() => {
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
+
     const token = localStorage.getItem("access_token")
     if (!token) return
 
@@ -157,7 +161,20 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
     return () => {
       unmountedRef.current = true
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
-      wsRef.current?.close()
+      const ws = wsRef.current
+      wsRef.current = null
+      if (ws) {
+        // Detach handlers so the close that fires on a CONNECTING socket
+        // doesn't bubble through onclose and trigger the reconnect path
+        // (or noisy logs) after Strict Mode tears the effect down in dev.
+        ws.onopen = null
+        ws.onmessage = null
+        ws.onerror = null
+        ws.onclose = null
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close()
+        }
+      }
     }
   }, [])
 

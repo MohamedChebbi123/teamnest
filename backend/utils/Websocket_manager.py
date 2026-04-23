@@ -8,7 +8,9 @@ class Text_Websocket_manager():
         self.channels: Dict[int, List[WebSocket]] = {}
 
     async def connect(self, channel_id: int, websocket: WebSocket):
-        await websocket.accept()
+        # Caller is expected to have already accepted the websocket so that
+        # auth/permission rejections can send a real close code (calling
+        # close() before accept() in Starlette yields an HTTP 403 -> 1006).
         channel_connections = self.channels.setdefault(channel_id, [])
         if websocket not in channel_connections:
             channel_connections.append(websocket)
@@ -130,7 +132,7 @@ class NotificationManager:
         self.connections = {}
 
     async def connect(self, user_id, websocket):
-        await websocket.accept()
+        # Caller already accepted the websocket (see notifications_ws_endpoint).
         self.connections[user_id] = websocket
 
     def disconnect(self, user_id):

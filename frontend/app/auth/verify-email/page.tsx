@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,8 +15,12 @@ export default function VerifyEmailPage() {
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const hasInitialized = useRef(false)
 
   useEffect(() => {
+    if (hasInitialized.current) return
+    hasInitialized.current = true
+
     const fetchProfile = async () => {
       const token = localStorage.getItem("access_token")
       
