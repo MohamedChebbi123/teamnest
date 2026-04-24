@@ -49,6 +49,18 @@ def _ensure_files_channel_id_column():
         ))
 
 
+def _ensure_user_code_columns():
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE users ALTER COLUMN verification_code TYPE VARCHAR(100)"
+        ))
+        conn.execute(text(
+            "ALTER TABLE users ALTER COLUMN reset_code TYPE VARCHAR(100)"
+        ))
+
+
 _ensure_files_channel_id_column()
+_ensure_user_code_columns()
 
 

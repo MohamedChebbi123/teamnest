@@ -1,7 +1,7 @@
 ﻿from models.Users import Users
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from utils.hasher import hash_password
+from utils.hasher import hash_password, hash_code, verify_code
 from utils.cloudinary_handler import upload_user_profile_image
 from utils.email_sender import simple_send, send_password_reset_code
 from datetime import datetime, timedelta, UTC
@@ -80,7 +80,7 @@ async def verify_email_service(
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
     
-    if user.verification_code != verification_code:
+    if not user.verification_code or not verify_code(verification_code, user.verification_code):
         raise HTTPException(status_code=400, detail="Invalid verification code")
     
     if user.verification_code_expiry < datetime.now(UTC).replace(tzinfo=None):
@@ -112,7 +112,7 @@ async def resend_verification_service(
     verification_code = str(secrets.randbelow(900_000) + 100_000)
     verification_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
     
-    user.verification_code = verification_code
+    user.verification_code = hash_code(verification_code)
     user.verification_code_expiry = verification_expiry
     
     db.commit()
@@ -391,7 +391,7 @@ async def send_password_reset_code_service(email: str, db: Session):
     reset_code = str(secrets.randbelow(900_000) + 100_000)
     reset_code_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
     
-    user.reset_code = reset_code
+    user.reset_code = hash_code(reset_code)
     user.reset_code_expiry = reset_code_expiry
     
     db.commit()
@@ -416,7 +416,7 @@ async def verify_reset_code_service(email: str, reset_code: str, db: Session):
     if not user.reset_code:
         raise HTTPException(status_code=400, detail="No reset code requested for this account")
     
-    if user.reset_code != reset_code:
+    if not user.reset_code or not verify_code(reset_code, user.reset_code):
         raise HTTPException(status_code=400, detail="Invalid reset code")
     
     if user.reset_code_expiry < datetime.now(UTC).replace(tzinfo=None):
@@ -435,7 +435,7 @@ async def reset_password_service(email: str, reset_code: str, new_password: str,
     if not user.reset_code:
         raise HTTPException(status_code=400, detail="No reset code requested for this account")
     
-    if user.reset_code != reset_code:
+    if not user.reset_code or not verify_code(reset_code, user.reset_code):
         raise HTTPException(status_code=400, detail="Invalid reset code")
     
     if user.reset_code_expiry < datetime.now(UTC).replace(tzinfo=None):
