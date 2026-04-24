@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -16,6 +17,7 @@ from database.connection import SessionLocal
 
 dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
+logger = logging.getLogger(__name__)
 
 
 def _serialize_direct_message(message: Direct_messages, sender: Users) -> dict:
@@ -144,6 +146,11 @@ def messages_users_service(data:Direct_messages_schema, authorization: str, db: 
     try:
         create_direct_message_notification(db, data.receiver_id, new_message.id)
     except Exception:
+        logger.exception(
+            "Failed to create direct message notification for message %s to user %s",
+            new_message.id,
+            data.receiver_id,
+        )
         db.rollback()
 
     return {
@@ -274,6 +281,11 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
     try:
         create_direct_message_notification(db, receiver_id, new_message.id)
     except Exception:
+        logger.exception(
+            "Failed to create direct message notification for message %s to user %s",
+            new_message.id,
+            receiver_id,
+        )
         db.rollback()
 
     return {
@@ -711,13 +723,25 @@ async def send_direct_messages_realtime(
                     try:
                         create_direct_message_notification(op_db, receiver_id, new_message.id)
                     except Exception:
+                        logger.exception(
+                            "Failed to create direct message notification for message %s to user %s",
+                            new_message.id,
+                            receiver_id,
+                        )
                         op_db.rollback()
 
-                    await _push_direct_message_notification(
-                        receiver_id=receiver_id,
-                        sender_id=user_id,
-                        message_id=new_message.id,
-                    )
+                    try:
+                        await _push_direct_message_notification(
+                            receiver_id=receiver_id,
+                            sender_id=user_id,
+                            message_id=new_message.id,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to push direct message notification for message %s to user %s",
+                            new_message.id,
+                            receiver_id,
+                        )
 
                     message_data = {
                         "type": "new_direct_message",
@@ -910,13 +934,25 @@ async def send_direct_messages_realtime(
                     try:
                         create_direct_message_notification(op_db, receiver_id, new_message.id)
                     except Exception:
+                        logger.exception(
+                            "Failed to create direct message notification for message %s to user %s",
+                            new_message.id,
+                            receiver_id,
+                        )
                         op_db.rollback()
 
-                    await _push_direct_message_notification(
-                        receiver_id=receiver_id,
-                        sender_id=user_id,
-                        message_id=new_message.id,
-                    )
+                    try:
+                        await _push_direct_message_notification(
+                            receiver_id=receiver_id,
+                            sender_id=user_id,
+                            message_id=new_message.id,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to push direct message notification for message %s to user %s",
+                            new_message.id,
+                            receiver_id,
+                        )
 
                     message_data = {
                         "type": "new_direct_message",
