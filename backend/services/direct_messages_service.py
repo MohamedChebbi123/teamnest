@@ -18,6 +18,30 @@ from database.connection import SessionLocal
 dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
 logger = logging.getLogger(__name__)
+DEFAULT_DIRECT_MESSAGE_LIMIT = 50
+MAX_DIRECT_MESSAGE_LIMIT = 200
+
+
+def _normalize_direct_message_pagination(limit: int | None, offset: int | None) -> tuple[int, int]:
+    try:
+        normalized_limit = int(limit if limit is not None else DEFAULT_DIRECT_MESSAGE_LIMIT)
+        normalized_offset = int(offset if offset is not None else 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="limit and offset must be valid integers")
+
+    if normalized_limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be greater than 0")
+
+    if normalized_limit > MAX_DIRECT_MESSAGE_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"limit cannot exceed {MAX_DIRECT_MESSAGE_LIMIT}",
+        )
+
+    if normalized_offset < 0:
+        raise HTTPException(status_code=400, detail="offset must be greater than or equal to 0")
+
+    return normalized_limit, normalized_offset
 
 
 def _serialize_direct_message(message: Direct_messages, sender: Users) -> dict:
@@ -309,7 +333,13 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
     }
 
 
-def fetch_direct_messages_service(receiver_id: int, authorization: str, db: Session):
+def fetch_direct_messages_service(
+    receiver_id: int,
+    authorization: str,
+    db: Session,
+    limit: int | None = None,
+    offset: int | None = None,
+):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -329,7 +359,9 @@ def fetch_direct_messages_service(receiver_id: int, authorization: str, db: Sess
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
 
-    rows = db.query(Direct_messages, Users).join(
+    limit, offset = _normalize_direct_message_pagination(limit, offset)
+
+    query = db.query(Direct_messages, Users).join(
         Users,
         Direct_messages.sender_id == Users.user_id
     ).filter(
@@ -338,7 +370,12 @@ def fetch_direct_messages_service(receiver_id: int, authorization: str, db: Sess
             and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id),
         ),
         Direct_messages.is_deleted == False
-    ).order_by(Direct_messages.sent_at.asc()).all()
+    ).order_by(Direct_messages.sent_at.desc(), Direct_messages.id.desc())
+
+    rows = query.offset(offset).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    rows.reverse()
 
     return {
         "conversation": {
@@ -351,11 +388,24 @@ def fetch_direct_messages_service(receiver_id: int, authorization: str, db: Sess
         "messages": [
             _serialize_direct_message(message, sender)
             for message, sender in rows
-        ]
+        ],
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "returned": len(rows),
+            "has_more": has_more,
+        },
     }
 
 
-def search_direct_messages_service(receiver_id: int, q: str, authorization: str, db: Session):
+def search_direct_messages_service(
+    receiver_id: int,
+    q: str,
+    authorization: str,
+    db: Session,
+    limit: int | None = None,
+    offset: int | None = None,
+):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -375,11 +425,15 @@ def search_direct_messages_service(receiver_id: int, q: str, authorization: str,
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
 
+    limit, offset = _normalize_direct_message_pagination(limit, offset)
+
     query = str(q or "").strip().lower()
     if not query:
-        return fetch_direct_messages_service(receiver_id, authorization, db)
+        return fetch_direct_messages_service(receiver_id, authorization, db, limit=limit, offset=offset)
 
-    rows = db.query(Direct_messages, Users).join(
+    search_term = f"%{query}%"
+
+    query_stmt = db.query(Direct_messages, Users).join(
         Users,
         Direct_messages.sender_id == Users.user_id
     ).filter(
@@ -387,30 +441,24 @@ def search_direct_messages_service(receiver_id: int, q: str, authorization: str,
             and_(Direct_messages.sender_id == user_id, Direct_messages.receiver_id == receiver_id),
             and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id),
         ),
-        Direct_messages.is_deleted == False
-    ).order_by(Direct_messages.sent_at.asc()).all()
+        Direct_messages.is_deleted == False,
+        or_(
+            Users.first_name.ilike(search_term),
+            Users.last_name.ilike(search_term),
+            Users.user_tag.ilike(search_term),
+            Direct_messages.content.ilike(search_term),
+        ),
+    ).order_by(Direct_messages.sent_at.desc(), Direct_messages.id.desc())
 
-    filtered_messages = []
-    for message, sender in rows:
-        serialized = _serialize_direct_message(message, sender)
-        sender_name = f"{sender.first_name} {sender.last_name}".lower()
-        sender_tag = (sender.user_tag or "").lower()
-        content = (serialized["content"] or "").lower()
-        file_name = ""
-        file_url = ""
+    rows = query_stmt.offset(offset).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    rows.reverse()
 
-        if serialized["file_attachment"]:
-            file_name = str(serialized["file_attachment"].get("file_name") or "").lower()
-            file_url = str(serialized["file_attachment"].get("file_url") or "").lower()
-
-        if (
-            query in sender_name
-            or query in sender_tag
-            or query in content
-            or query in file_name
-            or query in file_url
-        ):
-            filtered_messages.append(serialized)
+    filtered_messages = [
+        _serialize_direct_message(message, sender)
+        for message, sender in rows
+    ]
 
     return {
         "conversation": {
@@ -421,6 +469,12 @@ def search_direct_messages_service(receiver_id: int, q: str, authorization: str,
             "user_tag": receiver.user_tag,
         },
         "messages": filtered_messages,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "returned": len(filtered_messages),
+            "has_more": has_more,
+        },
     }
 
 

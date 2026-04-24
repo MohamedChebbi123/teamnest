@@ -5,6 +5,8 @@ from database.connection import connect_databse
 from schemas.Direct_messages_schema import Direct_messages_schema
 from schemas.Direct_message_file_input import Direct_message_file_input
 from services.direct_messages_service import (
+    DEFAULT_DIRECT_MESSAGE_LIMIT,
+    MAX_DIRECT_MESSAGE_LIMIT,
     messages_users_service,
     fetch_direct_messages_service,
     fetch_direct_conversations_service,
@@ -30,20 +32,24 @@ async def send_direct_message(
 @router.get("/direct-messages/{receiver_id}")
 async def get_direct_messages(
     receiver_id: int,
+    limit: int = Query(DEFAULT_DIRECT_MESSAGE_LIMIT, ge=1, le=MAX_DIRECT_MESSAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     authorization: str = Header(None),
     db: Session = Depends(connect_databse)
 ):
-    return fetch_direct_messages_service(receiver_id, authorization, db)
+    return fetch_direct_messages_service(receiver_id, authorization, db, limit=limit, offset=offset)
 
 
 @router.get("/direct-messages/{receiver_id}/search")
 async def search_direct_messages(
     receiver_id: int,
     q: str = Query(""),
+    limit: int = Query(DEFAULT_DIRECT_MESSAGE_LIMIT, ge=1, le=MAX_DIRECT_MESSAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     authorization: str = Header(None),
     db: Session = Depends(connect_databse)
 ):
-    return search_direct_messages_service(receiver_id, q, authorization, db)
+    return search_direct_messages_service(receiver_id, q, authorization, db, limit=limit, offset=offset)
 
 
 @router.get("/direct-messages")
