@@ -48,7 +48,7 @@ async def register_user_service(
         raise HTTPException(status_code=400, detail="Password must contain at least one number")
     
     if db.query(Users).filter(Users.email == email).first():
-        raise HTTPException(status_code=400, detail="Email is already used")
+        raise HTTPException(status_code=400, detail="Email is already ued")
 
 
 
