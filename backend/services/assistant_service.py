@@ -1,12 +1,12 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from utils.jwt_handler import verify_token
 from utils.vector_db_handler import search
 from utils.document_handler import search_documents
 from utils.messages_handler import search_messages
 from utils.assistant_handler import ask_assistant
 from models.Organization_members import Organization_members
 from models.Team_association import Team_association
+from models.Users import Users
 
 
 def _extract_hits(results):
@@ -59,17 +59,8 @@ def _normalize_hits(hits):
     return normalized
 
 
-def ask_assistant_service(query: str, team_id: int, org_id: int, authorization: str, db: Session, document_id: int | None = None):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def ask_assistant_service(query: str, team_id: int, org_id: int, user: Users, db: Session, document_id: int | None = None):
+    user_id = user.user_id
 
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,

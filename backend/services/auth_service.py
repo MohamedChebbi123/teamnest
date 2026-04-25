@@ -1,21 +1,20 @@
-﻿from models.Users import Users
+from models.Users import Users
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from utils.hasher import hash_password, hash_code, verify_code
 from utils.cloudinary_handler import upload_user_profile_image
 from utils.email_sender import simple_send, send_password_reset_code
 from datetime import datetime, timedelta, UTC
-import re
 import secrets
 from schemas.Logininput import Logininput
 from utils.hasher import verify_password
-from utils.jwt_handler import create_access_token,create_refresh_token
-from utils.jwt_handler import verify_token
+from utils.jwt_handler import create_access_token, create_refresh_token, verify_token
 from utils.Websocket_manager import connectivity_manager
+from utils.validators import validate_email, validate_password, validate_phone, validate_name
 from models.Friends import Friends
-from database.connection import SessionLocal
 
-ConnectivityManager=connectivity_manager
+ConnectivityManager = connectivity_manager
+
 
 async def register_user_service(
     first_name: str,
@@ -24,33 +23,13 @@ async def register_user_service(
     password: str,
     db: Session
 ):
+    validate_name(first_name, "First name")
+    validate_name(last_name, "Last name")
+    validate_email(email)
+    validate_password(password)
 
-    if len(first_name.strip()) < 1:
-        raise HTTPException(status_code=400, detail="First name is required")
-
-    if len(last_name.strip()) < 1:
-        raise HTTPException(status_code=400, detail="Last name is required")
-    
-    email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
-    if not re.match(email_regex, email):
-        raise HTTPException(status_code=400, detail="Please enter a valid email address")
-    
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
-    
-    if not re.search(r'[a-z]', password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
-    
-    if not re.search(r'[A-Z]', password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
-    
-    if not re.search(r'[0-9]', password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one number")
-    
     if db.query(Users).filter(Users.email == email).first():
         raise HTTPException(status_code=400, detail="Email is already ued")
-
-
 
     new_user = Users(
         first_name=first_name,
@@ -73,27 +52,26 @@ async def verify_email_service(
     db: Session
 ):
     user = db.query(Users).filter(Users.email == email).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
-    
+
     if not user.verification_code or not verify_code(verification_code, user.verification_code):
         raise HTTPException(status_code=400, detail="Invalid verification code")
-    
+
     if user.verification_code_expiry < datetime.now(UTC).replace(tzinfo=None):
         raise HTTPException(status_code=400, detail="Verification code has expired")
-    
-    
+
     user.is_verified = True
     user.verification_code = None
     user.verification_code_expiry = None
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return user
 
 
@@ -102,48 +80,48 @@ async def resend_verification_service(
     db: Session
 ):
     user = db.query(Users).filter(Users.email == email).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
-    
+
     verification_code = str(secrets.randbelow(900_000) + 100_000)
     verification_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
-    
+
     user.verification_code = hash_code(verification_code)
     user.verification_code_expiry = verification_expiry
-    
+
     db.commit()
     db.refresh(user)
-    
+
     try:
         await simple_send(email, verification_code)
     except Exception as e:
         print(f"Failed to send verification email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send verification email")
-    
+
     return {"message": "Verification code sent successfully"}
 
 
-async def login_user_service(validator:Logininput,db: Session):
-    
-    found_user=db.query(Users).filter(Users.email==validator.email).first()
-    
+async def login_user_service(validator: Logininput, db: Session):
+
+    found_user = db.query(Users).filter(Users.email == validator.email).first()
+
     if not found_user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    if not verify_password(validator.password,found_user.password_hashed):
-        raise HTTPException(status_code=401,detail="wrong password")
-    
-    access_token=create_access_token({"sub": str(found_user.user_id)})
-    refresh_token=create_refresh_token({"sub": str(found_user.user_id)})
 
-    return{
-        "message":"user logged in successfully",
-        "access_token":access_token,
-        "refresh_token":refresh_token
+    if not verify_password(validator.password, found_user.password_hashed):
+        raise HTTPException(status_code=401, detail="wrong password")
+
+    access_token = create_access_token({"sub": str(found_user.user_id)})
+    refresh_token = create_refresh_token({"sub": str(found_user.user_id)})
+
+    return {
+        "message": "user logged in successfully",
+        "access_token": access_token,
+        "refresh_token": refresh_token
     }
 
 
@@ -169,24 +147,7 @@ async def refresh_access_token_service(refresh_token: str, db: Session):
     }
 
 
-async def view_profile_service(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+async def view_profile_service(user: Users):
     return {
         "user_id": user.user_id,
         "first_name": user.first_name,
@@ -204,53 +165,34 @@ async def view_profile_service(authorization: str, db: Session):
 
 
 async def complete_profile_service(
-    authorization: str,
+    user: Users,
     phone_number: str,
     country: str,
     image,
     db: Session
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
     if user.profile_completed:
         raise HTTPException(status_code=400, detail="Profile is already completed")
-    
-    phone_digits = re.sub(r'\D', '', phone_number)  
-    if len(phone_digits) < 10:
-        raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
-    
+
+    validate_phone(phone_number)
+
     existing_phone = db.query(Users).filter(
         Users.phone_number == phone_number,
-        Users.user_id != user_id
+        Users.user_id != user.user_id
     ).first()
     if existing_phone:
         raise HTTPException(status_code=400, detail="Phone number is already used")
-    
+
     avatar_url = upload_user_profile_image(image)
-    
+
     user.phone_number = phone_number
     user.country = country
     user.avatar_url = avatar_url
     user.profile_completed = True
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return {
         "message": "Profile completed successfully",
         "user": {
@@ -264,44 +206,24 @@ async def complete_profile_service(
             "profile_completed": user.profile_completed
         }
     }
-    
-    
-async def edit_avatar_username(db: Session, authorization: str, image=None, lastname: str = None, firstname: str = None):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+
+
+async def edit_avatar_username(db: Session, user: Users, image=None, lastname: str = None, firstname: str = None):
     if firstname is not None:
-        if len(firstname.strip()) < 5:
-            raise HTTPException(status_code=400, detail="First name must be at least 5 characters long")
+        validate_name(firstname, "First name", min_length=5)
         user.first_name = firstname
-    
+
     if lastname is not None:
-        if len(lastname.strip()) < 5:
-            raise HTTPException(status_code=400, detail="Last name must be at least 5 characters long")
+        validate_name(lastname, "Last name", min_length=5)
         user.last_name = lastname
-    
+
     if image:
         avatar_url = upload_user_profile_image(image)
         user.avatar_url = avatar_url
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return {
         "message": "Profile updated successfully",
         "user": {
@@ -314,59 +236,37 @@ async def edit_avatar_username(db: Session, authorization: str, image=None, last
     }
 
 
-async def edit_email_country_phone(db: Session, authorization: str, email: str = None, country: str = None, phone_number: str = None):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+async def edit_email_country_phone(db: Session, user: Users, email: str = None, country: str = None, phone_number: str = None):
     if email is not None:
-        email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
-        if not re.match(email_regex, email):
-            raise HTTPException(status_code=400, detail="Please enter a valid email address")
-        
+        validate_email(email)
+
         existing_email = db.query(Users).filter(
             Users.email == email,
-            Users.user_id != user_id
+            Users.user_id != user.user_id
         ).first()
         if existing_email:
             raise HTTPException(status_code=400, detail="Email is already used")
-        
+
         user.email = email
-    
+
     if country is not None:
         user.country = country
-    
+
     if phone_number is not None:
-        phone_digits = re.sub(r'\D', '', phone_number)
-        if len(phone_digits) < 10:
-            raise HTTPException(status_code=400, detail="Phone number must be at least 10 digits")
-        
+        validate_phone(phone_number)
+
         existing_phone = db.query(Users).filter(
             Users.phone_number == phone_number,
-            Users.user_id != user_id
+            Users.user_id != user.user_id
         ).first()
         if existing_phone:
             raise HTTPException(status_code=400, detail="Phone number is already used")
-        
+
         user.phone_number = phone_number
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return {
         "message": "Profile updated successfully",
         "user": {
@@ -379,122 +279,85 @@ async def edit_email_country_phone(db: Session, authorization: str, email: str =
             "avatar_url": user.avatar_url
         }
     }
-    
+
 
 async def send_password_reset_code_service(email: str, db: Session):
-    
+
     user = db.query(Users).filter(Users.email == email).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found with this email")
-    
+
     reset_code = str(secrets.randbelow(900_000) + 100_000)
     reset_code_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
-    
+
     user.reset_code = hash_code(reset_code)
     user.reset_code_expiry = reset_code_expiry
-    
+
     db.commit()
     db.refresh(user)
-    
+
     try:
         await send_password_reset_code(email, reset_code)
     except Exception as e:
         print(f"Failed to send password reset email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send password reset email")
-    
+
     return {"message": "Password reset code sent to your email"}
 
 
 async def verify_reset_code_service(email: str, reset_code: str, db: Session):
-    
+
     user = db.query(Users).filter(Users.email == email).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if not user.reset_code:
         raise HTTPException(status_code=400, detail="No reset code requested for this account")
-    
+
     if not user.reset_code or not verify_code(reset_code, user.reset_code):
         raise HTTPException(status_code=400, detail="Invalid reset code")
-    
+
     if user.reset_code_expiry < datetime.now(UTC).replace(tzinfo=None):
         raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one")
-    
+
     return {"message": "Reset code verified successfully"}
 
 
 async def reset_password_service(email: str, reset_code: str, new_password: str, db: Session):
-    
+
     user = db.query(Users).filter(Users.email == email).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if not user.reset_code:
         raise HTTPException(status_code=400, detail="No reset code requested for this account")
-    
+
     if not user.reset_code or not verify_code(reset_code, user.reset_code):
         raise HTTPException(status_code=400, detail="Invalid reset code")
-    
+
     if user.reset_code_expiry < datetime.now(UTC).replace(tzinfo=None):
         raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one")
-    
-    if len(new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
-    
-    if not re.search(r'[a-z]', new_password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
-    
-    if not re.search(r'[A-Z]', new_password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
-    
-    if not re.search(r'[0-9]', new_password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one number")
-    
+
+    validate_password(new_password)
+
     user.password_hashed = hash_password(new_password)
     user.reset_code = None
     user.reset_code_expiry = None
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return {"message": "Password reset successful. You can now login with your new password"}
 
 
-
-async def change_password_service(authorization: str, current_password: str, new_password: str, db: Session):
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+async def change_password_service(user: Users, current_password: str, new_password: str, db: Session):
     if not verify_password(current_password, user.password_hashed):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
-    if len(new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
-
-    if not re.search(r'[a-z]', new_password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
-
-    if not re.search(r'[A-Z]', new_password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
-
-    if not re.search(r'[0-9]', new_password):
-        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    validate_password(new_password)
 
     if current_password == new_password:
         raise HTTPException(status_code=400, detail="New password must be different from current password")
@@ -505,20 +368,9 @@ async def change_password_service(authorization: str, current_password: str, new
     return {"message": "Password changed successfully"}
 
 
-async def get_user_info_by_id_service(user_id:int,authorization: str,db: Session):
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
+async def get_user_info_by_id_service(user_id: int, db: Session):
     user = db.query(Users).filter(Users.user_id == user_id).first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -533,28 +385,10 @@ async def get_user_info_by_id_service(user_id:int,authorization: str,db: Session
         "user_tag": user.user_tag,
         "is_verified": user.is_verified,
     }
-    
 
 
-async def check_connectivity(websocket, authorization: str, db: Session):
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+async def check_connectivity(websocket, user: Users, db: Session):
+    user_id = user.user_id
 
     from sqlalchemy import or_
     user_friends = db.query(Friends).filter(
@@ -591,4 +425,3 @@ async def check_connectivity(websocket, authorization: str, db: Session):
 
 def get_online_status(user_ids: list[int]) -> dict:
     return {uid: ConnectivityManager.is_online(uid) for uid in user_ids}
-

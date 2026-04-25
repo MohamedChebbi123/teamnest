@@ -10,7 +10,6 @@ from models.Team_association import Team_association
 from models.Team_roles import Team_roles
 from models.Channels import Channels
 from models.Files import Files
-from utils.jwt_handler import verify_token
 from schemas.team_creation import team_creation
 from schemas.Add_members_team import Add_members_team
 from schemas.Update_team_member_role import Update_team_member_role
@@ -21,18 +20,8 @@ from utils.log_handler import create_log
 
 
 
-def create_team(data:team_creation,authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def create_team(data: team_creation, user: Users, db: Session):
+    user_id = user.user_id
     
     found_organization = db.query(Organization).filter(Organization.organization_id == data.org_id).first()
     
@@ -85,18 +74,8 @@ def create_team(data:team_creation,authorization: str, db: Session):
         "created_at": new_team.created_at
     }
 
-def fetch_teams_service(org_id:int,authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def fetch_teams_service(org_id: int, user: Users, db: Session):
+    user_id = user.user_id
     
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     
@@ -128,18 +107,8 @@ def fetch_teams_service(org_id:int,authorization: str, db: Session):
     
     return teams_list
 
-def delete_team_service(team_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def delete_team_service(team_id: int, user: Users, db: Session):
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -174,18 +143,8 @@ def delete_team_service(team_id: int, authorization: str, db: Session):
         "team_id": team_id
     }
 
-def update_team_service(team_id: int, data: team_creation, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def update_team_service(team_id: int, data: team_creation, user: Users, db: Session):
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -237,19 +196,9 @@ def update_team_service(team_id: int, data: team_creation, authorization: str, d
         "created_at": team.created_at
     }
     
-def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: str, db: Session):
+def add_memebers_to_teams(team_id: int, data: Add_members_team, user: Users, db: Session):
     
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -274,8 +223,8 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
             detail="Only organization owner or admin can add members to teams"
         )
     
-    user = db.query(Users).filter(Users.user_id == data.user_id).first()
-    if not user:
+    target_user = db.query(Users).filter(Users.user_id == data.user_id).first()
+    if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
     
     is_org_owner = found_organization.owner_id == data.user_id
@@ -341,18 +290,8 @@ def add_memebers_to_teams(team_id: int, data: Add_members_team, authorization: s
         }
     }
 
-def fetch_team_members_service(team_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def fetch_team_members_service(team_id: int, user: Users, db: Session):
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -380,22 +319,22 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
     members_list = []
     
     for association in team_associations:
-        user = db.query(Users).filter(Users.user_id == association.user_id).first()
+        member_user = db.query(Users).filter(Users.user_id == association.user_id).first()
         role = db.query(Team_roles).filter(
             Team_roles.team_id == team_id,
             Team_roles.user_id == association.user_id
         ).first()
-        
-        if user:
+
+        if member_user:
             member_data = {
-                "user_id": user.user_id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "avatar_url": user.avatar_url,
-                "user_tag": user.user_tag,
-                "phone_number": user.phone_number,
-                "country": user.country,
+                "user_id": member_user.user_id,
+                "first_name": member_user.first_name,
+                "last_name": member_user.last_name,
+                "email": member_user.email,
+                "avatar_url": member_user.avatar_url,
+                "user_tag": member_user.user_tag,
+                "phone_number": member_user.phone_number,
+                "country": member_user.country,
                 "role": role.role if role else "MEMBER",
                 "permissions": {
                     "can_create_channels": role.can_create_channels if role else False,
@@ -415,18 +354,8 @@ def fetch_team_members_service(team_id: int, authorization: str, db: Session):
         "members": members_list
     }
 
-def update_member_permissions_service(team_id: int, member_user_id: int, data: Update_team_member_role, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def update_member_permissions_service(team_id: int, member_user_id: int, data: Update_team_member_role, user: Users, db: Session):
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -531,18 +460,8 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
         }
     }
 
-def kick_member_service(team_id: int, member_user_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+def kick_member_service(team_id: int, member_user_id: int, user: Users, db: Session):
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
 
@@ -609,19 +528,9 @@ def kick_member_service(team_id: int, member_user_id: int, authorization: str, d
         "team_id": team_id
     }
 
-def fetch_user_team_service(authorization: str, db: Session):
+def fetch_user_team_service(user: Users, db: Session):
     
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+    user_id = user.user_id
     
     results = db.query(Teams).join(
         Team_association, Teams.team_id == Team_association.team_id
@@ -640,19 +549,9 @@ def fetch_user_team_service(authorization: str, db: Session):
         for team in results
     ]
 
-def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_input, authorization: str, db: Session):
+def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_input, user: Users, db: Session):
     
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -726,19 +625,9 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
         "created_at": new_channel.created_at
     }
 
-def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: str, db: Session):
+def fetch_channels_for_teams_service(org_id: int, team_id: int, user: Users, db: Session):
     
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
+    user_id = user.user_id
     
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     
@@ -787,22 +676,8 @@ def fetch_channels_for_teams_service(org_id: int, team_id: int, authorization: s
         for channel in channels
     ]
     
-def fetch_members_info(org_id: int, team_id: int, user_id: int, authorization: str, db: Session):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    
-    
-    target_user_id = user_id
-    user_id = int(payload["sub"])
+def fetch_members_info(org_id: int, team_id: int, target_user_id: int, user: Users, db: Session):
+    user_id = user.user_id
     
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     
@@ -879,19 +754,9 @@ def fetch_members_info(org_id: int, team_id: int, user_id: int, authorization: s
     }
     
 
-def revoke_permissions_from_team_memebers(team_id: int, user_id: int, authorization: str, db: Session, permission_name: str = None):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    requester_user_id = int(payload["sub"])
-    target_user_id = int(user_id)
+def revoke_permissions_from_team_memebers(team_id: int, target_user_id: int, user: Users, db: Session, permission_name: str = None):
+    requester_user_id = user.user_id
+    target_user_id = int(target_user_id)
 
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     if not team:
@@ -984,19 +849,10 @@ def fetch_files_for_team_channel_service(
     org_id: int,
     team_id: int,
     channel_id: int,
-    authorization: str,
+    user: Users,
     db: Session,
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     if not team:
@@ -1063,16 +919,8 @@ def fetch_files_for_team_channel_service(
     }
 
 
-def view_pdf(org_id: int, team_id: int, file_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     team = db.query(Teams).filter(Teams.team_id == team_id).first()
     if not team:

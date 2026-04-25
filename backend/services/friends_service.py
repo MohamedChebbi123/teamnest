@@ -1,6 +1,5 @@
 ﻿from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from utils.jwt_handler import verify_token
 from models.Users import Users
 from models.Pending_friends_request import Pending_friends_request
 from models.Friends import Friends
@@ -8,17 +7,8 @@ from models.Blocked_users import Blocked_users
 from utils.Websocket_manager import friend_request_ws_manager
 
 
-async def send_friend_request_service(authorization: str, db: Session, user_tag: str = None, receiver_id: int = None):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+async def send_friend_request_service(user: Users, db: Session, user_tag: str = None, receiver_id: int = None):
+    user_id = user.user_id
 
     if not user_tag and not receiver_id:
         raise HTTPException(status_code=400, detail="Provide either user_tag or receiver_id")
@@ -66,15 +56,14 @@ async def send_friend_request_service(authorization: str, db: Session, user_tag:
     db.commit()
     db.refresh(new_request)
 
-    sender = db.query(Users).filter(Users.user_id == user_id).first()
     await friend_request_ws_manager.send(receiver.user_id, {
         "type": "friend_request_received",
         "request_id": new_request.id,
         "sender_id": user_id,
-        "first_name": sender.first_name if sender else "",
-        "last_name": sender.last_name if sender else "",
-        "user_tag": sender.user_tag if sender else "",
-        "avatar_url": sender.avatar_url if sender else None,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "user_tag": user.user_tag or "",
+        "avatar_url": user.avatar_url,
     })
 
     return {
@@ -90,17 +79,8 @@ async def send_friend_request_service(authorization: str, db: Session, user_tag:
     }
 
 
-def accept_or_reject_friend_service(request_id: int, action: str, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def accept_or_reject_friend_service(request_id: int, action: str, user: Users, db: Session):
+    user_id = user.user_id
 
     if action not in ("accepted", "rejected"):
         raise HTTPException(status_code=400, detail="Action must be 'accepted' or 'rejected'")
@@ -131,17 +111,8 @@ def accept_or_reject_friend_service(request_id: int, action: str, authorization:
     return {"message": f"Friend request {action}"}
 
 
-def remove_friend_service(friend_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def remove_friend_service(friend_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     friendship = db.query(Friends).filter(
         ((Friends.user_id == user_id) & (Friends.friend_id == friend_id)) |
@@ -156,17 +127,8 @@ def remove_friend_service(friend_id: int, authorization: str, db: Session):
     return {"message": "Friend removed successfully"}
 
 
-def get_friends_service(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def get_friends_service(user: Users, db: Session):
+    user_id = user.user_id
 
     friendships = db.query(Friends).filter(
         (Friends.user_id == user_id) | (Friends.friend_id == user_id)
@@ -190,17 +152,8 @@ def get_friends_service(authorization: str, db: Session):
     return friends_list
 
 
-def get_pending_requests_service(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def get_pending_requests_service(user: Users, db: Session):
+    user_id = user.user_id
 
     pending_requests = db.query(Pending_friends_request).filter(
         Pending_friends_request.receiver_id == user_id,
@@ -224,17 +177,8 @@ def get_pending_requests_service(authorization: str, db: Session):
     return requests_list
 
 
-def block_user_service(blocked_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def block_user_service(blocked_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     if blocked_id == user_id:
         raise HTTPException(status_code=400, detail="You cannot block yourself")
@@ -275,17 +219,8 @@ def block_user_service(blocked_id: int, authorization: str, db: Session):
     return {"message": "User blocked successfully"}
 
 
-def unblock_user_service(blocked_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def unblock_user_service(blocked_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     block = db.query(Blocked_users).filter(
         Blocked_users.blocker_id == user_id,
@@ -301,17 +236,8 @@ def unblock_user_service(blocked_id: int, authorization: str, db: Session):
     return {"message": "User unblocked successfully"}
 
 
-def get_blocked_users_service(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def get_blocked_users_service(user: Users, db: Session):
+    user_id = user.user_id
 
     blocks = db.query(Blocked_users).filter(
         Blocked_users.blocker_id == user_id

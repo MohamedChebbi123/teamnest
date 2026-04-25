@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
-from utils.jwt_handler import verify_token
 from fastapi import HTTPException
 from models.Logs import Logs
 from models.Organization import Organization
@@ -14,6 +13,7 @@ from models.Team_roles import Team_roles
 from models.Tasks import Tasks
 from models.PInned_messages import Pinned_messages
 from utils.log_handler import create_log
+from utils.security import current_user
 import json
 
 router = APIRouter()
@@ -34,19 +34,10 @@ REVERSIBLE_ACTIONS = {
 @router.get("/organization/{org_id}/logs")
 async def get_organization_logs(
     org_id: int,
-    authorization: str = Header(None),
-    db: Session = Depends(connect_databse)
+    user: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
@@ -92,19 +83,10 @@ async def get_organization_logs(
 async def undo_log_action(
     org_id: int,
     log_id: int,
-    authorization: str = Header(None),
-    db: Session = Depends(connect_databse)
+    user: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:

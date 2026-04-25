@@ -1,11 +1,10 @@
-﻿import random
+import random
 import re
 import os
 from fastapi import HTTPException
 import stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 from models.Users import Users
-from utils.jwt_handler import verify_token
 from models.Organization import Organization
 from models.Organization_members import Organization_members
 from sqlalchemy.orm import Session
@@ -16,87 +15,64 @@ from models.Pending_members_org import Pending_members_org
 from models.Organization_payments import Organization_payments
 from utils.plan_limits import get_member_limit
 from utils.log_handler import create_log
-def create_organization_service(
-    organization_name:str,
-    organization_description:str,
-    image,
-    authorization: str,
-    db: Session
-):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail='Please verify your account to create an organization')
-    
-    name_pattern = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,19}$"
-    if not re.match(name_pattern, organization_name):
+
+
+ORG_NAME_REGEX = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,19}$"
+
+
+def _validate_org_name(name: str):
+    if not re.match(ORG_NAME_REGEX, name):
         raise HTTPException(
             status_code=400,
             detail="Organization name must be 3-20 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores"
         )
-    
+
+
+def create_organization_service(
+    organization_name: str,
+    organization_description: str,
+    image,
+    user: Users,
+    db: Session
+):
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail='Please verify your account to create an organization')
+
+    _validate_org_name(organization_name)
+
     organaization_tag = str(random.randint(100000, 999999))
-    
+
     existing_organization = db.query(Organization).filter(Organization.organization_name == organization_name).first()
-    
+
     if existing_organization:
         raise HTTPException(status_code=409, detail="Organization with this name already exists")
-    
-    
-    
+
     new_organization = Organization(
         organization_name=organization_name,
         organaization_picture=upload_organization_picture(image),
         organization_description=organization_description,
         organaization_tag=organaization_tag,
-        owner_id=user_id
+        owner_id=user.user_id
     )
-    
+
     db.add(new_organization)
     db.commit()
     db.refresh(new_organization)
-    
-    new_org_mem=Organization_members(
-        memmber_id=user_id,
+
+    new_org_mem = Organization_members(
+        memmber_id=user.user_id,
         org_id=new_organization.organization_id,
         role_user="OWNER"
     )
-    
+
     db.add(new_org_mem)
     db.commit()
-        
+
     return new_organization
 
 
-def create_subscritpion_service(org_id:int,authorization: str,db:Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
-
-    if not user_id:
-        raise HTTPException(status_code=404, detail="user not found")
+def create_subscritpion_service(org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(
         Organization.organization_id == org_id,
@@ -123,18 +99,10 @@ def create_subscritpion_service(org_id:int,authorization: str,db:Session):
 
     return session.url
 
-def confirm_upgrade_service(org_id: int, session_id: str | None, authorization: str, db: Session):
+
+def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db: Session):
     print(f"[confirm_upgrade] org_id={org_id} session_id={session_id}")
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     org = db.query(Organization).filter(
         Organization.organization_id == org_id,
@@ -190,17 +158,9 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, authorization: 
 
     return {"message": "Upgraded"}
 
-def cancel_subscription_service(org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
 
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def cancel_subscription_service(org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     org = db.query(Organization).filter(
         Organization.organization_id == org_id,
@@ -235,28 +195,13 @@ def cancel_subscription_service(org_id: int, authorization: str, db: Session):
     return {"message": "Subscription cancelled. Your organization has been downgraded to the Free plan."}
 
 
-def fetch_organization_service(authorization: str,db: Session):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    
-    orgs_enrolled_in = db.query(Organization).join(Organization_members, Organization.organization_id == Organization_members.org_id).filter(Organization_members.memmber_id == user_id).all()
-    
+def fetch_organization_service(user: Users, db: Session):
+    user_id = user.user_id
+
+    orgs_enrolled_in = db.query(Organization).join(
+        Organization_members, Organization.organization_id == Organization_members.org_id
+    ).filter(Organization_members.memmber_id == user_id).all()
+
     return [
         {
             "organization_id": org.organization_id,
@@ -271,44 +216,35 @@ def fetch_organization_service(authorization: str,db: Session):
         for org in orgs_enrolled_in
     ]
 
-def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization: str,db: Session):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    
+
+def add_members_to_org_service(org_id: int, valid: Add_members_org, user: Users, db: Session):
+    user_id = user.user_id
+
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
-    
-   
+
     found_user_at_org = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
         Organization_members.org_id == org_id
     ).first()
-    
+
     if not found_user_at_org:
         raise HTTPException(status_code=403, detail="You are not a member of this organization")
-    
+
     if found_user_at_org.role_user not in ["OWNER", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Only owners and admins can add members")
-    
-    member_to_add=db.query(Users).filter(Users.user_tag==valid.user_tag).first()
-    
+
+    member_to_add = db.query(Users).filter(Users.user_tag == valid.user_tag).first()
+
     if not member_to_add:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    existing_member=db.query(Organization_members).filter(Organization_members.memmber_id==member_to_add.user_id,Organization_members.org_id==org_id).first()
-    
+
+    existing_member = db.query(Organization_members).filter(
+        Organization_members.memmber_id == member_to_add.user_id,
+        Organization_members.org_id == org_id
+    ).first()
+
     if existing_member:
         raise HTTPException(status_code=409, detail="User already in organization")
 
@@ -321,7 +257,7 @@ def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization:
                 detail=f"Free plan allows a maximum of {member_limit} members. Upgrade to Pro for unlimited members."
             )
 
-    new_member=Organization_members(
+    new_member = Organization_members(
         memmber_id=member_to_add.user_id,
         org_id=org_id,
         role_user=valid.role_user
@@ -334,8 +270,8 @@ def add_members_to_org_service(org_id: int, valid:Add_members_org,authorization:
     create_log(db, org_id=org_id, actor_id=user_id, action="member_added", target_id=member_to_add.user_id, target_type="user", metadata={"role": valid.role_user})
 
     return {
-        "msg":"member has been added sucessfully",
-        "user_id":member_to_add.user_id
+        "msg": "member has been added sucessfully",
+        "user_id": member_to_add.user_id
     }
 
 
@@ -345,55 +281,40 @@ def update_organization_service(
     organization_description: str,
     organization_plan: str,
     image,
-    authorization: str,
+    user: Users,
     db: Session
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
+    user_id = user.user_id
+
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
-    
-  
+
     if organization.owner_id != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can edit this organization")
 
     if organization_name and organization_name != organization.organization_name:
-        name_pattern = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,19}$"
-        if not re.match(name_pattern, organization_name):
-            raise HTTPException(
-                status_code=400,
-                detail="Organization name must be 3-20 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores"
-            )
-        
+        _validate_org_name(organization_name)
+
         existing_org = db.query(Organization).filter(
             Organization.organization_name == organization_name,
             Organization.organization_id != org_id
         ).first()
-        
+
         if existing_org:
             raise HTTPException(status_code=409, detail="Organization with this name already exists")
-        
+
         organization.organization_name = organization_name
-    
+
     if organization_description is not None:
         organization.organization_description = organization_description
-    
+
     if organization_plan:
         organization.organization_plan = organization_plan
-    
+
     if image:
         organization.organaization_picture = upload_organization_picture(image)
-    
+
     db.commit()
     db.refresh(organization)
 
@@ -411,29 +332,16 @@ def update_organization_service(
     }
 
 
-def delete_organization_service(
-    org_id: int,
-    authorization: str,
-    db: Session
-):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
+def delete_organization_service(org_id: int, user: Users, db: Session):
+    user_id = user.user_id
+
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
-    
+
     if organization.owner_id != user_id:
         raise HTTPException(status_code=403, detail="Only the owner can delete this organization")
-    
+
     create_log(db, org_id=org_id, actor_id=user_id, action="org_deleted", target_id=org_id, target_type="organization")
 
     db.query(Organization_members).filter(Organization_members.org_id == org_id).delete()
@@ -443,37 +351,26 @@ def delete_organization_service(
 
     return {"msg": "Organization deleted successfully"}
 
-def fetch_org_members(org_id: int,authorization: str,db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    
+
+def fetch_org_members(org_id: int, user: Users, db: Session):
+    user_id = user.user_id
+
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
-    
-   
+
     found_user_at_org = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
         Organization_members.org_id == org_id
     ).first()
-    
+
     if not found_user_at_org:
         raise HTTPException(status_code=404, detail="Organization not found")
-    
+
     org_members = db.query(Organization_members).join(
         Users, Organization_members.memmber_id == Users.user_id
     ).filter(Organization_members.org_id == org_id).all()
-    
+
     return [
         {
             "user_id": member.memmber_id,
@@ -487,22 +384,11 @@ def fetch_org_members(org_id: int,authorization: str,db: Session):
         }
         for member in org_members
     ]
-    
-    
-def join_org_service(data:Join_org,authorization: str,db: Session):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
+
+
+def join_org_service(data: Join_org, user: Users, db: Session):
+    user_id = user.user_id
+
     found_org = db.query(Organization).filter(
         Organization.organization_name == data.org_name,
         Organization.organaization_tag == str(data.org_tag)
@@ -545,17 +431,8 @@ def join_org_service(data:Join_org,authorization: str,db: Session):
     }
 
 
-def fetch_pending_org_requests_service(org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_pending_org_requests_service(org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
@@ -589,25 +466,15 @@ def fetch_pending_org_requests_service(org_id: int, authorization: str, db: Sess
     ]
 
 
-
 def accept_or_reject_service(
     org_id: int,
     request_id: int,
     action: str,
     role_user: str,
-    authorization: str,
+    user: Users,
     db: Session
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    requester_user_id = int(payload["sub"])
+    requester_user_id = user.user_id
 
     organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not organization:
@@ -684,6 +551,3 @@ def accept_or_reject_service(
         "user_id": new_member.memmber_id,
         "role_user": new_member.role_user
     }
-    
-
-

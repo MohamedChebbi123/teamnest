@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from utils.jwt_handler import verify_token
 from utils.cloudinary_handler import upload_chat_file_from_base64
 from schemas.Direct_messages_schema import Direct_messages_schema
 from models.Direct_messages import Direct_messages
@@ -106,18 +105,8 @@ async def _push_direct_message_notification(receiver_id: int, sender_id: int, me
         },
     )
 
-def messages_users_service(data:Direct_messages_schema, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def messages_users_service(data: Direct_messages_schema, user: Users, db: Session):
+    user_id = user.user_id
 
     if data.sender_id != user_id:
         raise HTTPException(status_code=403, detail="You can only send messages as the authenticated user")
@@ -198,17 +187,8 @@ def messages_users_service(data:Direct_messages_schema, authorization: str, db: 
     }
 
 
-def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, file_base64: str, mime_type: str | None, authorization: str, db: Session, parent_id: int | None = None):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, file_base64: str, mime_type: str | None, user: Users, db: Session, parent_id: int | None = None):
+    user_id = user.user_id
 
     try:
         receiver_id = int(receiver_id)
@@ -335,21 +315,12 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
 
 def fetch_direct_messages_service(
     receiver_id: int,
-    authorization: str,
+    user: Users,
     db: Session,
     limit: int | None = None,
     offset: int | None = None,
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     requester = db.query(Users).filter(Users.user_id == user_id).first()
     if not requester:
@@ -401,21 +372,12 @@ def fetch_direct_messages_service(
 def search_direct_messages_service(
     receiver_id: int,
     q: str,
-    authorization: str,
+    user: Users,
     db: Session,
     limit: int | None = None,
     offset: int | None = None,
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     requester = db.query(Users).filter(Users.user_id == user_id).first()
     if not requester:
@@ -429,7 +391,7 @@ def search_direct_messages_service(
 
     query = str(q or "").strip().lower()
     if not query:
-        return fetch_direct_messages_service(receiver_id, authorization, db, limit=limit, offset=offset)
+        return fetch_direct_messages_service(receiver_id, user, db, limit=limit, offset=offset)
 
     search_term = f"%{query}%"
 
@@ -478,17 +440,8 @@ def search_direct_messages_service(
     }
 
 
-def fetch_direct_conversations_service(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_direct_conversations_service(user: Users, db: Session):
+    user_id = user.user_id
 
     requester = db.query(Users).filter(Users.user_id == user_id).first()
     if not requester:
@@ -556,17 +509,8 @@ def fetch_direct_conversations_service(authorization: str, db: Session):
     return {"conversations": conversations}
 
 
-def edit_direct_message_service(message_id: int, content: str, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def edit_direct_message_service(message_id: int, content: str, user: Users, db: Session):
+    user_id = user.user_id
 
     message = db.query(Direct_messages).filter(
         Direct_messages.id == message_id,
@@ -591,8 +535,6 @@ def edit_direct_message_service(message_id: int, content: str, authorization: st
     db.commit()
     db.refresh(message)
 
-    sender = db.query(Users).filter(Users.user_id == user_id).first()
-
     return {
         "message_id": message.id,
         "sender_id": message.sender_id,
@@ -605,26 +547,17 @@ def edit_direct_message_service(message_id: int, content: str, authorization: st
         "sent_at": message.sent_at.isoformat() if message.sent_at else None,
         "edited_at": message.edited_at.isoformat() if message.edited_at else None,
         "sender": {
-            "user_id": sender.user_id,
-            "first_name": sender.first_name,
-            "last_name": sender.last_name,
-            "avatar_url": sender.avatar_url,
-            "user_tag": sender.user_tag,
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "avatar_url": user.avatar_url,
+            "user_tag": user.user_tag,
         }
     }
 
 
-def delete_direct_message_service(message_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def delete_direct_message_service(message_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     message = db.query(Direct_messages).filter(
         Direct_messages.id == message_id,
@@ -651,27 +584,13 @@ async def send_direct_messages_realtime(
     authorization: str,
     db: Session
 ):
-    if not authorization:
-        await websocket.close(code=1008, reason="Invalid authorization header")
-        return
+    from utils.security import authenticate_ws
 
-    if authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1]
-    else:
-        token = authorization
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        await websocket.close(code=1008, reason="Invalid or expired token")
-        return
-
-    user_id = int(payload["sub"])
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
+    user = await authenticate_ws(websocket, authorization, db)
     if not user:
-        await websocket.close(code=1008, reason="User not found")
         return
+
+    user_id = user.user_id
 
     user_info = {
         "user_id": user.user_id,

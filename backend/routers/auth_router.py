@@ -17,9 +17,11 @@ from services.auth_service import (
     check_connectivity,
     get_online_status
 )
-from fastapi import APIRouter, Form, File, Depends, UploadFile, Header, WebSocket, Query
+from fastapi import APIRouter, Form, File, Depends, UploadFile, WebSocket, Query
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
+from models.Users import Users
+from utils.security import current_user, current_user_ws
 
 router = APIRouter()
 
@@ -77,7 +79,8 @@ async def resend_verification(
     db: Session = Depends(connect_databse)
 ):
     return await resend_verification_service(email=email, db=db)
-    
+
+
 @router.post("/login")
 async def login_user_router(validator: Logininput, db: Session = Depends(connect_databse)):
     return await login_user_service(validator, db)
@@ -92,44 +95,41 @@ async def refresh_access_token_router(
 
 
 @router.get("/profile")
-async def get_profile(
-    authorization: str = Header(None),
-    db: Session = Depends(connect_databse)
-):
-    return await view_profile_service(authorization, db)
+async def get_profile(user: Users = Depends(current_user)):
+    return await view_profile_service(user)
 
 
 @router.post("/complete-profile")
 async def complete_profile(
-    authorization: str = Header(None),
     phone_number: str = Form(...),
     country: str = Form(...),
     avatar: UploadFile = File(...),
+    user: Users = Depends(current_user),
     db: Session = Depends(connect_databse)
 ):
-    return await complete_profile_service(authorization, phone_number, country, avatar, db)
+    return await complete_profile_service(user, phone_number, country, avatar, db)
 
 
 @router.put("/update-profile")
 async def update_profile(
-    authorization: str = Header(None),
     first_name: str = Form(None),
     last_name: str = Form(None),
     avatar: UploadFile = File(None),
+    user: Users = Depends(current_user),
     db: Session = Depends(connect_databse)
 ):
-    return await edit_avatar_username(db, authorization, avatar, last_name, first_name)
+    return await edit_avatar_username(db, user, avatar, last_name, first_name)
 
 
 @router.put("/update-contact-info")
 async def update_contact_info(
-    authorization: str = Header(None),
     email: str = Form(None),
     country: str = Form(None),
     phone_number: str = Form(None),
+    user: Users = Depends(current_user),
     db: Session = Depends(connect_databse)
 ):
-    return await edit_email_country_phone(db, authorization, email, country, phone_number)
+    return await edit_email_country_phone(db, user, email, country, phone_number)
 
 
 @router.post("/forgot-password")
@@ -159,20 +159,23 @@ async def reset_password(
     return await reset_password_service(email, reset_code, new_password, db)
 
 
-
 @router.put("/change-password")
 async def change_password(
-    authorization: str = Header(None),
     current_password: str = Form(...),
     new_password: str = Form(...),
+    user: Users = Depends(current_user),
     db: Session = Depends(connect_databse)
 ):
-    return await change_password_service(authorization, current_password, new_password, db)
+    return await change_password_service(user, current_password, new_password, db)
 
 
 @router.get("/get_user_info")
-async def get_user_info_service(user_id:int,authorization: str = Header(None),db: Session = Depends(connect_databse)):
-    return await get_user_info_by_id_service(user_id,authorization,db)
+async def get_user_info_service(
+    user_id: int,
+    _: Users = Depends(current_user),
+    db: Session = Depends(connect_databse)
+):
+    return await get_user_info_by_id_service(user_id, db)
 
 
 @router.websocket("/ws/connectivity")
@@ -181,13 +184,14 @@ async def connectivity_websocket(
     token: str = Query(...),
     db: Session = Depends(connect_databse)
 ):
-    await check_connectivity(websocket, f"Bearer {token}", db)
+    user: Users = await current_user_ws(websocket, token, db)
+    await check_connectivity(websocket, user, db)
 
 
 @router.get("/online-status")
 async def online_status(
     user_ids: str = Query(..., description="Comma-separated user IDs"),
-    authorization: str = Header(None)
+    _: Users = Depends(current_user)
 ):
     ids = [int(uid) for uid in user_ids.split(",") if uid.strip().isdigit()]
     return get_online_status(ids)

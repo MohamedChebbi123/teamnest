@@ -1,6 +1,6 @@
 ﻿from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from utils.jwt_handler import verify_token
+from models.Users import Users
 from utils.cloudinary_handler import upload_chat_file_from_base64
 from models.Tasks import Tasks
 from models.Task_assignees import Task_assignees
@@ -50,17 +50,8 @@ def task_to_dict(task):
         ],
     }
 
-def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not found_organization:
@@ -137,17 +128,8 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, autho
     return task_to_dict(new_task)
 
 
-def fetch_team_tasks_service(team_id: int, org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_team_tasks_service(team_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not found_organization:
@@ -166,17 +148,8 @@ def fetch_team_tasks_service(team_id: int, org_id: int, authorization: str, db: 
     return [task_to_dict(t) for t in tasks]
 
 
-def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_update, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_update, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not found_organization:
@@ -241,17 +214,8 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
     return task_to_dict(task)
 
 
-def delete_task_service(task_id: int, team_id: int, org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def delete_task_service(task_id: int, team_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not found_organization:
@@ -292,17 +256,8 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, authorization: 
 
 
 
-def get_my_tasks_service(task_id:int,authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def get_my_tasks_service(task_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.is_deleted == False).first()
     if not task:
@@ -319,17 +274,8 @@ def get_my_tasks_service(task_id:int,authorization: str, db: Session):
     return task_to_dict(task) 
 
 
-def fetch_my_tasks_service(team_id: int, org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_my_tasks_service(team_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not found_organization:
@@ -354,17 +300,8 @@ def fetch_my_tasks_service(team_id: int, org_id: int, authorization: str, db: Se
     return [task_to_dict(t) for t in tasks]
 
 
-def update_my_task_status_service(task_id: int, team_id: int, org_id: int, status_data: Task_status_update, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def update_my_task_status_service(task_id: int, team_id: int, org_id: int, status_data: Task_status_update, user: Users, db: Session):
+    user_id = user.user_id
 
     found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
     if not found_organization:
@@ -410,17 +347,8 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
 
 
 
-def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     if action not in ("accept", "reject"):
         raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
@@ -472,16 +400,8 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, authoriza
     return task_to_dict(task)
 
 
-def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachment_input, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachment_input, user: Users, db: Session):
+    user_id = user.user_id
 
     is_team_member = db.query(Team_association).filter(
         Team_association.team_id == team_id,
@@ -537,16 +457,8 @@ def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachmen
     }
 
 
-def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     is_team_member = db.query(Team_association).filter(
         Team_association.team_id == team_id,

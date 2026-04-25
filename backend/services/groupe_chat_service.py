@@ -3,7 +3,6 @@ from datetime import UTC, datetime
 from fastapi import HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from utils.jwt_handler import verify_token
 from utils.cloudinary_handler import upload_organization_picture
 from models.Group_chat import Group_chat
 from models.Group_chat_members import Group_chat_members
@@ -19,23 +18,10 @@ def create_group_chat(
     group_name: str,
     group_description: str,
     image: UploadFile,
-    authorization: str,
+    user: Users,
     db: Session
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user_id = user.user_id
 
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Please verify your account to create a group chat")
@@ -64,17 +50,8 @@ def create_group_chat(
     return new_group
 
 
-def get_friends_for_group_chat(group_chat_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def get_friends_for_group_chat(group_chat_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:
@@ -115,17 +92,8 @@ def get_friends_for_group_chat(group_chat_id: int, authorization: str, db: Sessi
     return friends_list
 
 
-def add_members_to_group_chat(group_chat_id: int, member_ids: List[int], authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def add_members_to_group_chat(group_chat_id: int, member_ids: List[int], user: Users, db: Session):
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:
@@ -140,8 +108,8 @@ def add_members_to_group_chat(group_chat_id: int, member_ids: List[int], authori
 
     added = []
     for mid in member_ids:
-        user = db.query(Users).filter(Users.user_id == mid).first()
-        if not user:
+        target = db.query(Users).filter(Users.user_id == mid).first()
+        if not target:
             continue
 
         new_member = Group_chat_members(
@@ -156,17 +124,8 @@ def add_members_to_group_chat(group_chat_id: int, member_ids: List[int], authori
     return {"added_members": added, "count": len(added)}
 
 
-def get_my_group_chats(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def get_my_group_chats(user: Users, db: Session):
+    user_id = user.user_id
 
     memberships = db.query(Group_chat_members).filter(
         Group_chat_members.user_id == user_id
@@ -198,19 +157,13 @@ def get_my_group_chats(authorization: str, db: Session):
 
 def edit_group_chat_service(
     group_chat_id: int,
-    authorization: str,
+    user: Users,
     db: Session,
     group_name: str = None,
     group_description: str = None,
     image: UploadFile = None,
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:
@@ -242,14 +195,8 @@ def edit_group_chat_service(
     }
 
 
-def delete_group_chat_service(group_chat_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user_id = int(payload["sub"])
+def delete_group_chat_service(group_chat_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:
@@ -265,14 +212,8 @@ def delete_group_chat_service(group_chat_id: int, authorization: str, db: Sessio
     return {"detail": "Group chat deleted successfully"}
 
 
-def fetch_group_messages_service(group_chat_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user_id = int(payload["sub"])
+def fetch_group_messages_service(group_chat_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:
@@ -329,14 +270,8 @@ def fetch_group_messages_service(group_chat_id: int, authorization: str, db: Ses
     }
 
 
-def edit_group_message_service(group_chat_id: int, message_id: int, content: str, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user_id = int(payload["sub"])
+def edit_group_message_service(group_chat_id: int, message_id: int, content: str, user: Users, db: Session):
+    user_id = user.user_id
 
     message = db.query(Group_chat_messages).filter(
         Group_chat_messages.id == message_id,
@@ -357,7 +292,6 @@ def edit_group_message_service(group_chat_id: int, message_id: int, content: str
     db.commit()
     db.refresh(message)
 
-    sender = db.query(Users).filter(Users.user_id == user_id).first()
     return {
         "message_id": message.id,
         "group_chat_id": message.group_chat_id,
@@ -368,23 +302,17 @@ def edit_group_message_service(group_chat_id: int, message_id: int, content: str
         "sent_at": message.sent_at.isoformat() if message.sent_at else None,
         "edited_at": message.edited_at.isoformat() if message.edited_at else None,
         "sender": {
-            "user_id": sender.user_id,
-            "first_name": sender.first_name,
-            "last_name": sender.last_name,
-            "avatar_url": sender.avatar_url,
-            "user_tag": sender.user_tag,
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "avatar_url": user.avatar_url,
+            "user_tag": user.user_tag,
         },
     }
 
 
-def delete_group_message_service(group_chat_id: int, message_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user_id = int(payload["sub"])
+def delete_group_message_service(group_chat_id: int, message_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:
@@ -411,22 +339,13 @@ async def group_chat_websocket_service(
     authorization: str,
     db: Session,
 ):
-    if not authorization:
-        await websocket.close(code=1008, reason="Missing authorization")
-        return
+    from utils.security import authenticate_ws
 
-    token = authorization.split(" ")[1] if authorization.startswith("Bearer ") else authorization
-    payload = verify_token(token, "access")
-    if not payload or "sub" not in payload:
-        await websocket.close(code=1008, reason="Invalid or expired token")
-        return
-
-    user_id = int(payload["sub"])
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
+    user = await authenticate_ws(websocket, authorization, db)
     if not user:
-        await websocket.close(code=1008, reason="User not found")
         return
+
+    user_id = user.user_id
 
     group = db.query(Group_chat).filter(Group_chat.id == group_chat_id).first()
     if not group:

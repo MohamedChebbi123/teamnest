@@ -25,6 +25,7 @@ from utils.document_handler import embed_document
 from utils.messages_handler import upsert_message
 from utils.log_handler import create_log
 from database.connection import SessionLocal
+from utils.security import authenticate_ws
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
@@ -184,17 +185,8 @@ async def push_announcement_notification(
     )
 
 
-def fetch_user_notifications_service(authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_user_notifications_service(user: Users, db: Session):
+    user_id = user.user_id
 
     rows = db.query(
         Notifications, Messages, Channels, Users
@@ -289,17 +281,8 @@ def fetch_user_notifications_service(authorization: str, db: Session):
     }
 
 
-def mark_notifications_seen_service(authorization: str, db: Session, notification_ids: list[int] | None = None):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def mark_notifications_seen_service(user: Users, db: Session, notification_ids: list[int] | None = None):
+    user_id = user.user_id
 
     query = db.query(Notifications).filter(
         Notifications.user_id == user_id,
@@ -537,17 +520,8 @@ async def send_file_realtime_service(
         print(f"[EMBED ERROR] Failed to embed document {stored_file_name}: {e}")
 
 
-def fetch_voice_participants_service(channel_id: int, org_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_voice_participants_service(channel_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
@@ -589,21 +563,9 @@ def fetch_voice_participants_service(channel_id: int, org_id: int, authorization
 
 
 
-def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Session):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
-    
+def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
+
     found_user_at_org = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
         Organization_members.org_id == org_id
@@ -752,19 +714,9 @@ def fetch_message_service(channel_id:int,org_id:int,authorization: str,db: Sessi
     return result
 
 
-def edit_message_service(message_id: int, data: Message_edit_input, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
+def edit_message_service(message_id: int, data: Message_edit_input, user: Users, db: Session):
+    user_id = user.user_id
+
     message = db.query(Messages).filter(
         Messages.message_id == message_id,
         Messages.is_deleted == False
@@ -790,19 +742,9 @@ def edit_message_service(message_id: int, data: Message_edit_input, authorizatio
     }
 
 
-def delete_message_service(message_id: int, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    payload = verify_token(token, "access")
-    
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload["sub"])
-    
+def delete_message_service(message_id: int, user: Users, db: Session):
+    user_id = user.user_id
+
     message = db.query(Messages).filter(
         Messages.message_id == message_id,
         Messages.is_deleted == False
@@ -824,29 +766,18 @@ async def send_messages_realtime(
     websocket: WebSocket,
     channel_id: int,
     authorization: str,
-    org_id: int ,
+    org_id: int,
     db: Session
 ):
     print(f"[WS /mesages] handler entered channel_id={channel_id} org_id={org_id} token_len={len(authorization) if authorization else 0}")
     await websocket.accept()
     print(f"[WS /mesages] accepted channel_id={channel_id}")
 
-    if not authorization:
-        await websocket.close(code=1008, reason="Invalid authorization header")
+    user = await authenticate_ws(websocket, authorization, db)
+    if not user:
         return
 
-    if authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1]
-    else:
-        token = authorization
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        await websocket.close(code=1008, reason="Invalid or expired token")
-        return
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
@@ -855,11 +786,6 @@ async def send_messages_realtime(
 
     if not member:
         await websocket.close(code=1008, reason="Not a member of this organization")
-        return
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    if not user:
-        await websocket.close(code=1008, reason="User not found")
         return
 
     channel = db.query(Channels).filter(
@@ -1127,29 +1053,14 @@ async def notifications_ws_endpoint(
     authorization: str,
     db: Session,
 ):
+    from utils.security import authenticate_ws
     await websocket.accept()
 
-    if not authorization:
-        await websocket.close(code=1008, reason="Invalid authorization header")
-        return
-
-    if authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1]
-    else:
-        token = authorization
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        await websocket.close(code=1008, reason="Invalid or expired token")
-        return
-
-    user_id = int(payload["sub"])
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
+    user = await authenticate_ws(websocket, authorization, db)
     if not user:
-        await websocket.close(code=1008, reason="User not found")
         return
+
+    user_id = user.user_id
 
     db.close()
 
@@ -1171,19 +1082,13 @@ async def voice_websocket_endpoint(
     org_id: int,
     db: Session
 ):
-    if not authorization or not authorization.startswith("Bearer "):
-        await websocket.close(code=1008, reason="Invalid authorization header")
+    from utils.security import authenticate_ws
+
+    user = await authenticate_ws(websocket, authorization, db)
+    if not user:
         return
 
-    token = authorization.split(" ")[1]
-
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        await websocket.close(code=1008, reason="Invalid or expired token")
-        return
-
-    user_id = int(payload["sub"])
+    user_id = user.user_id
 
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
@@ -1205,11 +1110,6 @@ async def voice_websocket_endpoint(
 
     if str(channel.channel_category).lower() != "voice":
         await websocket.close(code=1008, reason="Channel is not a voice channel")
-        return
-
-    user = db.query(Users).filter(Users.user_id == user_id).first()
-    if not user:
-        await websocket.close(code=1008, reason="User not found")
         return
 
     participant = {
@@ -1256,17 +1156,8 @@ async def voice_websocket_endpoint(
             )
             
             
-def search_messages_service(channel_id: int, org_id: int, query: str, authorization: str, db: Session):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def search_messages_service(channel_id: int, org_id: int, query: str, user: Users, db: Session):
+    user_id = user.user_id
 
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
@@ -1315,18 +1206,8 @@ def search_messages_service(channel_id: int, org_id: int, query: str, authorizat
     ]
 
 
-def pin_message_service(message_id: int, org_id: int, authorization: str, db: Session):
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def pin_message_service(message_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     message = db.query(Messages).filter(
         Messages.message_id == message_id,
@@ -1400,18 +1281,8 @@ def pin_message_service(message_id: int, org_id: int, authorization: str, db: Se
     }
 
 
-def unpin_message_service(message_id: int, org_id: int, authorization: str, db: Session):
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def unpin_message_service(message_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     pinned = db.query(Pinned_messages).filter(
         Pinned_messages.message_id == message_id
@@ -1463,18 +1334,8 @@ def unpin_message_service(message_id: int, org_id: int, authorization: str, db: 
     return {"detail": "Message unpinned successfully"}
 
 
-def fetch_pinned_messages_service(channel_id: int, org_id: int, authorization: str, db: Session):
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-
-    token = authorization.split(" ")[1]
-    payload = verify_token(token, "access")
-
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload["sub"])
+def fetch_pinned_messages_service(channel_id: int, org_id: int, user: Users, db: Session):
+    user_id = user.user_id
 
     member = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
