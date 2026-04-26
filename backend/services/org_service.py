@@ -88,16 +88,22 @@ def create_subscritpion_service(org_id: int, user: Users, db: Session):
     if found_organization.organization_plan == "PRO":
         raise HTTPException(status_code=400, detail="Organization is already on the Pro plan")
 
+    pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")
+    if not pro_price_id:
+        raise HTTPException(status_code=500, detail="Billing is not configured")
+
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="subscription",
         line_items=[{
-            "price": "price_1THLoIRaAIW7J24MHlivlWuy",
+            "price": pro_price_id,
             "quantity": 1,
         }],
         success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/success?org_id={org_id}&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/cancel",
-        metadata={"org_id": str(org_id)},
+        metadata={"org_id": str(org_id), "user_id": str(user_id)},
+        subscription_data={"metadata": {"org_id": str(org_id), "user_id": str(user_id)}},
+        client_reference_id=str(org_id),
     )
 
     return session.url
@@ -115,57 +121,166 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    stripe_subscription_id = None
-    stripe_price_id = None
+    payment = db.query(Organization_payments).filter(
+        Organization_payments.organization_id == org_id,
+        Organization_payments.status == "active",
+    ).first()
 
-    if session_id:
+    if org.organization_plan == "PRO" and payment and payment.stripe_subscription_id:
+        return {"status": "active", "plan": org.organization_plan}
+
+    return {"status": "pending", "plan": org.organization_plan}
+
+
+def _resolve_org_id_from_subscription(subscription) -> int | None:
+    metadata = subscription.get("metadata") or {}
+    org_id_raw = metadata.get("org_id")
+    if org_id_raw:
         try:
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            stripe_subscription_id = checkout_session.get("subscription")
-        except Exception:
-            logger.exception(
-                "confirm_upgrade session lookup failed",
-                extra={"org_id": org_id, "session_id": session_id},
-            )
+            return int(org_id_raw)
+        except (TypeError, ValueError):
+            return None
+    return None
 
-    if not stripe_subscription_id:
-        try:
-            sessions = stripe.checkout.Session.list(limit=10)
-            for s in sessions.data:
-                if s.get("metadata", {}).get("org_id") == str(org_id) and s.get("subscription"):
-                    stripe_subscription_id = s["subscription"]
-                    break
-        except Exception:
-            logger.exception("confirm_upgrade session list fallback failed", extra={"org_id": org_id})
 
-    if stripe_subscription_id:
-        try:
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-            stripe_price_id = subscription["items"]["data"][0]["price"]["id"] if subscription["items"]["data"] else None
-        except Exception:
-            logger.exception(
-                "confirm_upgrade subscription detail lookup failed",
-                extra={"org_id": org_id, "stripe_subscription_id": stripe_subscription_id},
-            )
+def _activate_pro_for_org(db: Session, org_id: int, stripe_subscription_id: str, stripe_price_id: str | None):
+    org = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not org:
+        logger.warning("webhook activate: org not found", extra={"org_id": org_id})
+        return
 
-    db.query(Organization_payments).filter(
-        Organization_payments.organization_id == org_id
-    ).delete()
+    payment = db.query(Organization_payments).filter(
+        Organization_payments.organization_id == org_id,
+        Organization_payments.stripe_subscription_id == stripe_subscription_id,
+    ).first()
 
-    new_payment = Organization_payments(
-        organization_id=org_id,
-        stripe_subscription_id=stripe_subscription_id,
-        stripe_price_id=stripe_price_id,
-        status="active",
-    )
-    db.add(new_payment)
+    if payment:
+        payment.status = "active"
+        payment.stripe_price_id = stripe_price_id or payment.stripe_price_id
+    else:
+        db.query(Organization_payments).filter(
+            Organization_payments.organization_id == org_id,
+            Organization_payments.status == "active",
+        ).update({Organization_payments.status: "superseded"})
+        db.add(Organization_payments(
+            organization_id=org_id,
+            stripe_subscription_id=stripe_subscription_id,
+            stripe_price_id=stripe_price_id,
+            status="active",
+        ))
 
-    org.organization_plan = "PRO"
+    if org.organization_plan != "PRO":
+        org.organization_plan = "PRO"
+        create_log(db, org_id=org_id, actor_id=org.owner_id, action="plan_upgraded", target_id=org_id, target_type="organization", metadata={"plan": "PRO"})
+
     db.commit()
 
-    create_log(db, org_id=org_id, actor_id=user_id, action="plan_upgraded", target_id=org_id, target_type="organization", metadata={"plan": "PRO"})
 
-    return {"message": "Upgraded"}
+def _deactivate_pro_for_subscription(db: Session, stripe_subscription_id: str, new_status: str):
+    payment = db.query(Organization_payments).filter(
+        Organization_payments.stripe_subscription_id == stripe_subscription_id,
+    ).first()
+    if not payment:
+        logger.info("webhook deactivate: no payment row", extra={"stripe_subscription_id": stripe_subscription_id})
+        return
+
+    payment.status = new_status
+
+    org = db.query(Organization).filter(Organization.organization_id == payment.organization_id).first()
+    if org and org.organization_plan == "PRO":
+        org.organization_plan = "FREE"
+        create_log(db, org_id=org.organization_id, actor_id=org.owner_id, action="plan_downgraded", target_id=org.organization_id, target_type="organization", metadata={"plan": "FREE", "reason": new_status})
+
+    db.commit()
+
+
+def handle_stripe_webhook_service(payload: bytes, sig_header: str | None, db: Session):
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if not webhook_secret:
+        logger.error("STRIPE_WEBHOOK_SECRET not configured")
+        raise HTTPException(status_code=500, detail="Webhook not configured")
+
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing Stripe signature")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    event_type = event["type"]
+    data_object = event["data"]["object"]
+    pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")
+
+    logger.info("stripe webhook received", extra={"event_type": event_type, "event_id": event.get("id")})
+
+    if event_type == "checkout.session.completed":
+        if data_object.get("mode") != "subscription":
+            return {"received": True}
+        if data_object.get("payment_status") != "paid":
+            logger.info("checkout session not paid, ignoring", extra={"payment_status": data_object.get("payment_status")})
+            return {"received": True}
+
+        metadata = data_object.get("metadata") or {}
+        org_id_raw = metadata.get("org_id") or data_object.get("client_reference_id")
+        if not org_id_raw:
+            logger.warning("checkout.session.completed without org_id metadata")
+            return {"received": True}
+        try:
+            org_id = int(org_id_raw)
+        except (TypeError, ValueError):
+            logger.warning("invalid org_id in metadata", extra={"org_id_raw": org_id_raw})
+            return {"received": True}
+
+        subscription_id = data_object.get("subscription")
+        if not subscription_id:
+            return {"received": True}
+
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id)
+        except stripe.error.StripeError:
+            logger.exception("failed to retrieve subscription", extra={"subscription_id": subscription_id})
+            raise HTTPException(status_code=502, detail="Stripe error")
+
+        items = subscription.get("items", {}).get("data", [])
+        price_id = items[0]["price"]["id"] if items else None
+        if pro_price_id and price_id != pro_price_id:
+            logger.warning("checkout completed for non-PRO price", extra={"price_id": price_id, "expected": pro_price_id})
+            return {"received": True}
+
+        _activate_pro_for_org(db, org_id, subscription_id, price_id)
+        return {"received": True}
+
+    if event_type in ("customer.subscription.updated", "customer.subscription.created"):
+        subscription_id = data_object.get("id")
+        status = data_object.get("status")
+        items = data_object.get("items", {}).get("data", [])
+        price_id = items[0]["price"]["id"] if items else None
+
+        if pro_price_id and price_id != pro_price_id:
+            return {"received": True}
+
+        if status in ("active", "trialing"):
+            org_id = _resolve_org_id_from_subscription(data_object)
+            existing = db.query(Organization_payments).filter(
+                Organization_payments.stripe_subscription_id == subscription_id,
+            ).first()
+            if org_id is None and existing:
+                org_id = existing.organization_id
+            if org_id is not None:
+                _activate_pro_for_org(db, org_id, subscription_id, price_id)
+        elif status in ("canceled", "unpaid", "past_due", "incomplete_expired"):
+            _deactivate_pro_for_subscription(db, subscription_id, status)
+        return {"received": True}
+
+    if event_type == "customer.subscription.deleted":
+        subscription_id = data_object.get("id")
+        _deactivate_pro_for_subscription(db, subscription_id, "cancelled")
+        return {"received": True}
+
+    return {"received": True}
 
 
 def cancel_subscription_service(org_id: int, user: Users, db: Session):

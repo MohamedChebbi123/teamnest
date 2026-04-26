@@ -11,8 +11,9 @@ from services.org_service import (
     create_subscritpion_service,
     confirm_upgrade_service,
     cancel_subscription_service,
+    handle_stripe_webhook_service,
 )
-from fastapi import APIRouter, Form, File, Depends, UploadFile, Query
+from fastapi import APIRouter, Form, File, Depends, UploadFile, Query, Request, Header
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from schemas.Add_members_org import Add_members_org
@@ -21,6 +22,16 @@ from models.Users import Users
 from utils.security import current_user
 
 router = APIRouter()
+
+
+@router.post("/stripe/webhook")
+async def stripe_webhook(
+    request: Request,
+    stripe_signature: str | None = Header(default=None, alias="stripe-signature"),
+    db: Session = Depends(connect_databse),
+):
+    payload = await request.body()
+    return handle_stripe_webhook_service(payload, stripe_signature, db)
 
 
 @router.post("/create_organization")
