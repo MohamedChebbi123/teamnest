@@ -28,8 +28,10 @@ async def register_user_service(
     validate_email(email)
     validate_password(password)
 
+    generic_response = {"message": "If the email is available, your account has been created. You can now log in."}
+
     if db.query(Users).filter(Users.email == email).first():
-        raise HTTPException(status_code=400, detail="Email is already ued")
+        return generic_response
 
     new_user = Users(
         first_name=first_name,
@@ -43,7 +45,7 @@ async def register_user_service(
     db.commit()
     db.refresh(new_user)
 
-    return new_user
+    return generic_response
 
 
 async def verify_email_service(
@@ -109,11 +111,8 @@ async def login_user_service(validator: Logininput, db: Session):
 
     found_user = db.query(Users).filter(Users.email == validator.email).first()
 
-    if not found_user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if not verify_password(validator.password, found_user.password_hashed):
-        raise HTTPException(status_code=401, detail="wrong password")
+    if not found_user or not verify_password(validator.password, found_user.password_hashed):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     access_token = create_access_token({"sub": str(found_user.user_id)})
     refresh_token = create_refresh_token({"sub": str(found_user.user_id)})
@@ -283,10 +282,12 @@ async def edit_email_country_phone(db: Session, user: Users, email: str = None, 
 
 async def send_password_reset_code_service(email: str, db: Session):
 
+    generic_response = {"message": "If an account exists for this email, a password reset code has been sent."}
+
     user = db.query(Users).filter(Users.email == email).first()
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found with this email")
+        return generic_response
 
     reset_code = str(secrets.randbelow(900_000) + 100_000)
     reset_code_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
@@ -301,9 +302,8 @@ async def send_password_reset_code_service(email: str, db: Session):
         await send_password_reset_code(email, reset_code)
     except Exception as e:
         print(f"Failed to send password reset email: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to send password reset email")
 
-    return {"message": "Password reset code sent to your email"}
+    return generic_response
 
 
 async def verify_reset_code_service(email: str, reset_code: str, db: Session):

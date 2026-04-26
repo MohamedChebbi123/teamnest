@@ -34,22 +34,13 @@ async def register_new_user(
     password: str = Form(...),
     db: Session = Depends(connect_databse)
 ):
-    new_user = await register_user_service(
+    return await register_user_service(
         first_name=first_name,
         last_name=last_name,
         email=email,
         password=password,
         db=db
     )
-    return {
-        "message": "User registered successfully",
-        "user": {
-            "user_id": new_user.user_id,
-            "first_name": new_user.first_name,
-            "last_name": new_user.last_name,
-            "email": new_user.email
-        }
-    }
 
 
 @router.post("/verify-email")
