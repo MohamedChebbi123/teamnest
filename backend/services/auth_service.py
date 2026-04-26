@@ -1,4 +1,5 @@
 from models.Users import Users
+from models.Refresh_tokens import Refresh_tokens
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from utils.hasher import hash_password, hash_code, verify_code
@@ -110,7 +111,12 @@ async def resend_verification_service(
     return {"message": "Verification code sent successfully"}
 
 
-async def login_user_service(validator: Logininput, db: Session):
+async def login_user_service(
+    validator: Logininput,
+    db: Session,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+):
 
     found_user = db.query(Users).filter(Users.email == validator.email).first()
 
@@ -118,35 +124,108 @@ async def login_user_service(validator: Logininput, db: Session):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     access_token = create_access_token({"sub": str(found_user.user_id)})
-    refresh_token = create_refresh_token({"sub": str(found_user.user_id)})
+    refresh_token, jti, expires_at = create_refresh_token({"sub": str(found_user.user_id)})
+
+    db.add(Refresh_tokens(
+        jti=jti,
+        user_id=found_user.user_id,
+        expires_at=expires_at,
+        user_agent=(user_agent or "")[:255] or None,
+        created_ip=(ip_address or "")[:45] or None,
+    ))
+    db.commit()
 
     return {
         "message": "user logged in successfully",
         "access_token": access_token,
-        "refresh_token": refresh_token
+        "refresh_token": refresh_token,
     }
 
 
-async def refresh_access_token_service(refresh_token: str, db: Session):
+def _revoke_all_user_tokens(db: Session, user_id: int):
+    now = datetime.now(UTC)
+    db.query(Refresh_tokens).filter(
+        Refresh_tokens.user_id == user_id,
+        Refresh_tokens.revoked_at.is_(None),
+    ).update({Refresh_tokens.revoked_at: now}, synchronize_session=False)
+
+
+async def refresh_access_token_service(
+    refresh_token: str,
+    db: Session,
+    user_agent: str | None = None,
+    ip_address: str | None = None,
+):
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Refresh token is required")
 
     payload = verify_token(refresh_token, "refresh")
 
-    if not payload or "sub" not in payload:
+    if not payload or "sub" not in payload or "jti" not in payload:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     user_id = int(payload["sub"])
-    user = db.query(Users).filter(Users.user_id == user_id).first()
+    jti = payload["jti"]
 
+    record = db.query(Refresh_tokens).filter(Refresh_tokens.jti == jti).first()
+
+    if not record:
+        _revoke_all_user_tokens(db, user_id)
+        db.commit()
+        logger.warning("Refresh token reuse: unknown jti", extra={"user_id": user_id, "jti": jti})
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    if record.revoked_at is not None:
+        _revoke_all_user_tokens(db, user_id)
+        db.commit()
+        logger.warning("Refresh token reuse: revoked jti replayed", extra={"user_id": user_id, "jti": jti})
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = db.query(Users).filter(Users.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    access_token = create_access_token({"sub": str(user.user_id)})
+    new_access = create_access_token({"sub": str(user.user_id)})
+    new_refresh, new_jti, new_expires = create_refresh_token({"sub": str(user.user_id)})
+
+    record.revoked_at = datetime.now(UTC)
+    record.replaced_by_jti = new_jti
+
+    db.add(Refresh_tokens(
+        jti=new_jti,
+        user_id=user.user_id,
+        expires_at=new_expires,
+        user_agent=(user_agent or "")[:255] or None,
+        created_ip=(ip_address or "")[:45] or None,
+    ))
+    db.commit()
 
     return {
-        "access_token": access_token
+        "access_token": new_access,
+        "refresh_token": new_refresh,
     }
+
+
+async def logout_service(refresh_token: str | None, db: Session):
+    if not refresh_token:
+        return {"message": "Logged out"}
+
+    payload = verify_token(refresh_token, "refresh")
+    if not payload or "jti" not in payload:
+        return {"message": "Logged out"}
+
+    record = db.query(Refresh_tokens).filter(Refresh_tokens.jti == payload["jti"]).first()
+    if record and record.revoked_at is None:
+        record.revoked_at = datetime.now(UTC)
+        db.commit()
+
+    return {"message": "Logged out"}
+
+
+async def logout_all_service(user: Users, db: Session):
+    _revoke_all_user_tokens(db, user.user_id)
+    db.commit()
+    return {"message": "All sessions logged out"}
 
 
 async def view_profile_service(user: Users):

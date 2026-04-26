@@ -5,19 +5,11 @@ export function getAccessToken(): string | null {
   return localStorage.getItem("access_token")
 }
 
-export function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem("refresh_token")
-}
-
-export function setTokens(accessToken: string, refreshToken?: string | null) {
+export function setAccessToken(accessToken: string) {
   localStorage.setItem("access_token", accessToken)
-  if (refreshToken) {
-    localStorage.setItem("refresh_token", refreshToken)
-  }
 }
 
-export function clearTokens() {
+export function clearAccessToken() {
   localStorage.removeItem("access_token")
   localStorage.removeItem("refresh_token")
 }
@@ -27,35 +19,29 @@ let refreshPromise: Promise<string | null> | null = null
 export async function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) return refreshPromise
 
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) return null
-
   refreshPromise = (async () => {
     try {
-      const body = new FormData()
-      body.append("refresh_token", refreshToken)
-
       const res = await fetch(`${API_URL}/refresh`, {
         method: "POST",
-        body,
+        credentials: "include",
       })
 
       if (!res.ok) {
-        clearTokens()
+        clearAccessToken()
         return null
       }
 
       const data = await res.json()
       const newAccess = data?.access_token
       if (!newAccess) {
-        clearTokens()
+        clearAccessToken()
         return null
       }
 
       localStorage.setItem("access_token", newAccess)
       return newAccess as string
     } catch {
-      clearTokens()
+      clearAccessToken()
       return null
     } finally {
       refreshPromise = null
@@ -63,6 +49,19 @@ export async function refreshAccessToken(): Promise<string | null> {
   })()
 
   return refreshPromise
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/logout`, {
+      method: "POST",
+      credentials: "include",
+    })
+  } catch {
+    // ignore network errors; client state is cleared regardless
+  } finally {
+    clearAccessToken()
+  }
 }
 
 function withAuthHeader(init: RequestInit | undefined, token: string): RequestInit {
@@ -74,7 +73,8 @@ function withAuthHeader(init: RequestInit | undefined, token: string): RequestIn
 export async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   let token = getAccessToken()
 
-  const firstInit = token ? withAuthHeader(init, token) : init
+  const baseInit: RequestInit = { ...(init || {}), credentials: "include" }
+  const firstInit = token ? withAuthHeader(baseInit, token) : baseInit
   let res = await fetch(input, firstInit)
 
   if (res.status !== 401) return res
@@ -82,5 +82,5 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
   const newToken = await refreshAccessToken()
   if (!newToken) return res
 
-  return fetch(input, withAuthHeader(init, newToken))
+  return fetch(input, withAuthHeader(baseInit, newToken))
 }

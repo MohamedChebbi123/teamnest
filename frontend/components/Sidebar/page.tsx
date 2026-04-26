@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { logout as logoutApi } from '@/lib/auth';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -122,7 +123,6 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           onUserFetched?.(data);
         } else {
           localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
           router.push('/auth/login');
         }
       } catch (error) {
@@ -167,10 +167,9 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
     fetchOrganizations();
   }, [router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     disconnect()
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    await logoutApi()
     router.push('/auth/login');
   };
 

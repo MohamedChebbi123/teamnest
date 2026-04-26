@@ -62,6 +62,7 @@ export default function Login() {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -98,10 +99,6 @@ export default function Login() {
         throw new Error("Login succeeded but no access token was returned")
       }
 
-      if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token)
-      }
-      
       setTimeout(() => {
         window.location.replace("/home")
       }, 1000)

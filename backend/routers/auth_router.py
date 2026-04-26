@@ -1,3 +1,4 @@
+import os
 from schemas.Logininput import Logininput
 from services.auth_service import (
     register_user_service,
@@ -5,6 +6,8 @@ from services.auth_service import (
     resend_verification_service,
     login_user_service,
     refresh_access_token_service,
+    logout_service,
+    logout_all_service,
     view_profile_service,
     complete_profile_service,
     edit_avatar_username,
@@ -17,13 +20,46 @@ from services.auth_service import (
     check_connectivity,
     get_online_status
 )
-from fastapi import APIRouter, Form, File, Depends, UploadFile, WebSocket, Query
+from fastapi import APIRouter, Form, File, Depends, UploadFile, WebSocket, Query, Request, Response, Cookie
 from sqlalchemy.orm import Session
 from database.connection import connect_databse
 from models.Users import Users
 from utils.security import current_user, current_user_ws
+from utils.jwt_handler import REFRESH_TOKEN_EXPIRE_DAYS
 
 router = APIRouter()
+
+REFRESH_COOKIE_NAME = "refresh_token"
+_COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+_COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax").lower()
+_COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN") or None
+
+
+def _set_refresh_cookie(response: Response, token: str):
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=_COOKIE_SECURE,
+        samesite=_COOKIE_SAMESITE,
+        domain=_COOKIE_DOMAIN,
+        path="/",
+    )
+
+
+def _clear_refresh_cookie(response: Response):
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        domain=_COOKIE_DOMAIN,
+        path="/",
+    )
+
+
+def _client_meta(request: Request) -> tuple[str | None, str | None]:
+    ua = request.headers.get("user-agent")
+    ip = request.client.host if request.client else None
+    return ua, ip
 
 
 @router.post("/register")
@@ -73,16 +109,59 @@ async def resend_verification(
 
 
 @router.post("/login")
-async def login_user_router(validator: Logininput, db: Session = Depends(connect_databse)):
-    return await login_user_service(validator, db)
+async def login_user_router(
+    validator: Logininput,
+    request: Request,
+    response: Response,
+    db: Session = Depends(connect_databse),
+):
+    ua, ip = _client_meta(request)
+    result = await login_user_service(validator, db, user_agent=ua, ip_address=ip)
+    refresh = result.pop("refresh_token", None)
+    if refresh:
+        _set_refresh_cookie(response, refresh)
+    return result
 
 
 @router.post("/refresh")
 async def refresh_access_token_router(
-    refresh_token: str = Form(...),
-    db: Session = Depends(connect_databse)
+    request: Request,
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    db: Session = Depends(connect_databse),
 ):
-    return await refresh_access_token_service(refresh_token, db)
+    ua, ip = _client_meta(request)
+    try:
+        result = await refresh_access_token_service(refresh_token, db, user_agent=ua, ip_address=ip)
+    except Exception:
+        _clear_refresh_cookie(response)
+        raise
+    new_refresh = result.pop("refresh_token", None)
+    if new_refresh:
+        _set_refresh_cookie(response, new_refresh)
+    return result
+
+
+@router.post("/logout")
+async def logout_router(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    db: Session = Depends(connect_databse),
+):
+    result = await logout_service(refresh_token, db)
+    _clear_refresh_cookie(response)
+    return result
+
+
+@router.post("/logout-all")
+async def logout_all_router(
+    response: Response,
+    user: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
+):
+    result = await logout_all_service(user, db)
+    _clear_refresh_cookie(response)
+    return result
 
 
 @router.get("/profile")

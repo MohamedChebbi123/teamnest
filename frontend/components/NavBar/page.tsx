@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Bell, User, Settings, LogOut, Mail, FileText } from 'lucide-react'
+import { logout as logoutApi } from '@/lib/auth'
 
 interface NavBarProps {
   user?: {
@@ -58,10 +59,9 @@ export default function NavBar({ user }: NavBarProps) {
   const activeNotifications = notifications.filter(n => n.show)
   const unreadCount = activeNotifications.length
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     disconnect()
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
+    await logoutApi()
     router.push('/auth/login')
   }
 

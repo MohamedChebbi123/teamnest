@@ -1,5 +1,6 @@
 import logging
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from dotenv import load_dotenv
@@ -31,11 +32,14 @@ def create_refresh_token(data: dict):
     expire = datetime.now(timezone.utc) + timedelta(
         days=REFRESH_TOKEN_EXPIRE_DAYS
     )
+    jti = secrets.token_urlsafe(32)
     to_encode.update({
         "exp": expire,
-        "type": "refresh"
+        "type": "refresh",
+        "jti": jti,
     })
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return token, jti, expire
 
 def verify_token(token: str, expected_type: str):
     try:

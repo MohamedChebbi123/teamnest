@@ -1,8 +1,9 @@
+import os
 from database.connection import Base, engine, connect_databse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, org_router, channels_router, team_router, direct_messages_router, tasks_router, friends_router, groupe_chat_router, assistant_router, logs_router
-from models import Users,Organization,Organization_members,Channels,Messages,Teams,Team_association,Team_roles,Files,Direct_messages,Notifications,Tasks,Task_assignees,Task_attachments,Friends,Pending_friends_request,Organization_payments,Blocked_users,Group_chat,Group_chat_members,Group_chat_messages,Logs
+from models import Users,Organization,Organization_members,Channels,Messages,Teams,Team_association,Team_roles,Files,Direct_messages,Notifications,Tasks,Task_assignees,Task_attachments,Friends,Pending_friends_request,Organization_payments,Blocked_users,Group_chat,Group_chat_members,Group_chat_messages,Logs,Refresh_tokens
 from utils.Websocket_manager import cleanup_task
 from contextlib import asynccontextmanager
 import asyncio
@@ -16,10 +17,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+_frontend_origins = [
+    o.strip() for o in os.getenv("FRONTEND_URL", "http://localhost:3000").split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=_frontend_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
