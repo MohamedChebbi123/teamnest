@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle, Activity, Undo2 } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import UpgradeModal from "@/components/UpgradeModal"
@@ -405,7 +406,7 @@ export default function OrganizationPage() {
             description: data.detail,
           })
         } else {
-          toast.error("Permission denied", { description: data.detail || "You don't have permission to add members" })
+          toast.error("Permission denied", { description: formatApiError(data.detail, "You don't have permission to add members") })
         }
       } else {
         throw new Error("Failed to add member")
@@ -468,7 +469,7 @@ export default function OrganizationPage() {
       } else if (response.status === 403) {
         const data = await response.json()
         toast.error("Permission denied", {
-          description: data.detail || "Only the owner can edit this organization"
+          description: formatApiError(data.detail, "Only the owner can edit this organization")
         })
       } else if (response.status === 409) {
         toast.error("Name already exists", {
@@ -513,7 +514,7 @@ export default function OrganizationPage() {
       } else if (response.status === 403) {
         const data = await response.json()
         toast.error("Permission denied", {
-          description: data.detail || "Only the owner can delete this organization"
+          description: formatApiError(data.detail, "Only the owner can delete this organization")
         })
       } else {
         throw new Error("Failed to delete organization")
@@ -580,12 +581,12 @@ export default function OrganizationPage() {
       } else if (response.status === 403) {
         const data = await response.json()
         toast.error("Permission denied", {
-          description: data.detail || "Only organization owner or admin can create teams"
+          description: formatApiError(data.detail, "Only organization owner or admin can create teams")
         })
       } else if (response.status === 400) {
         const data = await response.json()
         toast.error("Team name already exists", {
-          description: data.detail || "This team name is already taken in this organization"
+          description: formatApiError(data.detail, "This team name is already taken in this organization")
         })
       } else {
         throw new Error("Failed to create team")
@@ -652,12 +653,12 @@ export default function OrganizationPage() {
       } else if (response.status === 403) {
         const data = await response.json()
         toast.error("Permission denied", {
-          description: data.detail || "Only organization owner or admin can edit teams"
+          description: formatApiError(data.detail, "Only organization owner or admin can edit teams")
         })
       } else if (response.status === 400) {
         const data = await response.json()
         toast.error("Team name already exists", {
-          description: data.detail || "This team name is already taken in this organization"
+          description: formatApiError(data.detail, "This team name is already taken in this organization")
         })
       } else {
         throw new Error("Failed to update team")
@@ -711,7 +712,7 @@ export default function OrganizationPage() {
       } else if (response.status === 403) {
         const data = await response.json()
         toast.error("Permission denied", {
-          description: data.detail || "Only organization owner or admin can delete teams"
+          description: formatApiError(data.detail, "Only organization owner or admin can delete teams")
         })
       } else if (response.status === 404) {
         toast.error("Team not found", {
@@ -754,7 +755,7 @@ export default function OrganizationPage() {
       const data = await response.json().catch(() => null)
       if (!response.ok) {
         toast.error("Request failed", {
-          description: data?.detail || "Could not process join request"
+          description: formatApiError(data?.detail, "Could not process join request")
         })
         return
       }
@@ -797,7 +798,7 @@ export default function OrganizationPage() {
       } else {
         const data = await response.json()
         toast.error("Failed to start upgrade", {
-          description: data.detail || "Please try again"
+          description: formatApiError(data.detail, "Please try again")
         })
       }
     } catch (error) {
@@ -825,7 +826,7 @@ export default function OrganizationPage() {
         setCancelDialogOpen(false)
       } else {
         const data = await response.json()
-        toast.error("Failed to cancel", { description: data.detail || "Please try again" })
+        toast.error("Failed to cancel", { description: formatApiError(data.detail, "Please try again") })
       }
     } catch {
       toast.error("Error", { description: "Failed to cancel subscription" })
@@ -926,7 +927,7 @@ export default function OrganizationPage() {
         )
       } else {
         const data = await response.json()
-        toast.error("Failed to undo", { description: data.detail || "Please try again" })
+        toast.error("Failed to undo", { description: formatApiError(data.detail, "Please try again") })
       }
     } catch {
       toast.error("Error", { description: "Failed to undo action" })

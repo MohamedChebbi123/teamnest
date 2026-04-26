@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { logout as logoutApi } from '@/lib/auth';
 import type { PresenceStatus } from '@/context/OnlineStatusContext';
 import { toast } from 'sonner';
+import { formatApiError } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -233,7 +234,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        toast.error("Join Failed", { description: payload?.detail || "Failed to send join request" });
+        toast.error("Join Failed", { description: formatApiError(payload?.detail, "Failed to send join request") });
         return;
       }
 

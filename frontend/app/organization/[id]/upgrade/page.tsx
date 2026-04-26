@@ -33,6 +33,7 @@ import {
   Building2,
 } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 // ── Types ──
 
@@ -236,7 +237,7 @@ export default function UpgradePage() {
       } else {
         const data = await response.json()
         toast.error("Failed to start upgrade", {
-          description: data.detail || "Please try again",
+          description: formatApiError(data.detail, "Please try again"),
         })
       }
     } catch {

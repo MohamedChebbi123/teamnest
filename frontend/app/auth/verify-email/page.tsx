@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { Loader2, Mail, MailCheck, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 export default function VerifyEmailPage() {
   const [email, setEmail] = useState("")
@@ -92,7 +93,7 @@ export default function VerifyEmailPage() {
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.detail || "Failed to send verification code")
+        throw new Error(formatApiError(data.detail, "Failed to send verification code"))
       }
       
       toast.success("Verification code sent!", {
@@ -143,7 +144,7 @@ export default function VerifyEmailPage() {
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.detail || "Verification failed")
+        throw new Error(formatApiError(data.detail, "Verification failed"))
       }
       
       toast.success("Email Verified!", {

@@ -64,6 +64,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
 interface OrganizationNavBarProps {
@@ -554,7 +555,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         if (!response.ok) {
           const text = await response.text()
           let detail = "Search failed"
-          try { detail = JSON.parse(text)?.detail || detail } catch {}
+          try { detail = formatApiError(JSON.parse(text)?.detail, detail) } catch {}
           setSearchResults([])
           setSearchError(detail)
           return
@@ -592,24 +593,24 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }, [pathname])
 
   const navigationTabs = [
-    { 
-      name: "Overview", 
-      path: `/organization/${organizationId}`, 
-      icon: LayoutDashboard 
-    },
-    { 
-      name: "Teams", 
-      path: `/organization/${organizationId}/teams`, 
-      icon: Users 
-    },
-    { 
-      name: "Projects", 
-      path: `/organization/${organizationId}/projects`, 
-      icon: FolderKanban 
+    {
+      name: "Overview",
+      path: `/organization/${organizationId}`,
+      icon: LayoutDashboard
     },
     {
-      name: "Settings", 
-      path: `/organization/${organizationId}/settings`, 
+      name: "Teams",
+      path: `/organization/${organizationId}/teams`,
+      icon: Users
+    },
+    {
+      name: "Projects",
+      path: `/organization/${organizationId}/projects`,
+      icon: FolderKanban
+    },
+    {
+      name: "Settings",
+      path: `/organization/${organizationId}/settings`,
       icon: Settings,
       adminOnly: true
     }
@@ -690,11 +691,11 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         setIsDialogOpen(false)
         setUpgradeModal({
           title: "Channel limit reached",
-          description: data?.detail || "Upgrade to Pro for unlimited channels.",
+          description: formatApiError(data?.detail, "Upgrade to Pro for unlimited channels."),
         })
       } else {
         toast.error("Error", {
-          description: data?.detail || "Failed to create channel"
+          description: formatApiError(data?.detail, "Failed to create channel")
         })
       }
     } catch (error) {
@@ -763,7 +764,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         setEditingChannel(null)
       } else {
         toast.error("Error", {
-          description: data?.detail || "Failed to update channel"
+          description: formatApiError(data?.detail, "Failed to update channel")
         })
       }
     } catch (error) {
@@ -819,7 +820,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         }
       } else {
         toast.error("Error", {
-          description: data?.detail || "Failed to delete channel"
+          description: formatApiError(data?.detail, "Failed to delete channel")
         })
       }
     } catch (error) {

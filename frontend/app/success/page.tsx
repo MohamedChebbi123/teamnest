@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -43,7 +44,7 @@ function SuccessContent() {
         console.log("[SuccessPage] response:", response.status, data)
 
         if (!response.ok) {
-          toast.error("Upgrade failed", { description: data.detail || "Could not confirm upgrade" })
+          toast.error("Upgrade failed", { description: formatApiError(data.detail, "Could not confirm upgrade") })
         }
       } catch (error) {
         console.error("[SuccessPage] fetch error:", error)

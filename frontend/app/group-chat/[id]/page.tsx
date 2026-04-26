@@ -11,7 +11,7 @@ import {
   Loader2, SendHorizontal, Pencil, Trash2, Reply, X, Users, Check, ArrowLeft, UserPlus, Search, Smile, Settings, AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -364,7 +364,7 @@ export default function GroupChatRoom() {
         body: form,
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? "Failed to update group")
+      if (!res.ok) throw new Error(formatApiError(data.detail, "Failed to update group"))
       setGroupInfo(data)
       setShowEditGroup(false)
       toast.success("Group updated successfully")
@@ -384,7 +384,7 @@ export default function GroupChatRoom() {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? "Failed to delete group")
+      if (!res.ok) throw new Error(formatApiError(data.detail, "Failed to delete group"))
       toast.success("Group deleted")
       router.push("/direct-messages")
     } catch (err) {
@@ -405,7 +405,7 @@ export default function GroupChatRoom() {
       })
       const data = await res.json()
       if (res.ok) setAddableFriends(data)
-      else toast.error(data.detail ?? "Failed to load friends")
+      else toast.error(formatApiError(data.detail, "Failed to load friends"))
     } catch {
       toast.error("Failed to load friends")
     } finally {
@@ -424,7 +424,7 @@ export default function GroupChatRoom() {
         body: JSON.stringify(selectedFriends),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? "Failed to add members")
+      if (!res.ok) throw new Error(formatApiError(data.detail, "Failed to add members"))
       toast.success(`${data.count} member(s) added`)
       setShowAddMembers(false)
       setGroupInfo((prev) => prev ? { ...prev, member_count: prev.member_count + data.count } : prev)

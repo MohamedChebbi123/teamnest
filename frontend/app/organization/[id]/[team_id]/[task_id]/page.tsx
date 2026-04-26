@@ -25,6 +25,7 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Loader2, Plus, Calendar, CalendarDays, User, Flag, CheckCircle2, Circle, Clock, LayoutGrid, List, ChevronRight, ChevronLeft, ChevronDown, AlertCircle, Pencil, Trash2, Check, X, FolderOpen, Eye, Paperclip, FileText, Image, Download } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import Sidebar from "@/components/Sidebar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
@@ -296,7 +297,7 @@ export default function TasksPage() {
         setTaskStatus("todo")
         setTaskAssigneeIds([])
       } else {
-        toast.error("Error", { description: data.detail || "Failed to create task" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to create task") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -339,7 +340,7 @@ export default function TasksPage() {
         setSubtaskGroup("")
         setSubtaskAssigneeIds([])
       } else {
-        toast.error("Error", { description: data.detail || "Failed to create subtask" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to create subtask") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -370,7 +371,7 @@ export default function TasksPage() {
         setSelectedTask(data)
         setEditOpen(false)
       } else {
-        toast.error("Error", { description: data.detail || "Failed to update task" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to update task") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -399,7 +400,7 @@ export default function TasksPage() {
         setSelectedTask(null)
       } else {
         const data = await res.json()
-        toast.error("Error", { description: data.detail || "Failed to delete task" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to delete task") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -435,7 +436,7 @@ export default function TasksPage() {
           setTasks(prev => prev.map(t => t.id === taskId ? { ...t, attachments: [...(t.attachments || []), data] } : t))
           setSelectedTask(prev => prev && prev.id === taskId ? { ...prev, attachments: [...(prev.attachments || []), data] } : prev)
         } else {
-          toast.error("Error", { description: data.detail || "Failed to upload attachment" })
+          toast.error("Error", { description: formatApiError(data.detail, "Failed to upload attachment") })
         }
         setIsUploadingAttachment(false)
       }
@@ -460,7 +461,7 @@ export default function TasksPage() {
         setSelectedTask(prev => prev && prev.id === taskId ? { ...prev, attachments: prev.attachments.filter(a => a.id !== attachmentId) } : prev)
       } else {
         const data = await res.json()
-        toast.error("Error", { description: data.detail || "Failed to delete attachment" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to delete attachment") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -482,7 +483,7 @@ export default function TasksPage() {
         setMyTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setSelectedTask(prev => (prev && prev.id === data.id ? data : prev))
       } else {
-        toast.error("Error", { description: data.detail || "Failed to review task" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to review task") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -508,7 +509,7 @@ export default function TasksPage() {
         setMyTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setSelectedTask(prev => (prev && prev.id === data.id ? data : prev))
       } else {
-        toast.error("Error", { description: data.detail || "Failed to update task" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to update task") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -536,7 +537,7 @@ export default function TasksPage() {
         setTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setEditingSubtask(null)
       } else {
-        toast.error("Error", { description: data.detail || "Failed to update subtask" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to update subtask") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })
@@ -563,7 +564,7 @@ export default function TasksPage() {
         if (expandedSubtaskId === subtaskId) setExpandedSubtaskId(null)
       } else {
         const data = await res.json()
-        toast.error("Error", { description: data.detail || "Failed to delete subtask" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to delete subtask") })
       }
     } catch {
       toast.error("Error", { description: "An error occurred" })

@@ -38,10 +38,12 @@ import {
   Megaphone,
 } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import UpgradeModal from "@/components/UpgradeModal"
-import PdfViewerModal from "@/components/PdfViewerModal"
+import dynamic from "next/dynamic"
+const PdfViewerModal = dynamic(() => import("@/components/PdfViewerModal"), { ssr: false })
 import Sidebar from "@/components/Sidebar/page"
 import {
   Select,
@@ -449,7 +451,7 @@ export default function TeamPage() {
         setEditDialogOpen(false)
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to update team"
+          description: formatApiError(data.detail, "Failed to update team")
         })
       }
     } catch (error) {
@@ -521,7 +523,7 @@ export default function TeamPage() {
         await fetchTeamMembers()
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to add member to team"
+          description: formatApiError(data.detail, "Failed to add member to team")
         })
       }
     } catch (error) {
@@ -597,7 +599,7 @@ export default function TeamPage() {
         await fetchTeamMembers()
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to update permissions"
+          description: formatApiError(data.detail, "Failed to update permissions")
         })
       }
     } catch (error) {
@@ -642,7 +644,7 @@ export default function TeamPage() {
         await fetchTeamMembers()
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to kick member"
+          description: formatApiError(data.detail, "Failed to kick member")
         })
       }
     } catch (error) {
@@ -679,8 +681,8 @@ export default function TeamPage() {
           },
           body: JSON.stringify({
             channel_name: channelName,
-            channel_mode: channelMode,
-            channel_category: channelCategory,
+            channel_mode: channelCategory,
+            channel_category: channelMode,
             description: channelDescription || null
           })
         }
@@ -704,11 +706,11 @@ export default function TeamPage() {
         setCreateChannelDialogOpen(false)
         setUpgradeModal({
           title: "Channel limit reached",
-          description: data.detail || "Upgrade to Pro for unlimited channels.",
+          description: formatApiError(data.detail, "Upgrade to Pro for unlimited channels."),
         })
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to create channel"
+          description: formatApiError(data.detail, "Failed to create channel")
         })
       }
     } catch (error) {

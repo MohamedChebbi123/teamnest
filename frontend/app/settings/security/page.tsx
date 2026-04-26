@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 export default function SecuritySettings() {
     const [currentPassword, setCurrentPassword] = useState("")
@@ -45,7 +46,7 @@ export default function SecuritySettings() {
             if (!response.ok) {
                 const text = await response.text()
                 let detail = "Failed to change password"
-                try { detail = JSON.parse(text).detail || detail } catch {}
+                try { detail = formatApiError(JSON.parse(text).detail, detail) } catch {}
                 throw new Error(detail)
             }
 

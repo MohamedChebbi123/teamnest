@@ -16,7 +16,7 @@ import {
   UserPlus, UserMinus,
 } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import UpgradeModal from "@/components/UpgradeModal"
 
 type ReceiverInfo = {
@@ -442,7 +442,7 @@ export default function ChannelsPage() {
         setFriends((prev) => prev.filter((f) => f.user_id !== friendUserId))
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "Something went wrong") })
       }
     } catch {
       toast.error("Error", { description: "Failed to remove friend" })
@@ -470,7 +470,7 @@ export default function ChannelsPage() {
         toast.success("Friend request sent!")
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "Could not send request" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "Could not send request") })
       }
     } catch {
       toast.error("Error", { description: "Failed to send friend request" })
@@ -613,7 +613,7 @@ export default function ChannelsPage() {
           }
 
           if (data.type === "error") {
-            toast.error("Error", { description: data.detail || "Realtime error" })
+            toast.error("Error", { description: formatApiError(data.detail, "Realtime error") })
           }
         } catch (error) {
           console.error("Error parsing websocket message:", error)

@@ -42,6 +42,7 @@ import {
   Search,
 } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import Sidebar from "@/components/Sidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
@@ -323,7 +324,7 @@ export default function ChannelPage() {
         } else {
           const text = await response.text()
           let detail = "Failed to load channel"
-          try { detail = JSON.parse(text).detail || detail } catch {}
+          try { detail = formatApiError(JSON.parse(text).detail, detail) } catch {}
           toast.error("Error", { description: detail })
           router.push('/welcome')
         }
@@ -451,7 +452,7 @@ export default function ChannelPage() {
               setMessages(prev => prev.filter(msg => msg.message_id !== data.message_id))
             } else if (data.type === 'error') {
               toast.error("Upload failed", {
-                description: data.detail || "Something went wrong"
+                description: formatApiError(data.detail, "Something went wrong")
               })
               setIsUploadingFile(false)
             } else if (data.type === 'typing' && data.user) {
@@ -638,7 +639,7 @@ export default function ChannelPage() {
       } else {
         const text = await response.text()
         let detail = "Failed to load messages"
-        try { detail = JSON.parse(text).detail || detail } catch {}
+        try { detail = formatApiError(JSON.parse(text).detail, detail) } catch {}
         toast.error("Error", { description: detail })
       }
     } catch (error) {
@@ -984,7 +985,7 @@ export default function ChannelPage() {
         setEditMessageContent("")
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to update message"
+          description: formatApiError(data.detail, "Failed to update message")
         })
       }
     } catch (error) {
@@ -1039,7 +1040,7 @@ export default function ChannelPage() {
         setMessageToDelete(null)
       } else {
         toast.error("Error", {
-          description: data.detail || "Failed to delete message"
+          description: formatApiError(data.detail, "Failed to delete message")
         })
       }
     } catch (error) {
@@ -1069,7 +1070,7 @@ export default function ChannelPage() {
         setPinnedMessages(data)
       } else {
         const data = await response.json()
-        toast.error("Error", { description: data.detail || "Failed to load pinned messages" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to load pinned messages") })
       }
     } catch (error) {
       console.error('Error fetching pinned messages:', error)
@@ -1101,7 +1102,7 @@ export default function ChannelPage() {
           await fetchPinnedMessages()
         }
       } else {
-        toast.error("Error", { description: data.detail || "Failed to pin message" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to pin message") })
       }
     } catch (error) {
       console.error('Error pinning message:', error)
@@ -1132,7 +1133,7 @@ export default function ChannelPage() {
         toast.success("Message unpinned")
         setPinnedMessages(prev => prev.filter(p => p.message_id !== messageId))
       } else {
-        toast.error("Error", { description: data.detail || "Failed to unpin message" })
+        toast.error("Error", { description: formatApiError(data.detail, "Failed to unpin message") })
       }
     } catch (error) {
       console.error('Error unpinning message:', error)

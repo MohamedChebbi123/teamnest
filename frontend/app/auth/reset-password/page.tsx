@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { Lock, Loader2, Eye, EyeOff, Check, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import { toast } from "sonner"
 import Image from "next/image"
 import Link from "next/link"
@@ -116,7 +116,7 @@ export default function ResetPassword() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || "Failed to reset password")
+        throw new Error(formatApiError(data.detail, "Failed to reset password"))
       }
 
       toast.success("Password reset successful!", {

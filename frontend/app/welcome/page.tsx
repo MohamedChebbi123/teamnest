@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar/page"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 interface UserData {
     first_name?: string
@@ -107,7 +108,7 @@ export default function WelcomePage() {
             const payload = await response.json().catch(() => null)
 
             if (!response.ok) {
-                const detail = payload?.detail || "Failed to send join request"
+                const detail = formatApiError(payload?.detail, "Failed to send join request")
                 toast.error("Invite Failed", { description: detail })
                 return
             }

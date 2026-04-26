@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Building2, FileText, Image as ImageIcon, Loader2, Upload, Check } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import { toast } from "sonner"
 import Image from "next/image"
 import ImageCropDialog from "@/components/ImageCropDialog"
@@ -131,7 +131,7 @@ export default function CreateOrganization() {
       console.log("Response data:", data)
 
       if (!response.ok) {
-        throw new Error(data.detail || "Organization creation failed")
+        throw new Error(formatApiError(data.detail, "Organization creation failed"))
       }
 
       toast.success("Organization created successfully!", {

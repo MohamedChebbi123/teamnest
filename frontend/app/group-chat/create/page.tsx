@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { MessageCircle, FileText, Image as ImageIcon, Loader2, Upload, Check, UserPlus, Search, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import { toast } from "sonner"
 import Image from "next/image"
 import ImageCropDialog from "@/components/ImageCropDialog"
@@ -143,7 +143,7 @@ export default function CreateGroupChat() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || "Failed to add members")
+        throw new Error(formatApiError(data.detail, "Failed to add members"))
       }
 
       toast.success(`${data.count} member(s) added successfully!`)
@@ -208,7 +208,7 @@ export default function CreateGroupChat() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || "Group chat creation failed")
+        throw new Error(formatApiError(data.detail, "Group chat creation failed"))
       }
 
       toast.success("Group chat created successfully!", {

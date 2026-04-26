@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 interface Friend {
   friendship_id: number
@@ -90,7 +91,7 @@ export default function FriendsPage() {
       } else {
         const data = await response.json().catch(() => null)
         toast.error("Failed to load friends", {
-          description: data?.detail || "Unable to fetch friends list",
+          description: formatApiError(data?.detail, "Unable to fetch friends list"),
         })
       }
     } catch (error) {
@@ -171,7 +172,7 @@ export default function FriendsPage() {
         }
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "Something went wrong") })
       }
     } catch (error) {
       console.error("Error handling request:", error)
@@ -197,7 +198,7 @@ export default function FriendsPage() {
         setFriends((prev) => prev.filter((f) => f.user_id !== friendUserId))
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "Something went wrong") })
       }
     } catch (error) {
       console.error("Error removing friend:", error)
@@ -224,7 +225,7 @@ export default function FriendsPage() {
         await fetchBlockedUsers()
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "Something went wrong") })
       }
     } catch (error) {
       console.error("Error blocking user:", error)
@@ -250,7 +251,7 @@ export default function FriendsPage() {
         setBlockedUsers((prev) => prev.filter((b) => b.user_id !== userId))
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "Something went wrong" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "Something went wrong") })
       }
     } catch (error) {
       console.error("Error unblocking user:", error)
@@ -286,7 +287,7 @@ export default function FriendsPage() {
         setAddTag("")
       } else {
         const data = await response.json().catch(() => null)
-        toast.error("Failed", { description: data?.detail || "User not found" })
+        toast.error("Failed", { description: formatApiError(data?.detail, "User not found") })
       }
     } catch (error) {
       console.error("Error sending request:", error)

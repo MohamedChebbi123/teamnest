@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Users, ChevronLeft, ChevronRight, Loader2, Mail, Phone, Globe, X, UserPlus, Check } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 
 interface Member {
   user_id: number
@@ -391,7 +392,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
       } else {
         const data = await response.json().catch(() => null)
         toast.error("Failed to send request", {
-          description: data?.detail || "Something went wrong"
+          description: formatApiError(data?.detail, "Something went wrong")
         })
       }
     } catch (error) {
@@ -480,7 +481,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
       }
 
       const errorBody = await response.json().catch(() => null)
-      throw new Error(errorBody?.detail || "Failed to revoke permission")
+      throw new Error(formatApiError(errorBody?.detail, "Failed to revoke permission"))
     } catch (error) {
       console.error("Error revoking permission:", error)
       toast.error("Error", {

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { Loader2, ArrowLeft, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -66,7 +67,7 @@ export default function VerifyResetCode() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || "Invalid reset code")
+        throw new Error(formatApiError(data.detail, "Invalid reset code"))
       }
 
       toast.success("Code verified!", {
@@ -105,7 +106,7 @@ export default function VerifyResetCode() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || "Failed to resend code")
+        throw new Error(formatApiError(data.detail, "Failed to resend code"))
       }
 
       toast.success("Code resent!", {

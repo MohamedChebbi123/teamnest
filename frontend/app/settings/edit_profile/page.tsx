@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { formatApiError } from "@/lib/utils"
 import ImageCropDialog from "@/components/ImageCropDialog"
 
 interface UserProfile {
@@ -140,7 +141,7 @@ export default function EditProfile() {
             if (!response.ok) {
                 const text = await response.text()
                 let detail = "Failed to update profile"
-                try { detail = JSON.parse(text).detail || detail } catch {}
+                try { detail = formatApiError(JSON.parse(text).detail, detail) } catch {}
                 throw new Error(detail)
             }
 
@@ -196,7 +197,7 @@ export default function EditProfile() {
             if (!response.ok) {
                 const text = await response.text()
                 let detail = "Failed to update contact information"
-                try { detail = JSON.parse(text).detail || detail } catch {}
+                try { detail = formatApiError(JSON.parse(text).detail, detail) } catch {}
                 throw new Error(detail)
             }
 

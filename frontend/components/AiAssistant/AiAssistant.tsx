@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import { X, Send, Loader2, Bot, User } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 
 interface Message {
   role: "user" | "assistant"
@@ -75,7 +75,7 @@ export default function AiAssistant() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => null)
         console.error("Assistant API error:", response.status, errorData)
-        throw new Error(errorData?.detail || "Failed to get response")
+        throw new Error(formatApiError(errorData?.detail, "Failed to get response"))
       }
 
       const data = await response.json()

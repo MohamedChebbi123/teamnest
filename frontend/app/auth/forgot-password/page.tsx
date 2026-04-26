@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Check, Mail, Loader2, ArrowLeft } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import { toast } from "sonner"
 import Image from "next/image"
 import Link from "next/link"
@@ -62,7 +62,7 @@ export default function ForgotPassword() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || "Failed to send reset code")
+        throw new Error(formatApiError(data.detail, "Failed to send reset code"))
       }
 
       toast.success("Reset code sent!", {

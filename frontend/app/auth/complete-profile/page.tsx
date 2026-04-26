@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Phone, Globe, Upload, Check, User } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import countryList from "country-list"
 import PhoneInput from "react-phone-input-2"
 import "react-phone-input-2/lib/style.css"
@@ -128,7 +128,7 @@ export default function CompleteProfilePage() {
           router.push("/auth/login")
           return
         }
-        throw new Error(data.detail || "Profile completion failed")
+        throw new Error(formatApiError(data.detail, "Profile completion failed"))
       }
 
       toast.success("Profile completed!", {

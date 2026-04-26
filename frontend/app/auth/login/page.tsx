@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Check, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatApiError } from "@/lib/utils"
 import { toast } from "sonner"
 import Image from "next/image"
 import Link from "next/link"
@@ -85,7 +85,7 @@ export default function Login() {
       console.log("Response data:", data)
 
       if (!response.ok) {
-        throw new Error(data?.detail || data?.message || "Login failed")
+        throw new Error(formatApiError(data?.detail, data?.message || "Login failed"))
       }
 
       toast.success("Login successful!", {
