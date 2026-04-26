@@ -18,7 +18,8 @@ from services.auth_service import (
     change_password_service,
     get_user_info_by_id_service,
     check_connectivity,
-    get_online_status
+    get_online_status,
+    set_my_status_service,
 )
 from fastapi import APIRouter, Form, File, Depends, UploadFile, WebSocket, Query, Request, Response, Cookie
 from sqlalchemy.orm import Session
@@ -261,7 +262,17 @@ async def connectivity_websocket(
 @router.get("/online-status")
 async def online_status(
     user_ids: str = Query(..., description="Comma-separated user IDs"),
-    _: Users = Depends(current_user)
+    _: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
 ):
     ids = [int(uid) for uid in user_ids.split(",") if uid.strip().isdigit()]
-    return get_online_status(ids)
+    return get_online_status(ids, db)
+
+
+@router.put("/me/status")
+async def set_my_status(
+    status: str = Form(...),
+    user: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
+):
+    return await set_my_status_service(user, status, db)

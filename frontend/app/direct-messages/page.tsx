@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useOnlineStatus } from "@/context/OnlineStatusContext"
+import { useOnlineStatus, type PresenceStatus } from "@/context/OnlineStatusContext"
 import Sidebar from "@/components/Sidebar/page"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -136,6 +136,39 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const presenceDotClass = (status: PresenceStatus) => {
+  switch (status) {
+    case "online": return "bg-emerald-500"
+    case "away": return "bg-amber-500"
+    case "dnd": return "bg-rose-500"
+    default: return "bg-muted-foreground/40"
+  }
+}
+
+const presenceLabel = (status: PresenceStatus) => {
+  switch (status) {
+    case "online": return "Online"
+    case "away": return "Away"
+    case "dnd": return "Do not disturb"
+    default: return "Offline"
+  }
+}
+
+const formatLastSeen = (iso: string | null) => {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return null
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000))
+  if (diffSec < 60) return "just now"
+  const diffMin = Math.round(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.round(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.round(diffHr / 24)
+  if (diffDay < 7) return `${diffDay}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
 const isImageAttachment = (fileName: string, fileUrl: string) => {
   const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i
   const cleanName = fileName.split("?")[0]
@@ -145,7 +178,7 @@ const isImageAttachment = (fileName: string, fileUrl: string) => {
 
 export default function ChannelsPage() {
   const router = useRouter()
-  const { isUserOnline } = useOnlineStatus()
+  const { isUserOnline, getUserStatus, getUserLastSeen } = useOnlineStatus()
   const searchParams = useSearchParams()
 
   const receiverId = searchParams.get("dm_user_id")
@@ -976,7 +1009,7 @@ export default function ChannelsPage() {
                     const preview = item.last_message.is_file
                       ? `[File] ${item.last_message.file_attachment?.file_name || "Attachment"}`
                       : (item.last_message.content || "")
-                    const online = isUserOnline(item.user.user_id)
+                    const status = getUserStatus(item.user.user_id)
 
                     return (
                       <button
@@ -994,10 +1027,13 @@ export default function ChannelsPage() {
                             {item.user.avatar_url && <AvatarImage src={item.user.avatar_url} alt={`${item.user.first_name} ${item.user.last_name}`} />}
                             <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
                           </Avatar>
-                          <span className={cn(
-                            "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
-                            online ? "bg-emerald-500" : "bg-muted-foreground/40"
-                          )} />
+                          <span
+                            title={presenceLabel(status)}
+                            className={cn(
+                              "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                              presenceDotClass(status)
+                            )}
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">
@@ -1034,7 +1070,9 @@ export default function ChannelsPage() {
                   friendsWithoutConversation.map((friend) => {
                     const isActive = activeReceiverId === friend.user_id
                     const initials = `${friend.first_name[0] || ""}${friend.last_name[0] || ""}`.toUpperCase()
+                    const status = getUserStatus(friend.user_id)
                     const online = isUserOnline(friend.user_id)
+                    const lastSeenLabel = !online ? formatLastSeen(getUserLastSeen(friend.user_id)) : null
 
                     return (
                       <button
@@ -1052,17 +1090,24 @@ export default function ChannelsPage() {
                             {friend.avatar_url && <AvatarImage src={friend.avatar_url} alt={`${friend.first_name} ${friend.last_name}`} />}
                             <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
                           </Avatar>
-                          <span className={cn(
-                            "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
-                            online ? "bg-emerald-500" : "bg-muted-foreground/40"
-                          )} />
+                          <span
+                            title={presenceLabel(status)}
+                            className={cn(
+                              "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                              presenceDotClass(status)
+                            )}
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">
                             {friend.first_name} {friend.last_name}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {online ? "Active now" : (friend.user_tag ? `#${friend.user_tag}` : "Offline")}
+                            {online
+                              ? presenceLabel(status)
+                              : lastSeenLabel
+                                ? `Last seen ${lastSeenLabel}`
+                                : (friend.user_tag ? `#${friend.user_tag}` : "Offline")}
                           </p>
                         </div>
                       </button>
@@ -1146,13 +1191,31 @@ export default function ChannelsPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{activeReceiverName}</p>
               <div className="flex items-center gap-1.5">
-                <span className={cn(
-                  "h-1.5 w-1.5 rounded-full",
-                  activeReceiverId && isUserOnline(activeReceiverId) ? "bg-emerald-500" : "bg-muted-foreground"
-                )} />
-                <span className="text-xs text-muted-foreground">
-                  {activeReceiverId && isUserOnline(activeReceiverId) ? "Online" : "Offline"}
-                </span>
+                {(() => {
+                  if (!activeReceiverId) {
+                    return (
+                      <>
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Offline</span>
+                      </>
+                    )
+                  }
+                  const status = getUserStatus(activeReceiverId)
+                  const online = isUserOnline(activeReceiverId)
+                  const lastSeenLabel = !online ? formatLastSeen(getUserLastSeen(activeReceiverId)) : null
+                  return (
+                    <>
+                      <span className={cn("h-1.5 w-1.5 rounded-full", presenceDotClass(status))} />
+                      <span className="text-xs text-muted-foreground">
+                        {online
+                          ? presenceLabel(status)
+                          : lastSeenLabel
+                            ? `Last seen ${lastSeenLabel}`
+                            : "Offline"}
+                      </span>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>

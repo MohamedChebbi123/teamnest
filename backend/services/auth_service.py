@@ -11,9 +11,10 @@ import secrets
 from schemas.Logininput import Logininput
 from utils.hasher import verify_password
 from utils.jwt_handler import create_access_token, create_refresh_token, verify_token
-from utils.Websocket_manager import connectivity_manager
+from utils.Websocket_manager import connectivity_manager, VALID_STATUSES
 from utils.validators import validate_email, validate_password, validate_phone, validate_name
 from models.Friends import Friends
+from database.connection import connect_databse as connect_databse_factory
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +230,8 @@ async def logout_all_service(user: Users, db: Session):
 
 
 async def view_profile_service(user: Users):
+    live_status = ConnectivityManager.get_status(user.user_id)
+    persisted_last_seen = user.last_seen_at.isoformat() if user.last_seen_at else None
     return {
         "user_id": user.user_id,
         "first_name": user.first_name,
@@ -241,7 +244,9 @@ async def view_profile_service(user: Users):
         "joined_at": user.joined_at.isoformat() if user.joined_at else None,
         "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
         "is_verified": user.is_verified,
-        "profile_completed": user.profile_completed
+        "profile_completed": user.profile_completed,
+        "status": live_status,
+        "last_seen_at": persisted_last_seen,
     }
 
 
@@ -456,6 +461,9 @@ async def get_user_info_by_id_service(user_id: int, db: Session):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    live_status = ConnectivityManager.get_status(user_id)
+    persisted_last_seen = user.last_seen_at.isoformat() if user.last_seen_at else None
+
     return {
         "user_id": user.user_id,
         "first_name": user.first_name,
@@ -466,6 +474,8 @@ async def get_user_info_by_id_service(user_id: int, db: Session):
         "last_login_at": user.last_login_at,
         "user_tag": user.user_tag,
         "is_verified": user.is_verified,
+        "status": live_status,
+        "last_seen_at": persisted_last_seen,
     }
 
 
@@ -482,28 +492,134 @@ async def check_connectivity(websocket, user: Users, db: Session):
         for found_friend in user_friends
     ]
 
-    db.close()
+    initial_status = user.status if user.status in VALID_STATUSES and user.status != "offline" else "online"
 
     await ConnectivityManager.connect(user_id, websocket)
-    await ConnectivityManager.broadcast(friend_ids, {"type": "user_online", "user_id": user_id})
+    ConnectivityManager.user_status[user_id] = initial_status
 
-    already_online = [fid for fid in friend_ids if ConnectivityManager.is_online(fid)]
-    if already_online:
-        await websocket.send_json({"type": "friends_online", "user_ids": already_online})
+    db.query(Users).filter(Users.user_id == user_id).update(
+        {"status": initial_status, "last_seen_at": datetime.now(UTC)},
+        synchronize_session=False,
+    )
+    db.commit()
+    db.close()
+
+    await ConnectivityManager.broadcast(
+        friend_ids,
+        {"type": "user_status", "user_id": user_id, "status": initial_status},
+    )
+
+    online_friends = [
+        {"user_id": fid, "status": ConnectivityManager.get_status(fid)}
+        for fid in friend_ids
+        if ConnectivityManager.is_online(fid)
+    ]
+    if online_friends:
+        await websocket.send_json({"type": "friends_status", "users": online_friends})
 
     try:
         while True:
             data = await websocket.receive_json()
-            if data.get("type") == "ping":
+            msg_type = data.get("type")
+            if msg_type == "ping":
                 ConnectivityManager.last_seen[user_id] = datetime.now(UTC)
                 await websocket.send_json({"type": "pong"})
+            elif msg_type == "set_status":
+                requested = data.get("status")
+                applied = ConnectivityManager.set_status(user_id, requested)
+                if applied is None:
+                    continue
+                inner_db = next(connect_databse_factory())
+                try:
+                    inner_db.query(Users).filter(Users.user_id == user_id).update(
+                        {"status": applied},
+                        synchronize_session=False,
+                    )
+                    inner_db.commit()
+                finally:
+                    inner_db.close()
+                await ConnectivityManager.broadcast(
+                    friend_ids,
+                    {"type": "user_status", "user_id": user_id, "status": applied},
+                )
+                await websocket.send_json({"type": "status_ack", "status": applied})
     except Exception:
         pass
     finally:
         ConnectivityManager.disconnect(user_id, websocket)
         if not ConnectivityManager.is_online(user_id):
-            await ConnectivityManager.broadcast(friend_ids, {"type": "user_offline", "user_id": user_id})
+            now = datetime.now(UTC)
+            inner_db = next(connect_databse_factory())
+            try:
+                inner_db.query(Users).filter(Users.user_id == user_id).update(
+                    {"status": "offline", "last_seen_at": now},
+                    synchronize_session=False,
+                )
+                inner_db.commit()
+            finally:
+                inner_db.close()
+            await ConnectivityManager.broadcast(
+                friend_ids,
+                {
+                    "type": "user_offline",
+                    "user_id": user_id,
+                    "last_seen_at": now.isoformat(),
+                },
+            )
 
 
-def get_online_status(user_ids: list[int]) -> dict:
-    return {uid: ConnectivityManager.is_online(uid) for uid in user_ids}
+def get_online_status(user_ids: list[int], db: Session) -> dict:
+    result: dict[int, dict] = {}
+    persisted = {
+        u.user_id: u
+        for u in db.query(Users).filter(Users.user_id.in_(user_ids)).all()
+    } if user_ids else {}
+
+    for uid in user_ids:
+        if ConnectivityManager.is_online(uid):
+            status = ConnectivityManager.get_status(uid)
+            last_seen = ConnectivityManager.last_seen.get(uid)
+        else:
+            user_row = persisted.get(uid)
+            status = "offline"
+            last_seen = user_row.last_seen_at if user_row else None
+        result[uid] = {
+            "online": status != "offline",
+            "status": status,
+            "last_seen_at": last_seen.isoformat() if last_seen else None,
+        }
+    return result
+
+
+async def set_my_status_service(user: Users, status: str, db: Session):
+    if status not in VALID_STATUSES or status == "offline":
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    applied = ConnectivityManager.set_status(user.user_id, status)
+    if applied is None:
+        raise HTTPException(
+            status_code=409,
+            detail="You must be connected to the presence websocket to set status",
+        )
+
+    db.query(Users).filter(Users.user_id == user.user_id).update(
+        {"status": applied},
+        synchronize_session=False,
+    )
+    db.commit()
+
+    from sqlalchemy import or_
+    rows = db.query(Friends).filter(
+        or_(Friends.user_id == user.user_id, Friends.friend_id == user.user_id)
+    ).all()
+    friend_ids = [
+        r.friend_id if r.user_id == user.user_id else r.user_id
+        for r in rows
+    ]
+
+    await ConnectivityManager.broadcast(
+        friend_ids,
+        {"type": "user_status", "user_id": user.user_id, "status": applied},
+    )
+
+    return {"status": applied}

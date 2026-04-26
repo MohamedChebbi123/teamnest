@@ -146,10 +146,14 @@ class NotificationManager:
 notification_manager = NotificationManager()
 
 
+VALID_STATUSES = {"online", "away", "dnd", "offline"}
+
+
 class ConnectivityManager:
     def __init__(self):
         self.connections: Dict[int, List[WebSocket]] = {}
         self.last_seen: Dict[int, datetime] = {}
+        self.user_status: Dict[int, str] = {}
 
     async def connect(self, user_id: int, websocket: WebSocket):
         await websocket.accept()
@@ -157,6 +161,7 @@ class ConnectivityManager:
         if websocket not in user_connections:
             user_connections.append(websocket)
         self.last_seen[user_id] = datetime.now(timezone.utc)
+        self.user_status.setdefault(user_id, "online")
 
     def disconnect(self, user_id: int, websocket: WebSocket):
         if user_id in self.connections:
@@ -164,9 +169,23 @@ class ConnectivityManager:
                 self.connections[user_id].remove(websocket)
             if not self.connections[user_id]:
                 self.connections.pop(user_id, None)
+                self.user_status.pop(user_id, None)
 
     def is_online(self, user_id: int) -> bool:
         return user_id in self.connections and len(self.connections[user_id]) > 0
+
+    def get_status(self, user_id: int) -> str:
+        if not self.is_online(user_id):
+            return "offline"
+        return self.user_status.get(user_id, "online")
+
+    def set_status(self, user_id: int, status: str) -> str | None:
+        if status not in VALID_STATUSES or status == "offline":
+            return None
+        if not self.is_online(user_id):
+            return None
+        self.user_status[user_id] = status
+        return status
 
     async def send(self, user_id: int, data: dict):
         for ws in list(self.connections.get(user_id, [])):
@@ -193,6 +212,7 @@ async def cleanup_task(db_factory):
             if now - last > timeout:
                 dead_sockets = connectivity_manager.connections.pop(user_id, [])
                 connectivity_manager.last_seen.pop(user_id, None)
+                connectivity_manager.user_status.pop(user_id, None)
 
                 for ws in dead_sockets:
                     try:
@@ -203,6 +223,7 @@ async def cleanup_task(db_factory):
                 db = next(db_factory())
                 try:
                     from models.Friends import Friends
+                    from models.Users import Users
                     from sqlalchemy import or_
                     rows = db.query(Friends).filter(
                         or_(Friends.user_id == user_id, Friends.friend_id == user_id)
@@ -211,11 +232,21 @@ async def cleanup_task(db_factory):
                         r.friend_id if r.user_id == user_id else r.user_id
                         for r in rows
                     ]
+                    db.query(Users).filter(Users.user_id == user_id).update(
+                        {"status": "offline", "last_seen_at": last},
+                        synchronize_session=False,
+                    )
+                    db.commit()
                 finally:
                     db.close()
 
                 await connectivity_manager.broadcast(
-                    friend_ids, {"type": "user_offline", "user_id": user_id}
+                    friend_ids,
+                    {
+                        "type": "user_offline",
+                        "user_id": user_id,
+                        "last_seen_at": last.isoformat(),
+                    },
                 )
 
         await asyncio.sleep(10)

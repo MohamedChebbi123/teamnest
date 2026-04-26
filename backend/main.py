@@ -65,7 +65,19 @@ def _ensure_user_code_columns():
         ))
 
 
+def _ensure_user_presence_columns():
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(10) NOT NULL DEFAULT 'offline'"
+        ))
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE"
+        ))
+
+
 _ensure_files_channel_id_column()
 _ensure_user_code_columns()
+_ensure_user_presence_columns()
 
 

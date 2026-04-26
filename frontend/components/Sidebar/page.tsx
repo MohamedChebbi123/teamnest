@@ -32,6 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { logout as logoutApi } from '@/lib/auth';
+import type { PresenceStatus } from '@/context/OnlineStatusContext';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -90,7 +91,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const pathname = usePathname();
   const router = useRouter();
 
-  const { disconnect } = useOnlineStatus()
+  const { disconnect, myStatus, setMyStatus } = useOnlineStatus()
   const { unreadCount: friendRequestUnread } = useFriendRequests()
   const { unreadDmCount, markDmsRead } = useDirectMessageNotifications()
   const { unreadCount: mentionUnread } = useMentionNotifications()
@@ -255,6 +256,30 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
   const getFullName = () => {
     return `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
+  };
+
+  const STATUS_OPTIONS: { value: PresenceStatus; label: string; dot: string }[] = [
+    { value: 'online', label: 'Online', dot: 'bg-emerald-500' },
+    { value: 'away', label: 'Away', dot: 'bg-amber-500' },
+    { value: 'dnd', label: 'Do not disturb', dot: 'bg-rose-500' },
+  ];
+
+  const statusDotClass = (s: PresenceStatus) => {
+    switch (s) {
+      case 'online': return 'bg-emerald-500';
+      case 'away': return 'bg-amber-500';
+      case 'dnd': return 'bg-rose-500';
+      default: return 'bg-muted-foreground/40';
+    }
+  };
+
+  const statusLabel = (s: PresenceStatus) => {
+    switch (s) {
+      case 'online': return 'Online';
+      case 'away': return 'Away';
+      case 'dnd': return 'Do not disturb';
+      default: return 'Offline';
+    }
   };
 
   // Notifications
@@ -516,13 +541,22 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                       'w-full h-12 transition-all overflow-hidden hover:bg-accent/60',
                     'justify-center px-2'
                   )}
+                  title={`Status: ${statusLabel(myStatus)}`}
                 >
-                  <Avatar className="h-10 w-10 flex-shrink-0">
-                    <AvatarImage src={user.avatar_url} alt={getFullName()} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getInitials(user.first_name || 'U', user.last_name || '')}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
+                      <AvatarImage src={user.avatar_url} alt={getFullName()} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {getInitials(user.first_name || 'U', user.last_name || '')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span
+                      className={cn(
+                        'absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-background',
+                        statusDotClass(myStatus)
+                      )}
+                    />
+                  </div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -534,6 +568,23 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                     </p>
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
+                  Status
+                </DropdownMenuLabel>
+                {STATUS_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => setMyStatus(option.value)}
+                    className="cursor-pointer"
+                  >
+                    <span className={cn('mr-2 h-2.5 w-2.5 rounded-full', option.dot)} />
+                    <span className="flex-1">{option.label}</span>
+                    {myStatus === option.value && (
+                      <span className="text-xs text-muted-foreground">Active</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/auth/profile">
