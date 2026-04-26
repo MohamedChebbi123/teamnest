@@ -80,10 +80,12 @@ async def delete_channel(
 async def get_messages(
     channel_id: int,
     org_id: int,
+    limit: int | None = Query(None),
+    offset: int | None = Query(None),
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return fetch_message_service(channel_id, org_id, user, db)
+    return fetch_message_service(channel_id, org_id, user, db, limit=limit, offset=offset)
 
 
 @router.put("/message/{message_id}")
@@ -140,10 +142,12 @@ async def search_messages(
     channel_id: int,
     org_id: int,
     q: str = Query(""),
+    limit: int | None = Query(None),
+    offset: int | None = Query(None),
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return search_messages_service(channel_id, org_id, q, user, db)
+    return search_messages_service(channel_id, org_id, q, user, db, limit=limit, offset=offset)
 
 
 @router.websocket("/mesages/{channel_id}")

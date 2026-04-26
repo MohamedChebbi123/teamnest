@@ -549,17 +549,45 @@ def fetch_voice_participants_service(channel_id: int, org_id: int, user: Users, 
     }
 
 
-def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session):
+DEFAULT_MESSAGE_LIMIT = 50
+MAX_MESSAGE_LIMIT = 200
+
+
+def _normalize_message_pagination(limit: int | None, offset: int | None) -> tuple[int, int]:
+    try:
+        normalized_limit = int(limit if limit is not None else DEFAULT_MESSAGE_LIMIT)
+        normalized_offset = int(offset if offset is not None else 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="limit and offset must be valid integers")
+
+    if normalized_limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be greater than 0")
+    if normalized_limit > MAX_MESSAGE_LIMIT:
+        raise HTTPException(status_code=400, detail=f"limit cannot exceed {MAX_MESSAGE_LIMIT}")
+    if normalized_offset < 0:
+        raise HTTPException(status_code=400, detail="offset must be >= 0")
+
+    return normalized_limit, normalized_offset
+
+
+def fetch_message_service(
+    channel_id: int,
+    org_id: int,
+    user: Users,
+    db: Session,
+    limit: int | None = None,
+    offset: int | None = None,
+):
     user_id = user.user_id
 
     found_user_at_org = db.query(Organization_members).filter(
         Organization_members.memmber_id == user_id,
         Organization_members.org_id == org_id
     ).first()
-    
+
     if not found_user_at_org:
         raise HTTPException(status_code=403, detail="User is not a member of this organization")
-    
+
     channel = db.query(Channels).filter(
         Channels.channel_id == channel_id,
         Channels.org_id == org_id
@@ -578,6 +606,8 @@ def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session
         if not in_team and (not organization or organization.owner_id != user_id):
             raise HTTPException(status_code=403, detail="Not a team member")
 
+    limit, offset = _normalize_message_pagination(limit, offset)
+
     org_users = db.query(Users).join(
         Organization_members,
         Organization_members.memmber_id == Users.user_id
@@ -590,16 +620,29 @@ def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session
         for member in org_users
         if member.user_tag
     }
-    
-    messages = db.query(
-        Messages,
-        Users
-    ).join(
+
+    page_rows = db.query(Messages, Users).join(
         Users, Messages.sender_id == Users.user_id
     ).filter(
         Messages.channel_id == channel_id,
         Messages.is_deleted == False
-    ).all()
+    ).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()
+
+    has_more = len(page_rows) > limit
+    page_rows = page_rows[:limit]
+    messages = list(reversed(page_rows))
+
+    parent_ids = {m.parent_id for m, _ in messages if m.parent_id}
+    parents_by_id: dict[int, tuple[Messages, Users]] = {}
+    if parent_ids:
+        parent_rows = db.query(Messages, Users).join(
+            Users, Messages.sender_id == Users.user_id
+        ).filter(
+            Messages.message_id.in_(parent_ids),
+            Messages.channel_id == channel_id,
+            Messages.is_deleted == False,
+        ).all()
+        parents_by_id = {pm.message_id: (pm, ps) for pm, ps in parent_rows}
 
     result = []
 
@@ -618,28 +661,19 @@ def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session
             })
 
         reply_to = None
-        if message.parent_id:
-            parent_message_data = db.query(Messages, Users).join(
-                Users, Messages.sender_id == Users.user_id
-            ).filter(
-                Messages.message_id == message.parent_id,
-                Messages.channel_id == channel_id,
-                Messages.is_deleted == False
-            ).first()
-
-            if parent_message_data:
-                parent_message, parent_sender = parent_message_data
-                reply_to = {
-                    "message_id": parent_message.message_id,
-                    "message_content": parent_message.message_content,
-                    "sender": {
-                        "user_id": parent_sender.user_id,
-                        "first_name": parent_sender.first_name,
-                        "last_name": parent_sender.last_name,
-                        "avatar_url": parent_sender.avatar_url,
-                        "user_tag": parent_sender.user_tag
-                    }
+        if message.parent_id and message.parent_id in parents_by_id:
+            parent_message, parent_sender = parents_by_id[message.parent_id]
+            reply_to = {
+                "message_id": parent_message.message_id,
+                "message_content": parent_message.message_content,
+                "sender": {
+                    "user_id": parent_sender.user_id,
+                    "first_name": parent_sender.first_name,
+                    "last_name": parent_sender.last_name,
+                    "avatar_url": parent_sender.avatar_url,
+                    "user_tag": parent_sender.user_tag
                 }
+            }
 
         result.append({
             "message_id": message.message_id,
@@ -658,27 +692,19 @@ def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session
             }
         })
 
+    window_start = min((m.sent_at for m, _ in messages), default=None)
+    window_end = max((m.sent_at for m, _ in messages), default=None)
+
+    files_query = db.query(Files, Users).join(Users, Files.sender_id == Users.user_id).filter(
+        Files.is_deleted == False
+    )
     if channel.team_id is not None:
-        files = db.query(
-            Files,
-            Users
-        ).join(
-            Users, Files.sender_id == Users.user_id
-        ).filter(
-            Files.team_id == channel.team_id,
-            Files.is_deleted == False
-        ).all()
+        files_query = files_query.filter(Files.team_id == channel.team_id)
     else:
-        files = db.query(
-            Files,
-            Users
-        ).join(
-            Users, Files.sender_id == Users.user_id
-        ).filter(
-            Files.team_id == None,
-            Files.org_id == org_id,
-            Files.is_deleted == False
-        ).all()
+        files_query = files_query.filter(Files.team_id == None, Files.org_id == org_id)
+    if window_start is not None and window_end is not None:
+        files_query = files_query.filter(Files.sent_at >= window_start, Files.sent_at <= window_end)
+    files = files_query.order_by(Files.sent_at.desc()).limit(MAX_MESSAGE_LIMIT).all()
 
     for file_record, user in files:
         result.append({
@@ -706,8 +732,16 @@ def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session
         })
 
     result.sort(key=lambda item: item["sent_at"])
-    
-    return result
+
+    return {
+        "messages": result,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "returned": len(messages),
+            "has_more": has_more,
+        },
+    }
 
 
 def edit_message_service(message_id: int, data: Message_edit_input, user: Users, db: Session):
@@ -1164,7 +1198,15 @@ async def voice_websocket_endpoint(
             )
             
             
-def search_messages_service(channel_id: int, org_id: int, query: str, user: Users, db: Session):
+def search_messages_service(
+    channel_id: int,
+    org_id: int,
+    query: str,
+    user: Users,
+    db: Session,
+    limit: int | None = None,
+    offset: int | None = None,
+):
     user_id = user.user_id
 
     member = db.query(Organization_members).filter(
@@ -1196,32 +1238,45 @@ def search_messages_service(channel_id: int, org_id: int, query: str, user: User
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty")
 
+    limit, offset = _normalize_message_pagination(limit, offset)
+
     search_term = f"%{query.strip()}%"
 
-    results = db.query(Messages, Users).join(
+    rows = db.query(Messages, Users).join(
         Users, Messages.sender_id == Users.user_id
     ).filter(
         Messages.channel_id == channel_id,
         Messages.is_deleted == False,
         Messages.message_content.ilike(search_term)
-    ).order_by(Messages.sent_at.desc()).limit(50).all()
+    ).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()
 
-    return [
-        {
-            "message_id": message.message_id,
-            "message_content": message.message_content,
-            "sent_at": message.sent_at,
-            "edited_at": message.edited_at,
-            "sender": {
-                "user_id": user.user_id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "avatar_url": user.avatar_url,
-                "user_tag": user.user_tag
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    return {
+        "messages": [
+            {
+                "message_id": message.message_id,
+                "message_content": message.message_content,
+                "sent_at": message.sent_at,
+                "edited_at": message.edited_at,
+                "sender": {
+                    "user_id": sender.user_id,
+                    "first_name": sender.first_name,
+                    "last_name": sender.last_name,
+                    "avatar_url": sender.avatar_url,
+                    "user_tag": sender.user_tag
+                }
             }
-        }
-        for message, user in results
-    ]
+            for message, sender in rows
+        ],
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "returned": len(rows),
+            "has_more": has_more,
+        },
+    }
 
 
 def pin_message_service(message_id: int, org_id: int, user: Users, db: Session):
