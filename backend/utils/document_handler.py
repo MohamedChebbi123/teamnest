@@ -1,3 +1,4 @@
+import logging
 import os
 import tempfile
 import httpx
@@ -8,6 +9,8 @@ from llama_index.core import SimpleDirectoryReader, Document
 from llama_index.core.node_parser import SentenceSplitter
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
@@ -46,8 +49,8 @@ def extract_tables_from_pdf(file_path: str):
             table_texts.append(table_text)
 
         return table_texts
-    except Exception as e:
-        print(f"[TABLE EXTRACT] Camelot extraction failed: {e}")
+    except Exception:
+        logger.exception("Camelot table extraction failed", extra={"file_path": file_path})
         return []
 
 
@@ -55,7 +58,10 @@ def load_document(file_url: str, file_name: str):
     with tempfile.TemporaryDirectory() as tmp_dir:
         response = httpx.get(file_url, follow_redirects=True)
         response.raise_for_status()
-        print(f"[EMBED DEBUG] URL: {file_url}, status: {response.status_code}, size: {len(response.content)} bytes")
+        logger.debug(
+            "Document fetched",
+            extra={"file_url": file_url, "status": response.status_code, "size": len(response.content)},
+        )
         file_path = os.path.join(tmp_dir, file_name)
 
         with open(file_path, "wb") as f:

@@ -1,9 +1,12 @@
+import logging
 import random
 import re
 import os
 from fastapi import HTTPException
 import stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+logger = logging.getLogger(__name__)
 from models.Users import Users
 from models.Organization import Organization
 from models.Organization_members import Organization_members
@@ -101,7 +104,7 @@ def create_subscritpion_service(org_id: int, user: Users, db: Session):
 
 
 def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db: Session):
-    print(f"[confirm_upgrade] org_id={org_id} session_id={session_id}")
+    logger.info("confirm_upgrade invoked", extra={"org_id": org_id, "session_id": session_id})
     user_id = user.user_id
 
     org = db.query(Organization).filter(
@@ -119,8 +122,11 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
         try:
             checkout_session = stripe.checkout.Session.retrieve(session_id)
             stripe_subscription_id = checkout_session.get("subscription")
-        except Exception as e:
-            print(f"[confirm_upgrade] Session lookup failed: {e}")
+        except Exception:
+            logger.exception(
+                "confirm_upgrade session lookup failed",
+                extra={"org_id": org_id, "session_id": session_id},
+            )
 
     if not stripe_subscription_id:
         try:
@@ -129,15 +135,18 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
                 if s.get("metadata", {}).get("org_id") == str(org_id) and s.get("subscription"):
                     stripe_subscription_id = s["subscription"]
                     break
-        except Exception as e:
-            print(f"[confirm_upgrade] Session list fallback failed: {e}")
+        except Exception:
+            logger.exception("confirm_upgrade session list fallback failed", extra={"org_id": org_id})
 
     if stripe_subscription_id:
         try:
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             stripe_price_id = subscription["items"]["data"][0]["price"]["id"] if subscription["items"]["data"] else None
-        except Exception as e:
-            print(f"[confirm_upgrade] Subscription detail lookup failed: {e}")
+        except Exception:
+            logger.exception(
+                "confirm_upgrade subscription detail lookup failed",
+                extra={"org_id": org_id, "stripe_subscription_id": stripe_subscription_id},
+            )
 
     db.query(Organization_payments).filter(
         Organization_payments.organization_id == org_id

@@ -1,5 +1,6 @@
 ﻿from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime, UTC
+import logging
 import os
 import re
 from utils.jwt_handler import verify_token
@@ -26,6 +27,8 @@ from utils.messages_handler import upsert_message
 from utils.log_handler import create_log
 from database.connection import SessionLocal
 from utils.security import authenticate_ws
+
+logger = logging.getLogger(__name__)
 
 manager=Text_Websocket_manager()
 voice_manager = VoiceWebsocketManager()
@@ -100,8 +103,6 @@ def create_mention_notifications(db: Session, mentioned_users: list[Users], mess
 
         db.add(Notifications(**notification_kwargs))
 
-    db.commit()
-
 
 def get_announcement_recipients(db: Session, channel_team_id: int | None, org_id: int, sender_id: int) -> list[Users]:
     if channel_team_id is not None:
@@ -148,8 +149,6 @@ def create_announcement_notifications(db: Session, recipients: list[Users], mess
             notification_kwargs["is_read"] = False
 
         db.add(Notifications(**notification_kwargs))
-
-    db.commit()
 
 
 async def push_announcement_notification(
@@ -452,7 +451,7 @@ async def send_file_realtime_service(
             })
             return
         except Exception as e:
-            print(f"[CLOUDINARY ERROR] {file_name}: {e}")
+            logger.exception("Cloudinary upload failed", extra={"file_name": file_name})
             await websocket.send_json({
                 "type": "error",
                 "detail": f"Failed to upload file: {str(e)}"
@@ -516,8 +515,11 @@ async def send_file_realtime_service(
             user_id=str(user_id),
             team_id=channel.team_id
         )
-    except Exception as e:
-        print(f"[EMBED ERROR] Failed to embed document {stored_file_name}: {e}")
+    except Exception:
+        logger.exception(
+            "Failed to embed document",
+            extra={"file_name": stored_file_name, "document_id": new_file.id, "user_id": user_id},
+        )
 
 
 def fetch_voice_participants_service(channel_id: int, org_id: int, user: Users, db: Session):
@@ -798,9 +800,12 @@ async def send_messages_realtime(
     authorization: str,
     org_id: int,
 ):
-    print(f"[WS /mesages] handler entered channel_id={channel_id} org_id={org_id} token_len={len(authorization) if authorization else 0}")
+    logger.info(
+        "messages websocket handler entered",
+        extra={"channel_id": channel_id, "org_id": org_id, "token_len": len(authorization) if authorization else 0},
+    )
     await websocket.accept()
-    print(f"[WS /mesages] accepted channel_id={channel_id}")
+    logger.info("messages websocket accepted", extra={"channel_id": channel_id, "org_id": org_id})
 
     auth_db = SessionLocal()
     try:
@@ -907,11 +912,47 @@ async def send_messages_realtime(
                         parent_id=parent_message.message_id if parent_message else None
                     )
 
-                    msg_db.add(new_message)
-                    msg_db.commit()
-                    msg_db.refresh(new_message)
-
                     sender = msg_db.query(Users).filter(Users.user_id == user_id).first()
+
+                    mention_tags = get_user_tag(content)
+                    mentioned_users = resolve_mentioned_users(msg_db, org_id, mention_tags, user_id)
+                    mentions_payload = [
+                        {
+                            "user_id": mentioned.user_id,
+                            "first_name": mentioned.first_name,
+                            "last_name": mentioned.last_name,
+                            "user_tag": mentioned.user_tag,
+                        }
+                        for mentioned in mentioned_users
+                    ]
+
+                    announcement_recipients: list[Users] = []
+                    if channel_mode == "announcement":
+                        mentioned_ids = {m.user_id for m in mentioned_users}
+                        announcement_recipients = [
+                            r for r in get_announcement_recipients(msg_db, channel_team_id, org_id, user_id)
+                            if r.user_id not in mentioned_ids
+                        ]
+
+                    try:
+                        msg_db.add(new_message)
+                        msg_db.flush()
+                        create_mention_notifications(msg_db, mentioned_users, new_message.message_id)
+                        create_announcement_notifications(msg_db, announcement_recipients, new_message.message_id)
+                        msg_db.commit()
+                    except Exception:
+                        msg_db.rollback()
+                        logger.exception(
+                            "Failed to persist message",
+                            extra={"channel_id": channel_id, "org_id": org_id, "user_id": user_id},
+                        )
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": "Failed to send message",
+                        })
+                        continue
+
+                    msg_db.refresh(new_message)
 
                     try:
                         team = msg_db.query(Teams).filter(Teams.team_id == channel_team_id).first() if channel_team_id else None
@@ -931,24 +972,11 @@ async def send_messages_realtime(
                             org_name=org.organization_name if org else "",
                             parent_id=new_message.parent_id
                         )
-                    except Exception as e:
-                        print(f"Failed to upsert message to Pinecone: {e}")
-                    mention_tags = get_user_tag(new_message.message_content)
-                    mentioned_users = resolve_mentioned_users(msg_db, org_id, mention_tags, user_id)
-                    mentions_payload = [
-                        {
-                            "user_id": mentioned.user_id,
-                            "first_name": mentioned.first_name,
-                            "last_name": mentioned.last_name,
-                            "user_tag": mentioned.user_tag,
-                        }
-                        for mentioned in mentioned_users
-                    ]
-
-                    try:
-                        create_mention_notifications(msg_db, mentioned_users, new_message.message_id)
                     except Exception:
-                        msg_db.rollback()
+                        logger.exception(
+                            "Failed to upsert message to Pinecone",
+                            extra={"message_id": new_message.message_id, "channel_id": channel_id, "org_id": org_id},
+                        )
 
                     for mentioned in mentioned_users:
                         try:
@@ -965,36 +993,32 @@ async def send_messages_realtime(
                                 channel_name=channel_name,
                             )
                         except Exception:
+                            logger.exception(
+                                "Failed to push mention notification",
+                                extra={"receiver_id": mentioned.user_id, "message_id": new_message.message_id},
+                            )
                             continue
 
-                    if channel_mode == "announcement":
-                        mentioned_ids = {m.user_id for m in mentioned_users}
-                        announcement_recipients = [
-                            r for r in get_announcement_recipients(msg_db, channel_team_id, org_id, user_id)
-                            if r.user_id not in mentioned_ids
-                        ]
-
+                    for recipient in announcement_recipients:
                         try:
-                            create_announcement_notifications(msg_db, announcement_recipients, new_message.message_id)
+                            await push_announcement_notification(
+                                receiver_id=recipient.user_id,
+                                sender_id=user_id,
+                                message_id=new_message.message_id,
+                                channel_id=channel_id,
+                                org_id=org_id,
+                                sender_first_name=sender.first_name if sender else "",
+                                sender_last_name=sender.last_name if sender else "",
+                                sender_avatar_url=sender.avatar_url if sender else None,
+                                sender_user_tag=sender.user_tag if sender else None,
+                                channel_name=channel_name,
+                            )
                         except Exception:
-                            msg_db.rollback()
-
-                        for recipient in announcement_recipients:
-                            try:
-                                await push_announcement_notification(
-                                    receiver_id=recipient.user_id,
-                                    sender_id=user_id,
-                                    message_id=new_message.message_id,
-                                    channel_id=channel_id,
-                                    org_id=org_id,
-                                    sender_first_name=sender.first_name if sender else "",
-                                    sender_last_name=sender.last_name if sender else "",
-                                    sender_avatar_url=sender.avatar_url if sender else None,
-                                    sender_user_tag=sender.user_tag if sender else None,
-                                    channel_name=channel_name,
-                                )
-                            except Exception:
-                                continue
+                            logger.exception(
+                                "Failed to push announcement notification",
+                                extra={"receiver_id": recipient.user_id, "message_id": new_message.message_id},
+                            )
+                            continue
 
                     reply_to = None
                     if parent_message:
@@ -1076,7 +1100,10 @@ async def send_messages_realtime(
                         db=file_db,
                     )
                 except Exception as e:
-                    print(f"[FILE UPLOAD ERROR] {e}")
+                    logger.exception(
+                        "File upload failed",
+                        extra={"channel_id": channel_id, "org_id": org_id, "user_id": user_id},
+                    )
                     await websocket.send_json({
                         "type": "error",
                         "detail": f"File upload failed: {str(e)}"

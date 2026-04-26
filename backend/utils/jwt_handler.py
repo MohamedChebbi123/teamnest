@@ -1,9 +1,12 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
@@ -43,6 +46,6 @@ def verify_token(token: str, expected_type: str):
 
         return payload
 
-    except JWTError as e:
-        print("JWT error:", e)
+    except JWTError:
+        logger.warning("JWT verification failed", extra={"expected_type": expected_type}, exc_info=True)
         return None

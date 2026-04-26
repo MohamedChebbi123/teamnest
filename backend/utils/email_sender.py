@@ -1,8 +1,11 @@
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+import logging
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
@@ -18,9 +21,8 @@ conf = ConnectionConfig(
 
 async def simple_send(email: str, verification_code: str) -> bool:
     try:
-        print(f"Attempting to send email to: {email}")
-        print(f"Verification code: {verification_code}")
-        
+        logger.info("Sending verification email", extra={"email": email})
+
         html = f"""
         <p>Hi 👋 thanks for registering!</p>
         <p>Your verification code is: <b>{verification_code}</b></p>
@@ -28,19 +30,19 @@ async def simple_send(email: str, verification_code: str) -> bool:
 
         message = MessageSchema(
             subject="Verify your account",
-            recipients=[email],   
+            recipients=[email],
             body=html,
             subtype=MessageType.html
         )
 
         fm = FastMail(conf)
         await fm.send_message(message)
-        print(f"Email sent successfully to: {email}")
+        logger.info("Verification email sent", extra={"email": email})
         return True
-        
-    except Exception as e:
-        print(f"Email sending failed: {str(e)}")
-        raise e
+
+    except Exception:
+        logger.exception("Verification email send failed", extra={"email": email})
+        raise
 
 async def send_password_reset_code(email: str, verification_code: str) -> bool:
     try:
@@ -71,6 +73,6 @@ async def send_password_reset_code(email: str, verification_code: str) -> bool:
         await fm.send_message(message)
         return True
         
-    except Exception as e:
-        print(f"Password reset email sending failed: {str(e)}")
-        raise e
+    except Exception:
+        logger.exception("Password reset email send failed", extra={"email": email})
+        raise

@@ -5,6 +5,7 @@ from utils.hasher import hash_password, hash_code, verify_code
 from utils.cloudinary_handler import upload_user_profile_image
 from utils.email_sender import simple_send, send_password_reset_code
 from datetime import datetime, timedelta, UTC
+import logging
 import secrets
 from schemas.Logininput import Logininput
 from utils.hasher import verify_password
@@ -12,6 +13,8 @@ from utils.jwt_handler import create_access_token, create_refresh_token, verify_
 from utils.Websocket_manager import connectivity_manager
 from utils.validators import validate_email, validate_password, validate_phone, validate_name
 from models.Friends import Friends
+
+logger = logging.getLogger(__name__)
 
 ConnectivityManager = connectivity_manager
 
@@ -100,8 +103,8 @@ async def resend_verification_service(
 
     try:
         await simple_send(email, verification_code)
-    except Exception as e:
-        print(f"Failed to send verification email: {str(e)}")
+    except Exception:
+        logger.exception("Failed to send verification email", extra={"email": email})
         raise HTTPException(status_code=500, detail="Failed to send verification email")
 
     return {"message": "Verification code sent successfully"}
@@ -300,8 +303,8 @@ async def send_password_reset_code_service(email: str, db: Session):
 
     try:
         await send_password_reset_code(email, reset_code)
-    except Exception as e:
-        print(f"Failed to send password reset email: {str(e)}")
+    except Exception:
+        logger.exception("Failed to send password reset email", extra={"email": email})
 
     return generic_response
 
