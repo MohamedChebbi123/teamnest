@@ -152,9 +152,8 @@ async def websocket_handler(
     channel_id: int,
     token: str = Query(...),
     org_id: int = Query(...),
-    db: Session = Depends(connect_databse),
 ):
-    return await send_messages_realtime(websocket, channel_id, f"Bearer {token}", org_id, db)
+    return await send_messages_realtime(websocket, channel_id, f"Bearer {token}", org_id)
 
 
 @router.get("/user/notifications")
@@ -178,6 +177,5 @@ async def mark_notifications_seen(
 async def notifications_websocket_handler(
     websocket: WebSocket,
     token: str = Query(...),
-    db: Session = Depends(connect_databse),
 ):
-    return await notifications_ws_endpoint(websocket, f"Bearer {token}", db)
+    return await notifications_ws_endpoint(websocket, f"Bearer {token}")

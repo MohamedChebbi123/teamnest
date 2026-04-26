@@ -10,9 +10,44 @@ from schemas.Direct_messages_schema import Direct_messages_schema
 from models.Direct_messages import Direct_messages
 from models.Notifications import Notifications
 from models.Users import Users
+from models.Friends import Friends
+from models.Blocked_users import Blocked_users
+from models.Organization_members import Organization_members
 from utils.Websocket_manager import DMWebSocketManager, notification_manager
 from utils.plan_limits import FREE_MAX_FILE_SIZE_BYTES, FREE_MAX_FILE_SIZE_MB
 from database.connection import SessionLocal
+
+
+def can_direct_message(db: Session, sender_id: int, receiver_id: int) -> tuple[bool, str | None]:
+    if sender_id == receiver_id:
+        return False, "Cannot send direct message to yourself"
+
+    blocked = db.query(Blocked_users).filter(
+        ((Blocked_users.blocker_id == sender_id) & (Blocked_users.blocked_id == receiver_id)) |
+        ((Blocked_users.blocker_id == receiver_id) & (Blocked_users.blocked_id == sender_id))
+    ).first()
+    if blocked:
+        return False, "You cannot send messages to this user"
+
+    friendship = db.query(Friends).filter(
+        ((Friends.user_id == sender_id) & (Friends.friend_id == receiver_id)) |
+        ((Friends.user_id == receiver_id) & (Friends.friend_id == sender_id))
+    ).first()
+    if friendship:
+        return True, None
+
+    shared_org = db.query(Organization_members).filter(
+        Organization_members.memmber_id == sender_id,
+        Organization_members.org_id.in_(
+            db.query(Organization_members.org_id).filter(
+                Organization_members.memmber_id == receiver_id
+            )
+        )
+    ).first()
+    if shared_org:
+        return True, None
+
+    return False, "You can only message friends or members of your organization"
 
 dm_manager = DMWebSocketManager()
 DM_FILE_PREFIX = "__FILE__::"
@@ -119,6 +154,10 @@ def messages_users_service(data: Direct_messages_schema, user: Users, db: Sessio
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
 
+    allowed, reason = can_direct_message(db, user_id, data.receiver_id)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
+
     message_content = data.content.strip()
     if not message_content:
         raise HTTPException(status_code=400, detail="Message content cannot be empty")
@@ -202,6 +241,10 @@ def send_direct_file_service(receiver_id: int, file_name: str, file_size: int, f
     receiver = db.query(Users).filter(Users.user_id == receiver_id).first()
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
+
+    allowed, reason = can_direct_message(db, user_id, receiver_id)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
 
     if not file_name:
         raise HTTPException(status_code=400, detail="file_name is required")
@@ -641,6 +684,14 @@ async def send_direct_messages_realtime(
                         })
                         continue
 
+                    allowed, reason = can_direct_message(op_db, user_id, receiver_id)
+                    if not allowed:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": reason
+                        })
+                        continue
+
                     message_content = str(content).strip()
                     if not message_content:
                         await websocket.send_json({
@@ -753,6 +804,14 @@ async def send_direct_messages_realtime(
                 if receiver_id == user_id:
                     continue
 
+                gate_db = SessionLocal()
+                try:
+                    allowed, _ = can_direct_message(gate_db, user_id, receiver_id)
+                finally:
+                    gate_db.close()
+                if not allowed:
+                    continue
+
                 typing_payload = {
                     "type": "direct_typing",
                     "sender_id": user_info["user_id"],
@@ -788,6 +847,14 @@ async def send_direct_messages_realtime(
                         await websocket.send_json({
                             "type": "error",
                             "detail": "Receiver not found"
+                        })
+                        continue
+
+                    allowed, reason = can_direct_message(op_db, user_id, receiver_id)
+                    if not allowed:
+                        await websocket.send_json({
+                            "type": "error",
+                            "detail": reason
                         })
                         continue
 

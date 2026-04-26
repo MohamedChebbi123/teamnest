@@ -549,20 +549,6 @@ def fetch_voice_participants_service(channel_id: int, org_id: int, user: Users, 
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session):
     user_id = user.user_id
 
@@ -578,9 +564,19 @@ def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session
         Channels.channel_id == channel_id,
         Channels.org_id == org_id
     ).first()
-    
+
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    if channel.team_id is not None:
+        in_team = db.query(Team_association).filter_by(
+            team_id=channel.team_id, user_id=user_id
+        ).first()
+        organization = db.query(Organization).filter(
+            Organization.organization_id == org_id
+        ).first()
+        if not in_team and (not organization or organization.owner_id != user_id):
+            raise HTTPException(status_code=403, detail="Not a team member")
 
     org_users = db.query(Users).join(
         Organization_members,
@@ -767,41 +763,53 @@ async def send_messages_realtime(
     channel_id: int,
     authorization: str,
     org_id: int,
-    db: Session
 ):
     print(f"[WS /mesages] handler entered channel_id={channel_id} org_id={org_id} token_len={len(authorization) if authorization else 0}")
     await websocket.accept()
     print(f"[WS /mesages] accepted channel_id={channel_id}")
 
-    user = await authenticate_ws(websocket, authorization, db)
-    if not user:
-        return
+    auth_db = SessionLocal()
+    try:
+        user = await authenticate_ws(websocket, authorization, auth_db)
+        if not user:
+            return
 
-    user_id = user.user_id
+        user_id = user.user_id
 
-    member = db.query(Organization_members).filter(
-        Organization_members.memmber_id == user_id,
-        Organization_members.org_id == org_id
-    ).first()
+        member = auth_db.query(Organization_members).filter(
+            Organization_members.memmber_id == user_id,
+            Organization_members.org_id == org_id
+        ).first()
 
-    if not member:
-        await websocket.close(code=1008, reason="Not a member of this organization")
-        return
+        if not member:
+            await websocket.close(code=1008, reason="Not a member of this organization")
+            return
 
-    channel = db.query(Channels).filter(
-        Channels.channel_id == channel_id,
-        Channels.org_id == org_id
-    ).first()
+        channel = auth_db.query(Channels).filter(
+            Channels.channel_id == channel_id,
+            Channels.org_id == org_id
+        ).first()
 
-    if not channel:
-        await websocket.close(code=1008, reason="Channel not found")
-        return
+        if not channel:
+            await websocket.close(code=1008, reason="Channel not found")
+            return
 
-    channel_name = channel.channel_name
-    channel_team_id = channel.team_id
-    channel_mode = channel.channel_mode
+        if channel.team_id is not None:
+            in_team = auth_db.query(Team_association).filter_by(
+                team_id=channel.team_id, user_id=user_id
+            ).first()
+            organization = auth_db.query(Organization).filter(
+                Organization.organization_id == org_id
+            ).first()
+            if not in_team and (not organization or organization.owner_id != user_id):
+                await websocket.close(code=1008, reason="Not a team member")
+                return
 
-    db.close()
+        channel_name = channel.channel_name
+        channel_team_id = channel.team_id
+        channel_mode = channel.channel_mode
+    finally:
+        auth_db.close()
 
     await manager.connect(channel_id, websocket)
 
@@ -1051,18 +1059,19 @@ async def send_messages_realtime(
 async def notifications_ws_endpoint(
     websocket: WebSocket,
     authorization: str,
-    db: Session,
 ):
     from utils.security import authenticate_ws
     await websocket.accept()
 
-    user = await authenticate_ws(websocket, authorization, db)
-    if not user:
-        return
+    auth_db = SessionLocal()
+    try:
+        user = await authenticate_ws(websocket, authorization, auth_db)
+        if not user:
+            return
 
-    user_id = user.user_id
-
-    db.close()
+        user_id = user.user_id
+    finally:
+        auth_db.close()
 
     await notification_manager.connect(user_id, websocket)
 
@@ -1080,47 +1089,46 @@ async def voice_websocket_endpoint(
     channel_id: int,
     authorization: str,
     org_id: int,
-    db: Session
 ):
     from utils.security import authenticate_ws
 
-    user = await authenticate_ws(websocket, authorization, db)
-    if not user:
-        return
+    auth_db = SessionLocal()
+    try:
+        user = await authenticate_ws(websocket, authorization, auth_db)
+        if not user:
+            return
 
-    user_id = user.user_id
+        member = auth_db.query(Organization_members).filter(
+            Organization_members.memmber_id == user.user_id,
+            Organization_members.org_id == org_id
+        ).first()
 
-    member = db.query(Organization_members).filter(
-        Organization_members.memmber_id == user_id,
-        Organization_members.org_id == org_id
-    ).first()
+        if not member:
+            await websocket.close(code=1008, reason="Not a member of this organization")
+            return
 
-    if not member:
-        await websocket.close(code=1008, reason="Not a member of this organization")
-        return
+        channel = auth_db.query(Channels).filter(
+            Channels.channel_id == channel_id,
+            Channels.org_id == org_id
+        ).first()
 
-    channel = db.query(Channels).filter(
-        Channels.channel_id == channel_id,
-        Channels.org_id == org_id
-    ).first()
+        if not channel:
+            await websocket.close(code=1008, reason="Channel not found")
+            return
 
-    if not channel:
-        await websocket.close(code=1008, reason="Channel not found")
-        return
+        if str(channel.channel_category).lower() != "voice":
+            await websocket.close(code=1008, reason="Channel is not a voice channel")
+            return
 
-    if str(channel.channel_category).lower() != "voice":
-        await websocket.close(code=1008, reason="Channel is not a voice channel")
-        return
-
-    participant = {
-        "user_id": user.user_id,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "avatar_url": user.avatar_url,
-        "user_tag": user.user_tag,
-    }
-
-    db.close()
+        participant = {
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "avatar_url": user.avatar_url,
+            "user_tag": user.user_tag,
+        }
+    finally:
+        auth_db.close()
 
     await voice_manager.connect(channel_id, websocket, participant=participant)
 
@@ -1174,6 +1182,16 @@ def search_messages_service(channel_id: int, org_id: int, query: str, user: User
 
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    if channel.team_id is not None:
+        in_team = db.query(Team_association).filter_by(
+            team_id=channel.team_id, user_id=user_id
+        ).first()
+        organization = db.query(Organization).filter(
+            Organization.organization_id == org_id
+        ).first()
+        if not in_team and (not organization or organization.owner_id != user_id):
+            raise HTTPException(status_code=403, detail="Not a team member")
 
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty")
@@ -1352,6 +1370,16 @@ def fetch_pinned_messages_service(channel_id: int, org_id: int, user: Users, db:
 
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found in this organization")
+
+    if channel.team_id is not None:
+        in_team = db.query(Team_association).filter_by(
+            team_id=channel.team_id, user_id=user_id
+        ).first()
+        organization = db.query(Organization).filter(
+            Organization.organization_id == org_id
+        ).first()
+        if not in_team and (not organization or organization.owner_id != user_id):
+            raise HTTPException(status_code=403, detail="Not a team member")
 
     pinned_messages = db.query(Pinned_messages, Messages, Users).join(
         Messages, Pinned_messages.message_id == Messages.message_id
