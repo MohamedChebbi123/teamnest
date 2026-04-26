@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import UpgradeModal from "@/components/UpgradeModal"
 import { Label } from "@/components/ui/label"
@@ -59,6 +60,8 @@ import {
   MoreVertical,
   Edit,
   Trash2,
+  Search,
+  Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -116,6 +119,28 @@ interface LiveNotification {
   read: boolean
 }
 
+interface SearchResult {
+  message_id: number
+  message_content: string
+  sent_at: string
+  edited_at: string
+  score: number
+  channel: {
+    channel_id: number
+    channel_name: string
+    channel_mode: string
+    channel_category: string
+    team_id: number | null
+  }
+  sender: {
+    user_id: number
+    first_name: string
+    last_name: string
+    avatar_url: string | null
+    user_tag: string | null
+  }
+}
+
 const getChannelIcon = (mode: string, category: string, className: string) => {
   if ((mode || "").toLowerCase() === "announcement") {
     return <Megaphone className={className} />
@@ -132,6 +157,10 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   const [userRole, setUserRole] = useState<string>("MEMBER")
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [channels, setChannels] = useState<Channel[]>([])
@@ -497,6 +526,55 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
     setLiveNotifications((prev) => prev.map((item) => ({ ...item, read: true })))
   }, [isNotificationsOpen])
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (trimmed.length < 2) {
+      setSearchResults([])
+      setSearchError(null)
+      setIsSearching(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      setIsSearching(true)
+      setSearchError(null)
+      try {
+        const token = localStorage.getItem('access_token')
+        if (!token) {
+          router.push('/auth/login')
+          return
+        }
+        const url = `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/search/messages?q=${encodeURIComponent(trimmed)}&top_k=20`
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          const text = await response.text()
+          let detail = "Search failed"
+          try { detail = JSON.parse(text)?.detail || detail } catch {}
+          setSearchResults([])
+          setSearchError(detail)
+          return
+        }
+        const data = await response.json()
+        setSearchResults(Array.isArray(data?.results) ? data.results : [])
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return
+        setSearchError("Search failed")
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
+  }, [searchQuery, organizationId, router])
 
   useEffect(() => {
     const channelMatch = pathname.match(/^\/channels\/(\d+)$/)
@@ -983,6 +1061,87 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             </>
           )}
         </div>
+
+        {/* Global semantic search */}
+        {isExpanded && (
+          <div className="border-b p-3">
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      if (!searchOpen) setSearchOpen(true)
+                    }}
+                    onFocus={() => setSearchOpen(true)}
+                    placeholder="Search messages..."
+                    className="h-8 pl-8 pr-2 text-xs"
+                  />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                sideOffset={6}
+                className="w-[320px] p-0"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                <div className="px-3 py-2 border-b flex items-center gap-2">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-medium">Semantic search</span>
+                  {isSearching && <Loader2 className="ml-auto h-3 w-3 animate-spin text-muted-foreground" />}
+                </div>
+                <ScrollArea className="max-h-80">
+                  <div className="py-1">
+                    {searchQuery.trim().length < 2 ? (
+                      <p className="px-3 py-6 text-xs text-muted-foreground text-center">
+                        Type at least 2 characters to search across the organization.
+                      </p>
+                    ) : searchError ? (
+                      <p className="px-3 py-6 text-xs text-destructive text-center">{searchError}</p>
+                    ) : !isSearching && searchResults.length === 0 ? (
+                      <p className="px-3 py-6 text-xs text-muted-foreground text-center">No matches found.</p>
+                    ) : (
+                      searchResults.map((result) => {
+                        const senderName = `${result.sender.first_name} ${result.sender.last_name}`.trim() || "Unknown"
+                        const initials = ((result.sender.first_name?.[0] ?? "") + (result.sender.last_name?.[0] ?? "")).toUpperCase() || "?"
+                        return (
+                          <button
+                            key={result.message_id}
+                            onClick={() => {
+                              setSearchOpen(false)
+                              router.push(`/channels/${result.channel.channel_id}`)
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-accent flex items-start gap-2.5 transition-colors"
+                          >
+                            <Avatar className="h-7 w-7 flex-shrink-0">
+                              <AvatarImage src={result.sender.avatar_url ?? undefined} />
+                              <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <span className="font-medium text-foreground truncate">{senderName}</span>
+                                <span>in</span>
+                                <span className="inline-flex items-center gap-0.5 truncate">
+                                  {getChannelIcon(result.channel.channel_mode, result.channel.channel_category, "h-3 w-3")}
+                                  <span className="truncate">{result.channel.channel_name}</span>
+                                </span>
+                              </div>
+                              <p className="text-xs text-foreground/80 line-clamp-2 mt-0.5">
+                                {result.message_content}
+                              </p>
+                            </div>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
 
         {/* DM + Sound Controls */}
         <div className={cn("border-b", isExpanded ? "p-3" : "p-2")}>

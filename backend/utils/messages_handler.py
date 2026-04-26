@@ -77,22 +77,45 @@ def upsert_message(
         record["sent_at_ts"] = sent_at_ts
     if parent_id is not None:
         record["parent_id"] = parent_id
-    _get_index().upsert_records(
+    index = _get_index()
+    index.upsert_records(
         namespace=f"team-{team_id}",
         records=[record]
     )
+    org_record = {**record, "_id": f"org-message-{message_id}"}
+    index.upsert_records(
+        namespace=f"org-{org_id}",
+        records=[org_record]
+    )
 
 
-def delete_message(message_id: int, team_id: int):
-    _get_index().delete(
+def delete_message(message_id: int, team_id: int, org_id: int | None = None):
+    index = _get_index()
+    index.delete(
         ids=[f"message-{message_id}"],
         namespace=f"team-{team_id}"
     )
+    if org_id is not None:
+        index.delete(
+            ids=[f"org-message-{message_id}"],
+            namespace=f"org-{org_id}"
+        )
 
 
 def search_messages(query: str, team_id: int, top_k: int = 5):
     results = _get_index().search(
         namespace=f"team-{team_id}",
+        query={
+            "top_k": top_k,
+            "inputs": {"text": query}
+        }
+    )
+    return results
+
+
+def search_messages_org(query: str, org_id: int, top_k: int = 20):
+    results = _get_index().search(
+        namespace=f"org-{org_id}",
         query={
             "top_k": top_k,
             "inputs": {"text": query}
