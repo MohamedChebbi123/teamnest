@@ -13,11 +13,12 @@ class Tasks(Base):
     created_by=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     parent_task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)  # self-reference
     subtask_group = Column(String, nullable=True)  # group/family label for subtasks
-    priotrity=Column(String,nullable=False)
+    priority=Column(String,nullable=False)
     status=Column(String,nullable=False)
     is_deleted=Column(Boolean,default=False)
-    updated_at = Column(DateTime(timezone=True), default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     finished=Column(Boolean,default=False)
+    due_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
     team = relationship("Teams", back_populates="tasks")

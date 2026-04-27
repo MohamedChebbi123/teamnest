@@ -57,12 +57,13 @@ interface Task {
   id: number
   title: string
   description: string
-  priotrity: string
+  priority: string
   status: string
   team_id: number
   created_by: number
   parent_task_id: number | null
   subtask_group: string | null
+  due_date: string | null
   created_at: string
   updated_at: string
   assignees: Assignee[]
@@ -132,6 +133,8 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<"board" | "list" | "calendar" | "my-tasks">("board")
   const [userId, setUserId] = useState<number | null>(null)
   const [filterPriority, setFilterPriority] = useState<string>("all")
+  const [filterDue, setFilterDue] = useState<"all" | "overdue" | "today" | "week" | "no_date">("all")
+  const [sortBy, setSortBy] = useState<"default" | "due_asc" | "due_desc">("default")
   const [weekStart, setWeekStart] = useState<Date>(() => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
@@ -149,6 +152,7 @@ export default function TasksPage() {
   const [taskDescription, setTaskDescription] = useState("")
   const [taskPriority, setTaskPriority] = useState("medium")
   const [taskStatus, setTaskStatus] = useState("todo")
+  const [taskDueDate, setTaskDueDate] = useState("")
   const [isCreating, setIsCreating] = useState(false)
 
   // Edit dialog
@@ -158,6 +162,7 @@ export default function TasksPage() {
   const [editPriority, setEditPriority] = useState("medium")
   const [editStatus, setEditStatus] = useState("todo")
   const [editAssigneeIds, setEditAssigneeIds] = useState<number[]>([])
+  const [editDueDate, setEditDueDate] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -168,6 +173,7 @@ export default function TasksPage() {
   const [subtaskDescription, setSubtaskDescription] = useState("")
   const [subtaskPriority, setSubtaskPriority] = useState("medium")
   const [subtaskGroup, setSubtaskGroup] = useState("")
+  const [subtaskDueDate, setSubtaskDueDate] = useState("")
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false)
 
   // Assignees
@@ -185,6 +191,7 @@ export default function TasksPage() {
   const [editSubStatus, setEditSubStatus] = useState("todo")
   const [editSubAssigneeIds, setEditSubAssigneeIds] = useState<number[]>([])
   const [editSubGroup, setEditSubGroup] = useState("")
+  const [editSubDueDate, setEditSubDueDate] = useState("")
   const [isEditingSubtask, setIsEditingSubtask] = useState(false)
   const [deletingSubtaskId, setDeletingSubtaskId] = useState<number | null>(null)
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
@@ -283,7 +290,7 @@ export default function TasksPage() {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: taskTitle, description: taskDescription, priority: taskPriority, status: taskStatus, parent_task_id: null, assignee_ids: taskAssigneeIds }),
+          body: JSON.stringify({ title: taskTitle, description: taskDescription, priority: taskPriority, status: taskStatus, parent_task_id: null, assignee_ids: taskAssigneeIds, due_date: taskDueDate ? new Date(taskDueDate).toISOString() : null }),
         }
       )
       const data = await res.json()
@@ -296,6 +303,7 @@ export default function TasksPage() {
         setTaskPriority("medium")
         setTaskStatus("todo")
         setTaskAssigneeIds([])
+        setTaskDueDate("")
       } else {
         toast.error("Error", { description: formatApiError(data.detail, "Failed to create task") })
       }
@@ -326,6 +334,7 @@ export default function TasksPage() {
             parent_task_id: subtaskParentId,
             subtask_group: subtaskGroup.trim() || null,
             assignee_ids: subtaskAssigneeIds,
+            due_date: subtaskDueDate ? new Date(subtaskDueDate).toISOString() : null,
           }),
         }
       )
@@ -339,6 +348,7 @@ export default function TasksPage() {
         setSubtaskPriority("medium")
         setSubtaskGroup("")
         setSubtaskAssigneeIds([])
+        setSubtaskDueDate("")
       } else {
         toast.error("Error", { description: formatApiError(data.detail, "Failed to create subtask") })
       }
@@ -361,7 +371,7 @@ export default function TasksPage() {
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: editTitle, description: editDescription, priority: editPriority, status: editStatus, assignee_ids: editAssigneeIds }),
+          body: JSON.stringify({ title: editTitle, description: editDescription, priority: editPriority, status: editStatus, assignee_ids: editAssigneeIds, due_date: editDueDate ? new Date(editDueDate).toISOString() : null }),
         }
       )
       const data = await res.json()
@@ -528,7 +538,7 @@ export default function TasksPage() {
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: editSubTitle, description: editSubDescription, priority: editSubPriority, status: editSubStatus, subtask_group: editSubGroup.trim() || null, assignee_ids: editSubAssigneeIds }),
+          body: JSON.stringify({ title: editSubTitle, description: editSubDescription, priority: editSubPriority, status: editSubStatus, subtask_group: editSubGroup.trim() || null, assignee_ids: editSubAssigneeIds, due_date: editSubDueDate ? new Date(editSubDueDate).toISOString() : null }),
         }
       )
       const data = await res.json()
@@ -577,11 +587,40 @@ export default function TasksPage() {
   const canCreate = userRole === "OWNER" || canManageTasks
 
   const parentTasks = tasks.filter(t => t.parent_task_id === null)
-  const filteredTasks = (filterPriority === "all"
-    ? parentTasks
-    : parentTasks.filter(t => t.priotrity === filterPriority))
 
-  const tasksForColumn = (status: string) => filteredTasks.filter(t => t.status === status)
+  const startOfToday = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })()
+  const endOfToday = (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d })()
+  const endOfWeek = (() => { const d = new Date(startOfToday); d.setDate(d.getDate() + 7); return d })()
+
+  const matchesDueFilter = (t: Task) => {
+    if (filterDue === "all") return true
+    if (filterDue === "no_date") return !t.due_date
+    if (!t.due_date) return false
+    const due = new Date(t.due_date)
+    if (filterDue === "overdue") return due.getTime() < startOfToday.getTime() && t.status !== "done"
+    if (filterDue === "today") return due.getTime() >= startOfToday.getTime() && due.getTime() <= endOfToday.getTime()
+    if (filterDue === "week") return due.getTime() >= startOfToday.getTime() && due.getTime() <= endOfWeek.getTime()
+    return true
+  }
+
+  const filteredTasks = parentTasks
+    .filter(t => filterPriority === "all" || t.priority === filterPriority)
+    .filter(matchesDueFilter)
+
+  const sortTasks = (list: Task[]) => {
+    if (sortBy === "default") return list
+    const dir = sortBy === "due_asc" ? 1 : -1
+    return [...list].sort((a, b) => {
+      const ad = a.due_date ? new Date(a.due_date).getTime() : null
+      const bd = b.due_date ? new Date(b.due_date).getTime() : null
+      if (ad === null && bd === null) return 0
+      if (ad === null) return 1
+      if (bd === null) return -1
+      return (ad - bd) * dir
+    })
+  }
+
+  const tasksForColumn = (status: string) => sortTasks(filteredTasks.filter(t => t.status === status))
 
   const totalTasks = parentTasks.length
   const doneTasks = parentTasks.filter(t => t.status === "done").length
@@ -697,6 +736,30 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
 
+              <Select value={filterDue} onValueChange={(v) => setFilterDue(v as typeof filterDue)}>
+                <SelectTrigger className="w-[130px] h-8 text-xs">
+                  <SelectValue placeholder="Due" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any due date</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="today">Due today</SelectItem>
+                  <SelectItem value="week">Due this week</SelectItem>
+                  <SelectItem value="no_date">No due date</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default order</SelectItem>
+                  <SelectItem value="due_asc">Due soonest</SelectItem>
+                  <SelectItem value="due_desc">Due latest</SelectItem>
+                </SelectContent>
+              </Select>
+
               {canCreate && viewMode !== "my-tasks" && (
                 <Button onClick={() => setCreateOpen(true)} size="sm">
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -724,7 +787,7 @@ export default function TasksPage() {
               a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
             const tasksForDay = (day: Date) =>
-              filteredTasks.filter(t => sameDay(new Date(t.created_at), day))
+              filteredTasks.filter(t => t.due_date && sameDay(new Date(t.due_date), day))
 
             const monthLabel = (() => {
               const months = new Set(weekDays.map(d => d.getMonth()))
@@ -797,7 +860,7 @@ export default function TasksPage() {
                         <div key={i} className="border-r last:border-r-0 border-b p-2 flex flex-col gap-1.5 min-h-[500px]">
                           {dayTasks.map(task => {
                             const col = COLUMNS.find(c => c.key === task.status) ?? COLUMNS[0]
-                            const priority = PRIORITY_CONFIG[task.priotrity] ?? PRIORITY_CONFIG.medium
+                            const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
                             return (
                               <button
                                 key={task.id}
@@ -865,7 +928,7 @@ export default function TasksPage() {
                         </div>
                       ) : (
                         colTasks.map(task => {
-                          const priority = PRIORITY_CONFIG[task.priotrity] ?? PRIORITY_CONFIG.medium
+                          const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
                           const subs = subtasksOf(task.id)
                           const doneSubs = subs.filter(s => s.status === "done").length
                           return (
@@ -892,6 +955,17 @@ export default function TasksPage() {
                                       {doneSubs}/{subs.length}
                                     </span>
                                   )}
+                                  {task.due_date && (() => {
+                                    const due = new Date(task.due_date)
+                                    const overdue = due.getTime() < startOfToday.getTime() && task.status !== "done"
+                                    const dueToday = due.getTime() >= startOfToday.getTime() && due.getTime() <= endOfToday.getTime()
+                                    return (
+                                      <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${overdue ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400" : dueToday ? "bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" : "bg-muted text-muted-foreground"}`}>
+                                        <CalendarDays className="h-2.5 w-2.5" />
+                                        {formatDate(task.due_date)}
+                                      </span>
+                                    )
+                                  })()}
                                 </div>
                                 {task.assignees?.length > 0 ? (
                                   <div className="flex -space-x-1.5">
@@ -941,7 +1015,7 @@ export default function TasksPage() {
                     ) : (
                       <div className="space-y-1">
                         {colTasks.map(task => {
-                          const priority = PRIORITY_CONFIG[task.priotrity] ?? PRIORITY_CONFIG.medium
+                          const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
                           const subs = subtasksOf(task.id)
                           const doneSubs = subs.filter(s => s.status === "done").length
                           return (
@@ -972,6 +1046,16 @@ export default function TasksPage() {
                                     {doneSubs}/{subs.length}
                                   </span>
                                 )}
+                                {task.due_date && (() => {
+                                  const due = new Date(task.due_date)
+                                  const overdue = due.getTime() < startOfToday.getTime() && task.status !== "done"
+                                  return (
+                                    <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${overdue ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                                      <CalendarDays className="h-3 w-3" />
+                                      {formatDate(task.due_date)}
+                                    </span>
+                                  )
+                                })()}
                                 <span className="text-[10px] text-muted-foreground">{formatDate(task.created_at)}</span>
                                 <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
                               </div>
@@ -990,7 +1074,7 @@ export default function TasksPage() {
                   </div>
                   <h3 className="text-sm font-medium mb-1">No tasks found</h3>
                   <p className="text-xs text-muted-foreground">
-                    {filterPriority !== "all" ? "Try changing the priority filter" : "Create your first task to get started"}
+                    {filterPriority !== "all" || filterDue !== "all" ? "Try changing the filters" : "Create your first task to get started"}
                   </p>
                 </div>
               )}
@@ -1019,7 +1103,7 @@ export default function TasksPage() {
                   </div>
                   {myTasks.map(task => {
                     const col = COLUMNS.find(c => c.key === task.status) ?? COLUMNS[0]
-                    const priority = PRIORITY_CONFIG[task.priotrity] ?? PRIORITY_CONFIG.medium
+                    const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
                     const Icon = col.icon
                     const statusOrder = ["todo", "in_progress", "review", "done"]
                     const currentIdx = statusOrder.indexOf(task.status)
@@ -1113,7 +1197,7 @@ export default function TasksPage() {
         <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden max-h-[85vh] rounded-2xl shadow-2xl border-0 bg-background">
           {selectedTask && (() => {
             const col = COLUMNS.find(c => c.key === selectedTask.status) ?? COLUMNS[0]
-            const priority = PRIORITY_CONFIG[selectedTask.priotrity] ?? PRIORITY_CONFIG.medium
+            const priority = PRIORITY_CONFIG[selectedTask.priority] ?? PRIORITY_CONFIG.medium
             const subs = subtasksOf(selectedTask.id)
             const doneSubs = subs.filter(s => s.status === "done").length
             const Icon = col.icon
@@ -1137,9 +1221,10 @@ export default function TasksPage() {
                             onClick={() => {
                               setEditTitle(selectedTask.title)
                               setEditDescription(selectedTask.description)
-                              setEditPriority(selectedTask.priotrity)
+                              setEditPriority(selectedTask.priority)
                               setEditStatus(selectedTask.status)
                               setEditAssigneeIds(selectedTask.assignees?.map(a => a.user_id) || [])
+                              setEditDueDate(selectedTask.due_date ? selectedTask.due_date.slice(0, 10) : "")
                               setEditOpen(true)
                             }}
                             className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
@@ -1248,7 +1333,7 @@ export default function TasksPage() {
                       const renderSubtask = (sub: Task) => {
                         const subCol = COLUMNS.find(c => c.key === sub.status) ?? COLUMNS[0]
                         const SubIcon = subCol.icon
-                        const subPriority = PRIORITY_CONFIG[sub.priotrity] ?? PRIORITY_CONFIG.medium
+                        const subPriority = PRIORITY_CONFIG[sub.priority] ?? PRIORITY_CONFIG.medium
                         const isExpanded = expandedSubtaskId === sub.id
                         return (
                           <div key={sub.id}>
@@ -1323,7 +1408,7 @@ export default function TasksPage() {
                                 </label>
                                 {canCreate && viewMode !== "my-tasks" && (
                                   <div className="flex items-center gap-2 pt-1">
-                                    <button onClick={(e) => { e.stopPropagation(); setEditingSubtask(sub); setEditSubTitle(sub.title); setEditSubDescription(sub.description); setEditSubPriority(sub.priotrity); setEditSubStatus(sub.status); setEditSubGroup(sub.subtask_group || ""); setEditSubAssigneeIds(sub.assignees?.map(a => a.user_id) || []) }} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">Edit</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setEditingSubtask(sub); setEditSubTitle(sub.title); setEditSubDescription(sub.description); setEditSubPriority(sub.priority); setEditSubStatus(sub.status); setEditSubGroup(sub.subtask_group || ""); setEditSubAssigneeIds(sub.assignees?.map(a => a.user_id) || []); setEditSubDueDate(sub.due_date ? sub.due_date.slice(0, 10) : "") }} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">Edit</button>
                                     <span className="text-muted-foreground/30">·</span>
                                     <button disabled={deletingSubtaskId === sub.id} onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(sub.id) }} className="text-[11px] text-muted-foreground hover:text-red-500 transition-colors">{deletingSubtaskId === sub.id ? "Deleting..." : "Delete"}</button>
                                   </div>
@@ -1409,6 +1494,23 @@ export default function TasksPage() {
                         {col.label}
                       </div>
                     </div>
+
+                    {/* Due date */}
+                    {selectedTask.due_date && (() => {
+                      const due = new Date(selectedTask.due_date)
+                      const now = new Date()
+                      const overdue = due.getTime() < now.getTime() && selectedTask.status !== "done"
+                      return (
+                        <div>
+                          <p className="text-[11px] font-medium text-muted-foreground mb-2">Due</p>
+                          <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium ${overdue ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400" : "bg-muted text-foreground/70"}`}>
+                            <CalendarDays className="h-3 w-3" />
+                            {due.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            {overdue && <span className="text-[10px]">overdue</span>}
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                     {/* Date */}
                     <div>
@@ -1520,6 +1622,15 @@ export default function TasksPage() {
                 </Select>
               </div>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="task_due_date">Due date</Label>
+              <Input
+                id="task_due_date"
+                type="date"
+                value={taskDueDate}
+                onChange={e => setTaskDueDate(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={isCreating}>
@@ -1586,6 +1697,15 @@ export default function TasksPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_due_date">Due date</Label>
+              <Input
+                id="edit_due_date"
+                type="date"
+                value={editDueDate}
+                onChange={e => setEditDueDate(e.target.value)}
+              />
             </div>
             {teamMembers.length > 0 && (
               <div className="grid gap-2">
@@ -1679,6 +1799,15 @@ export default function TasksPage() {
                 onChange={e => setSubtaskGroup(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground">Subtasks with the same group name will be grouped together</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="subtask_due_date">Due date</Label>
+              <Input
+                id="subtask_due_date"
+                type="date"
+                value={subtaskDueDate}
+                onChange={e => setSubtaskDueDate(e.target.value)}
+              />
             </div>
             {teamMembers.length > 0 && (
               <div className="grid gap-2">
@@ -1784,6 +1913,15 @@ export default function TasksPage() {
                 placeholder="e.g. Design, Backend, Testing..."
                 value={editSubGroup}
                 onChange={e => setEditSubGroup(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_sub_due_date">Due date</Label>
+              <Input
+                id="edit_sub_due_date"
+                type="date"
+                value={editSubDueDate}
+                onChange={e => setEditSubDueDate(e.target.value)}
               />
             </div>
             {teamMembers.length > 0 && (

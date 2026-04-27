@@ -5,7 +5,6 @@ from utils.cloudinary_handler import upload_chat_file_from_base64
 from models.Tasks import Tasks
 from models.Task_assignees import Task_assignees
 from models.Task_attachments import Task_attachments
-from models.Organization import Organization
 from models.Team_association import Team_association
 from models.Team_roles import Team_roles
 from schemas.Task_input import Task_input, Task_update, Task_status_update
@@ -13,6 +12,20 @@ from schemas.Task_attachment_input import Task_attachment_input
 from models.Teams import Teams
 from utils.plan_limits import get_file_size_limit
 from utils.log_handler import create_log
+
+
+def _validate_team_in_org(team_id: int, org_id: int, user_id: int, db: Session) -> Teams:
+    team = db.query(Teams).filter(Teams.team_id == team_id, Teams.org_id == org_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found in this organization")
+
+    is_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id,
+    ).first()
+    if not is_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    return team
 
 
 def task_to_dict(task):
@@ -24,9 +37,10 @@ def task_to_dict(task):
         "created_by": task.created_by,
         "parent_task_id": task.parent_task_id,
         "subtask_group": task.subtask_group,
-        "priotrity": task.priotrity,
+        "priority": task.priority,
         "status": task.status,
         "is_deleted": task.is_deleted,
+        "due_date": task.due_date,
         "created_at": task.created_at,
         "updated_at": task.updated_at,
         "assignees": [
@@ -53,19 +67,8 @@ def task_to_dict(task):
 def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user: Users, db: Session):
     user_id = user.user_id
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
-
-    is_owner = found_organization.owner_id == user_id
+    team = _validate_team_in_org(team_id, org_id, user_id, db)
+    is_owner = team.organization.owner_id == user_id
 
     if not is_owner:
         role = db.query(Team_roles).filter(
@@ -99,16 +102,17 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
         description=task_data.description,
         team_id=team_id,
         created_by=user_id,
-        priotrity=task_data.priority,
+        priority=task_data.priority,
         status=task_data.status,
         parent_task_id=task_data.parent_task_id,
-        subtask_group=task_data.subtask_group
+        subtask_group=task_data.subtask_group,
+        due_date=task_data.due_date,
     )
 
     db.add(new_task)
-    db.flush() 
-    
-    if task_data.parent_task_id and task_data.assignee_ids:
+    db.flush()
+
+    if task_data.assignee_ids:
         for assignee_id in task_data.assignee_ids:
             db.add(Task_assignees(task_id=new_task.id, user_id=assignee_id))
 
@@ -131,17 +135,7 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
 def fetch_team_tasks_service(team_id: int, org_id: int, user: Users, db: Session):
     user_id = user.user_id
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    _validate_team_in_org(team_id, org_id, user_id, db)
 
     tasks = db.query(Tasks).filter(Tasks.team_id == team_id, Tasks.is_deleted == False).all()
 
@@ -151,23 +145,13 @@ def fetch_team_tasks_service(team_id: int, org_id: int, user: Users, db: Session
 def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_update, user: Users, db: Session):
     user_id = user.user_id
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    team = _validate_team_in_org(team_id, org_id, user_id, db)
 
     task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.team_id == team_id, Tasks.is_deleted == False).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    is_owner = found_organization.owner_id == user_id
+    is_owner = team.organization.owner_id == user_id
 
     if not is_owner:
         role = db.query(Team_roles).filter(
@@ -183,15 +167,37 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
     if task_data.description is not None:
         task.description = task_data.description
     if task_data.priority is not None:
-        task.priotrity = task_data.priority
+        task.priority = task_data.priority
     if task_data.status is not None:
         if task_data.status == "done" and task.status != "review":
             raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
         task.status = task_data.status
     if task_data.parent_task_id is not None:
+        if task_data.parent_task_id == task.id:
+            raise HTTPException(status_code=400, detail="A task cannot be its own parent")
+
+        new_parent = db.query(Tasks).filter(
+            Tasks.id == task_data.parent_task_id,
+            Tasks.team_id == team_id,
+            Tasks.is_deleted == False,
+        ).first()
+        if not new_parent:
+            raise HTTPException(status_code=404, detail="Parent task not found in this team")
+
+        ancestor_id = new_parent.parent_task_id
+        seen = {task.id}
+        while ancestor_id is not None:
+            if ancestor_id in seen:
+                raise HTTPException(status_code=400, detail="Parent change would create a cycle")
+            seen.add(ancestor_id)
+            ancestor = db.query(Tasks.parent_task_id).filter(Tasks.id == ancestor_id).first()
+            ancestor_id = ancestor[0] if ancestor else None
+
         task.parent_task_id = task_data.parent_task_id
     if task_data.subtask_group is not None:
         task.subtask_group = task_data.subtask_group
+    if task_data.due_date is not None:
+        task.due_date = task_data.due_date
 
     if task_data.assignee_ids is not None:
         for assignee_id in task_data.assignee_ids:
@@ -217,23 +223,13 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
 def delete_task_service(task_id: int, team_id: int, org_id: int, user: Users, db: Session):
     user_id = user.user_id
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    team = _validate_team_in_org(team_id, org_id, user_id, db)
 
     task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.team_id == team_id, Tasks.is_deleted == False).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    is_owner = found_organization.owner_id == user_id
+    is_owner = team.organization.owner_id == user_id
 
     if not is_owner:
         role = db.query(Team_roles).filter(
@@ -255,39 +251,10 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, user: Users, db
     return {"message": "Task deleted successfully"}
 
 
-
-def get_my_tasks_service(task_id: int, user: Users, db: Session):
-    user_id = user.user_id
-
-    task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.is_deleted == False).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    is_assigned = db.query(Task_assignees).filter(
-        Task_assignees.task_id == task_id,
-        Task_assignees.user_id == user_id
-    ).first()
-
-    if not is_assigned:
-        raise HTTPException(status_code=403, detail="You are not assigned to this task")
-
-    return task_to_dict(task) 
-
-
 def fetch_my_tasks_service(team_id: int, org_id: int, user: Users, db: Session):
     user_id = user.user_id
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    _validate_team_in_org(team_id, org_id, user_id, db)
 
     tasks = db.query(Tasks).join(
         Task_assignees, Task_assignees.task_id == Tasks.id
@@ -303,17 +270,7 @@ def fetch_my_tasks_service(team_id: int, org_id: int, user: Users, db: Session):
 def update_my_task_status_service(task_id: int, team_id: int, org_id: int, status_data: Task_status_update, user: Users, db: Session):
     user_id = user.user_id
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    _validate_team_in_org(team_id, org_id, user_id, db)
 
     allowed_statuses = {"todo", "in_progress", "review", "done"}
     if status_data.status not in allowed_statuses:
@@ -353,16 +310,7 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
     if action not in ("accept", "reject"):
         raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
 
-    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
-    if not found_organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    team = _validate_team_in_org(team_id, org_id, user_id, db)
 
     task = db.query(Tasks).filter(
         Tasks.id == task_id,
@@ -382,7 +330,7 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
     if is_assignee:
         raise HTTPException(status_code=403, detail="Assignees cannot accept or reject their own task")
 
-    is_owner = found_organization.owner_id == user_id
+    is_owner = team.organization.owner_id == user_id
     if not is_owner:
         role = db.query(Team_roles).filter(
             Team_roles.team_id == team_id,
@@ -400,15 +348,10 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
     return task_to_dict(task)
 
 
-def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachment_input, user: Users, db: Session):
+def add_task_attachment_service(task_id: int, team_id: int, org_id: int, data: Task_attachment_input, user: Users, db: Session):
     user_id = user.user_id
 
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    team = _validate_team_in_org(team_id, org_id, user_id, db)
 
     task = db.query(Tasks).filter(Tasks.id == task_id, Tasks.team_id == team_id, Tasks.is_deleted == False).first()
     if not task:
@@ -427,9 +370,7 @@ def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachmen
     # Estimate file size from base64 payload and enforce plan limit
     raw_b64 = data.file_base64.split(",", 1)[-1]  # strip data URI prefix if present
     estimated_bytes = len(raw_b64) * 3 // 4
-    team = db.query(Teams).filter(Teams.team_id == team_id).first()
-    org = db.query(Organization).filter(Organization.organization_id == team.org_id).first() if team else None
-    file_size_limit = get_file_size_limit(org.organization_plan if org else None)
+    file_size_limit = get_file_size_limit(team.organization.organization_plan)
     if file_size_limit is not None and estimated_bytes > file_size_limit:
         raise HTTPException(
             status_code=413,
@@ -457,15 +398,10 @@ def add_task_attachment_service(task_id: int, team_id: int, data: Task_attachmen
     }
 
 
-def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: int, user: Users, db: Session):
+def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: int, org_id: int, user: Users, db: Session):
     user_id = user.user_id
 
-    is_team_member = db.query(Team_association).filter(
-        Team_association.team_id == team_id,
-        Team_association.user_id == user_id
-    ).first()
-    if not is_team_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this team")
+    team = _validate_team_in_org(team_id, org_id, user_id, db)
 
     attachment = db.query(Task_attachments).filter(
         Task_attachments.id == attachment_id,
@@ -474,7 +410,16 @@ def delete_task_attachment_service(task_id: int, attachment_id: int, team_id: in
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
 
-    if attachment.uploaded_by != user_id:
+    is_owner = team.organization.owner_id == user_id
+    can_manage = False
+    if not is_owner:
+        role = db.query(Team_roles).filter(
+            Team_roles.team_id == team_id,
+            Team_roles.user_id == user_id,
+        ).first()
+        can_manage = bool(role and role.can_manage_tasks)
+
+    if attachment.uploaded_by != user_id and not is_owner and not can_manage:
         raise HTTPException(status_code=403, detail="You can only delete your own attachments")
 
     db.delete(attachment)

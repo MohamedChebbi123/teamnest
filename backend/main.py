@@ -44,41 +44,5 @@ app.include_router(search_router.router)
 Base.metadata.create_all(bind=engine)
 
 
-def _ensure_files_channel_id_column():
-    from sqlalchemy import text
-    with engine.begin() as conn:
-        conn.execute(text(
-            "ALTER TABLE files ADD COLUMN IF NOT EXISTS channel_id INTEGER REFERENCES channels(channel_id)"
-        ))
-        conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_files_channel_id ON files (channel_id)"
-        ))
-
-
-def _ensure_user_code_columns():
-    from sqlalchemy import text
-    with engine.begin() as conn:
-        conn.execute(text(
-            "ALTER TABLE users ALTER COLUMN verification_code TYPE VARCHAR(100)"
-        ))
-        conn.execute(text(
-            "ALTER TABLE users ALTER COLUMN reset_code TYPE VARCHAR(100)"
-        ))
-
-
-def _ensure_user_presence_columns():
-    from sqlalchemy import text
-    with engine.begin() as conn:
-        conn.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(10) NOT NULL DEFAULT 'offline'"
-        ))
-        conn.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE"
-        ))
-
-
-_ensure_files_channel_id_column()
-_ensure_user_code_columns()
-_ensure_user_presence_columns()
 
 

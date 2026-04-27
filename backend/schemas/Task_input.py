@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -9,6 +10,7 @@ class Task_input(BaseModel):
     parent_task_id: Optional[int] = None
     subtask_group: Optional[str] = None
     assignee_ids: Optional[List[int]] = []
+    due_date: Optional[datetime] = None
 
 class Task_update(BaseModel):
     title: Optional[str] = None
@@ -18,6 +20,7 @@ class Task_update(BaseModel):
     parent_task_id: Optional[int] = None
     subtask_group: Optional[str] = None
     assignee_ids: Optional[List[int]] = None
+    due_date: Optional[datetime] = None
 
 
 class Task_status_update(BaseModel):

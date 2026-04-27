@@ -107,7 +107,7 @@ async def add_attachment_endpoint(
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return add_task_attachment_service(task_id, team_id, data, user, db)
+    return add_task_attachment_service(task_id, team_id, org_id, data, user, db)
 
 
 @router.delete("/organization/{org_id}/team/{team_id}/tasks/{task_id}/attachments/{attachment_id}")
@@ -119,4 +119,4 @@ async def delete_attachment_endpoint(
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return delete_task_attachment_service(task_id, attachment_id, team_id, user, db)
+    return delete_task_attachment_service(task_id, attachment_id, team_id, org_id, user, db)

@@ -250,7 +250,7 @@ def create_task(db_session, *, team: Teams, creator: Users, title: str = "Task 1
         description="Task description",
         team_id=team.team_id,
         created_by=creator.user_id,
-        priotrity="medium",
+        priority="medium",
         status=status,
     )
     db_session.add(task)
