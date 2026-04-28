@@ -25,6 +25,7 @@ import {
   UserPlus,
   Sun,
   Moon,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { logout as logoutApi } from '@/lib/auth';
+import { startTutorial } from '@/components/Tutorial/Tutorial';
 import type { PresenceStatus } from '@/context/OnlineStatusContext';
 import { toast } from 'sonner';
 import { formatApiError } from '@/lib/utils';
@@ -357,7 +359,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               (pathname === '/welcome' || pathname === '/home') && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
           >
-            <Link href="/home" title="Home">
+            <Link href="/home" title="Home" data-tour="sidebar-home">
               <Home className="h-5 w-5 flex-shrink-0" />
             </Link>
           </Button>
@@ -371,6 +373,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
               'justify-center px-2',
               pathname === '/friends' && 'bg-primary/10 text-primary hover:bg-primary/20'
             )}
+            data-tour="sidebar-friends"
           >
             <Link href="/friends" title="Friends">
               <Users className="h-5 w-5 flex-shrink-0" />
@@ -387,6 +390,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
             )}
             onClick={() => { markDmsRead(); router.push('/direct-messages'); }}
             title="Direct Messages"
+            data-tour="sidebar-dm"
           >
             <MessageCircle className="h-5 w-5 flex-shrink-0" />
             {unreadDmCount > 0 && (
@@ -490,6 +494,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                         'justify-center px-2',
                         'border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-accent/60'
                       )}
+                      data-tour="sidebar-add-org"
                     >
                       <Plus className="h-5 w-5 text-muted-foreground" />
                     </Button>
@@ -598,6 +603,10 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => startTutorial()} className="cursor-pointer">
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  Restart tutorial
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">

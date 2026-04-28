@@ -1011,7 +1011,7 @@ export default function OrganizationPage() {
             <div className="flex items-center gap-2 shrink-0">
               <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm">
+                  <Button size="sm" data-tour="org-add-member">
                     <UserPlus className="h-4 w-4 mr-2" />
                     Add Member
                   </Button>
@@ -1063,7 +1063,7 @@ export default function OrganizationPage() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" data-tour="org-settings">
                     <Settings className="h-4 w-4 mr-2" />
                     Settings
                   </Button>
@@ -1153,7 +1153,7 @@ export default function OrganizationPage() {
                   <CardTitle className="text-base font-semibold">Teams</CardTitle>
                   <CardDescription className="mt-0.5">All teams within {organization.organization_name}</CardDescription>
                 </div>
-                <Button size="sm" onClick={() => setCreateTeamDialogOpen(true)}>
+                <Button size="sm" onClick={() => setCreateTeamDialogOpen(true)} data-tour="org-new-team">
                   <FolderKanban className="h-4 w-4 mr-2" />
                   New Team
                 </Button>
@@ -1237,7 +1237,7 @@ export default function OrganizationPage() {
 
             {/* Right Column */}
             <div className="col-span-1 space-y-6">
-              <Card className="rounded-xl h-fit">
+              <Card className="rounded-xl h-fit" data-tour="org-quick-actions">
                 <CardHeader className="px-6 py-5 border-b">
                   <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
                 </CardHeader>
