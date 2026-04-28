@@ -6,7 +6,7 @@ import { driver, type Driver } from "driver.js"
 import "driver.js/dist/driver.css"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Rocket } from "lucide-react"
+import { Sparkles, Rocket, PlayCircle, X } from "lucide-react"
 
 const TUTORIAL_KEY = "teamnest_tutorial_completed"
 const TUTORIAL_FORCE_EVENT = "teamnest:start-tutorial"
@@ -135,19 +135,6 @@ export default function Tutorial() {
   const isOrgPage = /^\/organization\/\d+$/.test(pathname || "")
 
   useEffect(() => {
-    if (!isWelcomePage && !isOrgPage) return
-    if (startedRef.current) return
-
-    const completed = localStorage.getItem(TUTORIAL_KEY) === "true"
-    if (completed) return
-
-    if (isWelcomePage) {
-      const t = setTimeout(() => setWelcomeOpen(true), 500)
-      return () => clearTimeout(t)
-    }
-  }, [pathname, isWelcomePage, isOrgPage])
-
-  useEffect(() => {
     const startTour = (steps: TourStep[]) => {
       if (driverRef.current) {
         driverRef.current.destroy()
@@ -167,14 +154,6 @@ export default function Tutorial() {
         }
       }
       tryStart()
-    }
-
-    if (isOrgPage && !startedRef.current) {
-      const completed = localStorage.getItem(TUTORIAL_KEY) === "true"
-      if (!completed) {
-        const t = setTimeout(() => startTour(organizationTour), 1200)
-        return () => clearTimeout(t)
-      }
     }
 
     const handleForceStart = () => {
@@ -211,32 +190,77 @@ export default function Tutorial() {
     setWelcomeOpen(false)
   }
 
+  const showWelcomeButton = isWelcomePage
+  const showOrgButton = isOrgPage
+
+  const handleOrgButtonClick = () => {
+    if (driverRef.current) driverRef.current.destroy()
+    let attempts = 0
+    const tryStart = () => {
+      if (elementsExist(organizationTour)) {
+        driverRef.current = buildDriver(organizationTour, () => {
+          localStorage.setItem(TUTORIAL_KEY, "true")
+          startedRef.current = false
+        })
+        driverRef.current.drive()
+        startedRef.current = true
+      } else if (attempts < 20) {
+        attempts++
+        setTimeout(tryStart, 200)
+      }
+    }
+    tryStart()
+  }
+
   return (
-    <Dialog open={welcomeOpen} onOpenChange={setWelcomeOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <div className="flex items-center justify-center mb-2">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-primary" />
+    <>
+      {showWelcomeButton && (
+        <Button
+          onClick={() => setWelcomeOpen(true)}
+          className="fixed bottom-6 right-6 z-50 shadow-lg"
+          size="lg"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Start tutorial
+        </Button>
+      )}
+      {showOrgButton && (
+        <Button
+          onClick={handleOrgButtonClick}
+          className="fixed bottom-6 right-6 z-50 shadow-lg"
+          size="lg"
+        >
+          <PlayCircle className="h-4 w-4 mr-2" />
+          Start tutorial
+        </Button>
+      )}
+      <Dialog open={welcomeOpen} onOpenChange={setWelcomeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-2">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
             </div>
-          </div>
-          <DialogTitle className="text-center text-xl">Welcome to TeamNest</DialogTitle>
-          <DialogDescription className="text-center">
-            Take a quick 60-second tour and we'll show you the essentials —
-            organizations, teams, channels, and how to chat with your team.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-center gap-2 sm:gap-2">
-          <Button variant="ghost" onClick={handleSkip}>
-            Skip for now
-          </Button>
-          <Button onClick={handleStartWelcomeTour}>
-            <Rocket className="h-4 w-4 mr-2" />
-            Start tour
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <DialogTitle className="text-center text-xl">Welcome to TeamNest</DialogTitle>
+            <DialogDescription className="text-center">
+              Take a quick 60-second tour and we'll show you the essentials —
+              organizations, teams, channels, and how to chat with your team.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-center gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={handleSkip}>
+              <X className="h-4 w-4 mr-2" />
+              Close
+            </Button>
+            <Button onClick={handleStartWelcomeTour}>
+              <Rocket className="h-4 w-4 mr-2" />
+              Start tour
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
