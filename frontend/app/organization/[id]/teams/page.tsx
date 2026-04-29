@@ -101,7 +101,7 @@ export default function OrganizationTeamsPage() {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col">
-        <OrganizationNavBar />
+        <OrganizationNavBar organizationId={organizationId} />
         <main className="flex-1 p-6 max-w-6xl mx-auto w-full">
           <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
             <div>
