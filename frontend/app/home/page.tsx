@@ -2,13 +2,14 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { getAccessToken, hydrateAccessToken, clearAccessToken } from "@/lib/auth"
 
 export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken() ?? (await hydrateAccessToken())
       if (!token) {
         router.replace("/auth/login")
         return
@@ -22,7 +23,7 @@ export default function Home() {
         })
 
         if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem("access_token")
+          clearAccessToken()
           router.replace("/auth/login")
           return
         }

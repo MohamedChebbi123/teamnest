@@ -892,6 +892,7 @@ def fetch_files_for_team_channel_service(
         Users, Files.sender_id == Users.user_id
     ).filter(
         Files.team_id == team_id,
+        Files.channel_id == channel_id,
         Files.is_deleted == False
     ).order_by(Files.sent_at.asc()).all()
 
@@ -956,25 +957,37 @@ def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
+    client = httpx.Client(timeout=30.0, follow_redirects=True)
     try:
-        upstream = httpx.get(file.file_url, follow_redirects=True, timeout=30.0)
+        upstream = client.stream("GET", file.file_url).__enter__()
     except httpx.HTTPError:
+        client.close()
         raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
 
     if upstream.status_code != 200:
+        upstream.close()
+        client.close()
         raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
 
-    content = upstream.content
     media_type = upstream.headers.get("content-type", "application/octet-stream")
+    content_length = upstream.headers.get("content-length")
 
     def iterator():
-        yield content
+        try:
+            for chunk in upstream.iter_bytes(chunk_size=64 * 1024):
+                yield chunk
+        finally:
+            upstream.close()
+            client.close()
+
+    response_headers = {
+        "Content-Disposition": f'inline; filename="{file.file_name}"',
+    }
+    if content_length:
+        response_headers["Content-Length"] = content_length
 
     return StreamingResponse(
         iterator(),
         media_type=media_type,
-        headers={
-            "Content-Disposition": f'inline; filename="{file.file_name}"',
-            "Content-Length": str(len(content)),
-        },
+        headers=response_headers,
     )

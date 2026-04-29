@@ -16,3 +16,5 @@ class Channels(Base):
     
     team = relationship("Teams", back_populates="channels")
     organization = relationship("Organization", back_populates="channels")
+    messages = relationship("Messages", back_populates="channel", cascade="all, delete-orphan")
+    files = relationship("Files", back_populates="channel", cascade="all, delete-orphan")

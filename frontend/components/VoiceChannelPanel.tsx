@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2, Mic, MicOff } from "lucide-react"
 import { toast } from "sonner"
+import { getAccessToken } from "@/lib/auth"
 
 type VoiceParticipant = {
   user_id: number
@@ -106,7 +107,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     setIsLoadingParticipants(true)
 
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         setVoiceParticipants([])
         return
@@ -368,7 +369,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     setIsJoining(true)
 
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required", {
           description: "Please log in first",

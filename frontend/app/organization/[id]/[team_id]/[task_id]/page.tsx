@@ -26,6 +26,7 @@ import { ArrowLeft, Loader2, Plus, Calendar, CalendarDays, User, Flag, CheckCirc
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import Sidebar from "@/components/Sidebar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
@@ -199,7 +200,7 @@ export default function TasksPage() {
 
   const fetchTasks = async () => {
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks`,
@@ -213,7 +214,7 @@ export default function TasksPage() {
 
   const fetchMyTasks = async () => {
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const tasks_list = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/my-tasks`,
@@ -230,7 +231,7 @@ export default function TasksPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        const token = localStorage.getItem("access_token")
+        const token = getAccessToken()
         if (!token) { router.push("/auth/login"); return }
 
         const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
@@ -283,7 +284,7 @@ export default function TasksPage() {
     if (!taskDescription.trim()) { toast.error("Error", { description: "Description is required" }); return }
     setIsCreating(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks`,
@@ -319,7 +320,7 @@ export default function TasksPage() {
     if (!subtaskDescription.trim()) { toast.error("Error", { description: "Description is required" }); return }
     setIsCreatingSubtask(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks`,
@@ -364,7 +365,7 @@ export default function TasksPage() {
     if (!editTitle.trim()) { toast.error("Error", { description: "Title is required" }); return }
     setIsEditing(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${selectedTask.id}`,
@@ -394,7 +395,7 @@ export default function TasksPage() {
     if (!selectedTask) return
     setIsDeleting(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${selectedTask.id}`,
@@ -427,7 +428,7 @@ export default function TasksPage() {
     }
     setIsUploadingAttachment(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const reader = new FileReader()
       reader.onload = async () => {
@@ -459,7 +460,7 @@ export default function TasksPage() {
 
   const handleDeleteAttachment = async (taskId: number, attachmentId: number) => {
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${taskId}/attachments/${attachmentId}`,
@@ -480,7 +481,7 @@ export default function TasksPage() {
 
   const handleReviewTask = async (taskId: number, action: "accept" | "reject") => {
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${taskId}/review?action=${action}`,
@@ -502,7 +503,7 @@ export default function TasksPage() {
 
   const handleUpdateTaskStatus = async (taskId: number, newStatus: string) => {
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/my-tasks/${taskId}/status`,
@@ -531,7 +532,7 @@ export default function TasksPage() {
     if (!editSubTitle.trim()) { toast.error("Error", { description: "Title is required" }); return }
     setIsEditingSubtask(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${editingSubtask.id}`,
@@ -559,7 +560,7 @@ export default function TasksPage() {
   const handleDeleteSubtask = async (subtaskId: number) => {
     setDeletingSubtaskId(subtaskId)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) return
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/tasks/${subtaskId}`,

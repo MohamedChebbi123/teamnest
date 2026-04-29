@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from sqlalchemy import Column, DateTime,Integer,ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from database.connection import Base
 
 
@@ -13,6 +13,6 @@ class Pinned_messages(Base):
     pinned_by=Column(Integer,ForeignKey("users.user_id"),nullable=False)
     pinned_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
-    message=relationship("Messages",backref="pinned_messages")
-    channel=relationship("Channels",backref="pinned_messages")
+    message=relationship("Messages", overlaps="pinned_entries,pinned_message_ref")
+    channel=relationship("Channels", backref=backref("pinned_messages", cascade="all, delete-orphan"))
     user=relationship("Users",backref="pinned_messages")

@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { getAccessToken } from "@/lib/auth"
 
 export interface MentionNotification {
   id: string
@@ -82,7 +83,7 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
     if (hasInitializedRef.current) return
     hasInitializedRef.current = true
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     unmountedRef.current = false
@@ -185,7 +186,7 @@ export function MentionNotificationProvider({ children }: { children: React.Reac
     setMentions((prev) => prev.map((m) => ({ ...m, read: true })))
     setAnnouncements((prev) => prev.map((a) => ({ ...a, read: true })))
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/notifications/seen`, {
       method: "POST",

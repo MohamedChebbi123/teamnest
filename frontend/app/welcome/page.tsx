@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 interface UserData {
     first_name?: string
@@ -69,7 +70,7 @@ export default function WelcomePage() {
             return
         }
 
-        const token = localStorage.getItem("access_token") || localStorage.getItem("token")
+        const token = getAccessToken()
         if (!token) {
             toast.error("Authentication Required", {
                 description: "Please login again to continue."

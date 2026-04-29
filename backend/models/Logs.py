@@ -15,5 +15,5 @@ class Logs(Base):
     log_metadata=Column(Text,nullable=True)
     created_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
-    organization=relationship("Organization",backref="logs")
+    organization=relationship("Organization", overlaps="logs")
     actor=relationship("Users",backref="logs")

@@ -43,6 +43,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import Sidebar from "@/components/Sidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
@@ -278,7 +279,7 @@ export default function ChannelPage() {
   useEffect(() => {
     const fetchChannelData = async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) {
           router.push('/auth/login')
           return
@@ -361,7 +362,7 @@ export default function ChannelPage() {
         return
       }
 
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       isConnectingRef.current = true
@@ -615,7 +616,7 @@ export default function ChannelPage() {
   const fetchMessages = async (orgId: number, token?: string) => {
     setLoadingMessages(true)
     try {
-      const authToken = token || localStorage.getItem('access_token')
+      const authToken = token || getAccessToken()
       if (!authToken) return
 
       const response = await fetch(
@@ -654,7 +655,7 @@ export default function ChannelPage() {
 
   const fetchOrgMembers = async (orgId: number, token?: string) => {
     try {
-      const authToken = token || localStorage.getItem('access_token')
+      const authToken = token || getAccessToken()
       if (!authToken) return
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/members`, {
@@ -696,7 +697,7 @@ export default function ChannelPage() {
     setIsSearching(true)
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token || !channel) return
 
         const response = await fetch(
@@ -884,7 +885,7 @@ export default function ChannelPage() {
 
     // Fallback to REST API if WebSocket is not connected
     // try {
-    //   const token = localStorage.getItem('access_token')
+    //   const token = getAccessToken()
     //   if (!token) {
     //     router.push('/auth/login')
     //     return
@@ -949,7 +950,7 @@ export default function ChannelPage() {
 
     setIsEditingMessage(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -1012,7 +1013,7 @@ export default function ChannelPage() {
 
     setIsDeletingMessage(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -1057,7 +1058,7 @@ export default function ChannelPage() {
     if (!channel) return
     setLoadingPinnedMessages(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       const response = await fetch(
@@ -1083,7 +1084,7 @@ export default function ChannelPage() {
     if (!channel) return
     setPinningMessageId(messageId)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       const response = await fetch(
@@ -1116,7 +1117,7 @@ export default function ChannelPage() {
     if (!channel) return
     setPinningMessageId(messageId)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       const response = await fetch(

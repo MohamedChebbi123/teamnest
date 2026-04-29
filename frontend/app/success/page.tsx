@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -23,7 +24,7 @@ function SuccessContent() {
         return
       }
 
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         router.push("/auth/login")
         return

@@ -1,20 +1,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
+let accessToken: string | null = null
+let hydratePromise: Promise<string | null> | null = null
+let refreshPromise: Promise<string | null> | null = null
+
 export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem("access_token")
+  return accessToken
 }
 
-export function setAccessToken(accessToken: string) {
-  localStorage.setItem("access_token", accessToken)
+export function setAccessToken(token: string) {
+  accessToken = token
 }
 
 export function clearAccessToken() {
-  localStorage.removeItem("access_token")
-  localStorage.removeItem("refresh_token")
+  accessToken = null
 }
-
-let refreshPromise: Promise<string | null> | null = null
 
 export async function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) return refreshPromise
@@ -38,7 +38,7 @@ export async function refreshAccessToken(): Promise<string | null> {
         return null
       }
 
-      localStorage.setItem("access_token", newAccess)
+      accessToken = newAccess
       return newAccess as string
     } catch {
       clearAccessToken()
@@ -49,6 +49,15 @@ export async function refreshAccessToken(): Promise<string | null> {
   })()
 
   return refreshPromise
+}
+
+export async function hydrateAccessToken(): Promise<string | null> {
+  if (accessToken) return accessToken
+  if (hydratePromise) return hydratePromise
+  hydratePromise = refreshAccessToken().finally(() => {
+    hydratePromise = null
+  })
+  return hydratePromise
 }
 
 export async function logout(): Promise<void> {
@@ -71,7 +80,7 @@ function withAuthHeader(init: RequestInit | undefined, token: string): RequestIn
 }
 
 export async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  let token = getAccessToken()
+  let token = accessToken ?? (await hydrateAccessToken())
 
   const baseInit: RequestInit = { ...(init || {}), credentials: "include" }
   const firstInit = token ? withAuthHeader(baseInit, token) : baseInit

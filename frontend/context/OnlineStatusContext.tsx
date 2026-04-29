@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
+import { getAccessToken } from "@/lib/auth"
 
 export type PresenceStatus = "online" | "away" | "dnd" | "offline"
 
@@ -89,7 +90,7 @@ export function OnlineStatusProvider({ children }: { children: React.ReactNode }
     const connect = () => {
       if (unmountedRef.current) return
 
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!isTokenUsable(token)) return
 
       const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/connectivity?token=${token}`)

@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { getAccessToken } from "@/lib/auth"
 
 export interface DmNotification {
   id: string
@@ -38,7 +39,7 @@ export function DirectMessageNotificationProvider({ children }: { children: Reac
   const currentUserIdRef = useRef<number | null>(null)
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     try {

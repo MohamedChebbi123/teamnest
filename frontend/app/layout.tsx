@@ -9,6 +9,7 @@ import { DirectMessageNotificationProvider } from "@/context/DirectMessageNotifi
 import { MentionNotificationProvider } from "@/context/MentionNotificationContext";
 import AiAssistant from "@/components/AiAssistant/AiAssistant";
 import Tutorial from "@/components/Tutorial/Tutorial";
+import AuthHydrationProvider from "@/components/AuthHydrationProvider";
 
 export const metadata: Metadata = {
   title: "TeamNest",
@@ -25,20 +26,19 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ThemeProvider>
           <AntdRegistry>
-            <OnlineStatusProvider>
-              <FriendRequestProvider>
-
-
-                
-                <DirectMessageNotificationProvider>
-                  <MentionNotificationProvider>
-                    {children}
-                    <AiAssistant />
-                    <Tutorial />
-                  </MentionNotificationProvider>
-                </DirectMessageNotificationProvider>
-              </FriendRequestProvider>
-            </OnlineStatusProvider>
+            <AuthHydrationProvider>
+              <OnlineStatusProvider>
+                <FriendRequestProvider>
+                  <DirectMessageNotificationProvider>
+                    <MentionNotificationProvider>
+                      {children}
+                      <AiAssistant />
+                      <Tutorial />
+                    </MentionNotificationProvider>
+                  </DirectMessageNotificationProvider>
+                </FriendRequestProvider>
+              </OnlineStatusProvider>
+            </AuthHydrationProvider>
           </AntdRegistry>
           <Toaster />
         </ThemeProvider>

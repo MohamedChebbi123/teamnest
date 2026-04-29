@@ -21,6 +21,7 @@ import {
 
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 interface Friend {
   friendship_id: number
@@ -65,7 +66,7 @@ export default function FriendsPage() {
   const [searchQuery, setSearchQuery] = useState("")
 
   const getToken = () => {
-    const rawToken = localStorage.getItem("access_token") || localStorage.getItem("token")
+    const rawToken = getAccessToken()
     const token = rawToken?.replace(/^Bearer\s+/i, "")
     if (!token) {
       router.push("/auth/login")

@@ -66,6 +66,7 @@ import {
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
 import { cn } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 interface OrganizationNavBarProps {
   organizationId: string | number
@@ -251,7 +252,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) {
           router.push('/auth/login')
           return
@@ -404,7 +405,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token')
+    const token = getAccessToken()
     if (!token) {
       return
     }
@@ -542,7 +543,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       setIsSearching(true)
       setSearchError(null)
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) {
           router.push('/auth/login')
           return
@@ -658,7 +659,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
     setIsCreatingChannel(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -731,7 +732,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
     setIsEditingChannel(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -787,7 +788,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
 
     setIsDeletingChannel(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return

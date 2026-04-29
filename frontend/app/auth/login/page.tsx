@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Check, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react"
 import { cn, formatApiError } from "@/lib/utils"
+import { setAccessToken } from "@/lib/auth"
 import { toast } from "sonner"
 import Image from "next/image"
 import Link from "next/link"
@@ -94,7 +95,7 @@ export default function Login() {
       
       const token = data.access_token || data.token
       if (token) {
-        localStorage.setItem("access_token", token)
+        setAccessToken(token)
       } else {
         throw new Error("Login succeeded but no access token was returned")
       }

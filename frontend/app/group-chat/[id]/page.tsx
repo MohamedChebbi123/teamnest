@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn, formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import {
   Dialog,
   DialogContent,
@@ -109,7 +110,7 @@ export default function GroupChatRoom() {
   const emojiButtonRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) {
       router.push("/auth/login")
       return
@@ -352,7 +353,7 @@ export default function GroupChatRoom() {
   const handleSaveGroup = async () => {
     setSavingGroup(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       const form = new FormData()
       if (editGroupName) form.append("group_name", editGroupName)
       if (editGroupDescription) form.append("group_description", editGroupDescription)
@@ -378,7 +379,7 @@ export default function GroupChatRoom() {
   const handleDeleteGroup = async () => {
     setDeletingGroup(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -399,7 +400,7 @@ export default function GroupChatRoom() {
     setFriendSearch("")
     setLoadingFriends(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/friends`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -417,7 +418,7 @@ export default function GroupChatRoom() {
     if (selectedFriends.length === 0) return
     setAddingMembers(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/add_members`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

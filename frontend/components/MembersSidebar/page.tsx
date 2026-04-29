@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Users, ChevronLeft, ChevronRight, Loader2, Mail, Phone, Globe, X, UserPlus, Check } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 interface Member {
   user_id: number
@@ -139,7 +140,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
   useEffect(() => {
     const fetchMembers = async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) {
           router.push('/auth/login')
           return
@@ -186,7 +187,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
     if (!teamId) {
       if (!selectedMember) return
 
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         router.push("/auth/login")
         return
@@ -286,7 +287,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
     try {
       setLoadingMemberDetails(true)
 
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         router.push("/auth/login")
         return
@@ -369,7 +370,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
   const sendFriendRequest = async () => {
     if (!memberDetails?.user.user_id) return
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) {
       router.push("/auth/login")
       return
@@ -428,7 +429,7 @@ export default function MembersSidebar({ organizationId, teamId, isOpen: isOpenP
   const revokePermission = async (team: TeamInfo, permissionKey: PermissionKey) => {
     if (selectedMemberId === null) return
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) {
       router.push("/auth/login")
       return

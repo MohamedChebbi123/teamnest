@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { Building2, FileText, Image as ImageIcon, Loader2, Upload, Check } from "lucide-react"
 import { cn, formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import { toast } from "sonner"
 import Image from "next/image"
 import ImageCropDialog from "@/components/ImageCropDialog"
@@ -101,7 +102,7 @@ export default function CreateOrganization() {
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       
       if (!token) {
         toast.error("Authentication Error", {

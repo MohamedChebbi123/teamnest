@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 // ── Types ──
 
@@ -187,7 +188,7 @@ export default function UpgradePage() {
   useEffect(() => {
     const fetchOrg = async () => {
       try {
-        const token = localStorage.getItem("access_token")
+        const token = getAccessToken()
         if (!token) {
           router.replace("/auth/login")
           return
@@ -216,7 +217,7 @@ export default function UpgradePage() {
   const handleUpgrade = async () => {
     setUpgrading(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push("/auth/login")

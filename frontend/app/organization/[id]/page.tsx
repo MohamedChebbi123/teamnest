@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { Building2, Loader2, Users, Settings, Calendar, UserPlus, Edit, Trash2, FolderKanban, ChevronRight, Zap, XCircle, Activity, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import UpgradeModal from "@/components/UpgradeModal"
@@ -130,7 +131,7 @@ export default function OrganizationPage() {
   useEffect(() => {
     const fetchOrganizationDetails = async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) {
           toast.error("Authentication required", {
             description: "Please log in to view organization details"
@@ -222,7 +223,7 @@ export default function OrganizationPage() {
 
       setLoadingPendingJoinRequests(true)
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) return
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/join-requests`, {
@@ -260,7 +261,7 @@ export default function OrganizationPage() {
       
       setLoadingTeams(true)
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) return
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
@@ -292,7 +293,7 @@ export default function OrganizationPage() {
     let isInitial = true
 
     const fetchLogs = async () => {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       if (isInitial) setLoadingLogs(true)
@@ -362,7 +363,7 @@ export default function OrganizationPage() {
 
     setAddingMember(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -431,7 +432,7 @@ export default function OrganizationPage() {
 
     setUpdating(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -491,7 +492,7 @@ export default function OrganizationPage() {
   const handleDeleteOrganization = async () => {
     setDeleting(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -539,7 +540,7 @@ export default function OrganizationPage() {
 
     setCreatingTeam(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -613,7 +614,7 @@ export default function OrganizationPage() {
 
     setIsEditingTeam(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -678,7 +679,7 @@ export default function OrganizationPage() {
 
     setIsDeletingTeam(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -737,7 +738,7 @@ export default function OrganizationPage() {
     roleUser: "ADMIN" | "MEMBER" = "MEMBER"
   ) => {
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -778,7 +779,7 @@ export default function OrganizationPage() {
   const handleUpgrade = async () => {
     setUpgrading(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         toast.error("Authentication required")
         router.push('/auth/login')
@@ -812,7 +813,7 @@ export default function OrganizationPage() {
   const handleCancelSubscription = async () => {
     setCancelling(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) { router.push("/auth/login"); return }
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/cancel-subscription`, {
@@ -894,7 +895,7 @@ export default function OrganizationPage() {
     if (!organizationId) return
     setUndoingLogId(logId)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/logs/${logId}/undo`, {

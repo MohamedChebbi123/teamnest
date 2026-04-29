@@ -13,3 +13,4 @@ class Organization_members(Base):
     joined_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     
     user = relationship("Users")
+    organization = relationship("Organization", back_populates="members")

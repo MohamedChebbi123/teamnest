@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { MessageCircle, FileText, Image as ImageIcon, Loader2, Upload, Check, UserPlus, Search, X } from "lucide-react"
 import { cn, formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import { toast } from "sonner"
 import Image from "next/image"
 import ImageCropDialog from "@/components/ImageCropDialog"
@@ -101,7 +102,7 @@ export default function CreateGroupChat() {
   const fetchFriendsForGroup = async (groupId: number) => {
     setLoadingFriends(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${groupId}/friends`, {
         headers: { "Authorization": `Bearer ${token}` }
       })
@@ -130,7 +131,7 @@ export default function CreateGroupChat() {
 
     setAddingMembers(true)
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/group_chat/${createdGroupId}/add_members`, {
         method: "POST",
         headers: {
@@ -180,7 +181,7 @@ export default function CreateGroupChat() {
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
 
       if (!token) {
         toast.error("Authentication Error", {

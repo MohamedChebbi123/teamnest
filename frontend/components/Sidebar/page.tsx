@@ -6,6 +6,7 @@ import { useFriendRequests } from '@/context/FriendRequestContext';
 import { useDirectMessageNotifications } from '@/context/DirectMessageNotificationContext';
 import { useMentionNotifications } from '@/context/MentionNotificationContext';
 import { useTheme } from '@/context/ThemeContext';
+import { getAccessToken, clearAccessToken } from '@/lib/auth';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -109,7 +110,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const token = localStorage.getItem('access_token');
+        const token = getAccessToken();
         if (!token) {
           router.push('/auth/login');
           return;
@@ -126,7 +127,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
           setUser(data);
           onUserFetched?.(data);
         } else {
-          localStorage.removeItem('access_token');
+          clearAccessToken();
           router.push('/auth/login');
         }
       } catch (error) {
@@ -139,7 +140,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
     const fetchOrganizations = async () => {
       try {
-        const token = localStorage.getItem('access_token');
+        const token = getAccessToken();
         if (!token) return;
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_org_for_admin_org`, {
@@ -203,7 +204,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
       return;
     }
 
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     if (!token) {
       toast.error("Authentication Required", { description: "Please login again." });
       router.push('/auth/login');

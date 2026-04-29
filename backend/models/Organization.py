@@ -18,3 +18,5 @@ class Organization(Base):
     teams = relationship("Teams", back_populates="organization", cascade="all, delete-orphan")
     channels = relationship("Channels", back_populates="organization", cascade="all, delete-orphan")
     payments = relationship("Organization_payments", back_populates="organization", cascade="all, delete-orphan")
+    members = relationship("Organization_members", back_populates="organization", cascade="all, delete-orphan", passive_deletes=True)
+    logs = relationship("Logs", cascade="all, delete-orphan", overlaps="organization")

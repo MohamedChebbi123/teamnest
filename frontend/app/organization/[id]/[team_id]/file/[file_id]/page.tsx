@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Bot, ChevronLeft, ChevronRight, Download, Loader2, Send, User } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
@@ -38,7 +39,7 @@ export default function FileViewerPage() {
 
   useEffect(() => {
     if (!fileId) return
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     fetch(
@@ -66,7 +67,7 @@ export default function FileViewerPage() {
     const query = input.trim()
     if (!query || chatLoading) return
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setInput("")

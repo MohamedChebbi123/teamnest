@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2, Phone, Globe, Upload, Check, User } from "lucide-react"
 import { toast } from "sonner"
 import { cn, formatApiError } from "@/lib/utils"
+import { getAccessToken, clearAccessToken } from "@/lib/auth"
 import countryList from "country-list"
 import PhoneInput from "react-phone-input-2"
 import "react-phone-input-2/lib/style.css"
@@ -44,7 +45,7 @@ export default function CompleteProfilePage() {
   const countries = countryList.getData()
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) {
       toast.error("Not authenticated", {
         description: "Please log in first"
@@ -102,7 +103,7 @@ export default function CompleteProfilePage() {
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!token) {
         throw new Error("Not authenticated")
       }
@@ -124,7 +125,7 @@ export default function CompleteProfilePage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          localStorage.removeItem("access_token")
+          clearAccessToken()
           router.push("/auth/login")
           return
         }

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Download, Loader2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
+import { getAccessToken } from "@/lib/auth"
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
@@ -39,7 +40,7 @@ export default function PdfViewerModal({ open, onOpenChange, fileId, fileUrl, fi
       return
     }
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     const url = contentUrl

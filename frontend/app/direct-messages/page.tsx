@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn, formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import UpgradeModal from "@/components/UpgradeModal"
 
 type ReceiverInfo = {
@@ -355,7 +356,7 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     if (!receiverId) { setReceiverInfo(null); setShowProfilePanel(false); return }
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
     setLoadingReceiverInfo(true)
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/get_user_info?user_id=${receiverId}`, {
@@ -368,7 +369,7 @@ export default function ChannelsPage() {
   }, [receiverId])
 
   const fetchConversations = async () => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setLoadingConversations(true)
@@ -387,7 +388,7 @@ export default function ChannelsPage() {
   }
 
   const fetchFriends = async () => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setLoadingFriends(true)
@@ -407,7 +408,7 @@ export default function ChannelsPage() {
   }
 
   const fetchGroupChats = async () => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setLoadingGroupChats(true)
@@ -427,7 +428,7 @@ export default function ChannelsPage() {
   }
 
   const handleRemoveFriend = async (friendUserId: number) => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setFriendActionLoading(true)
@@ -452,7 +453,7 @@ export default function ChannelsPage() {
   }
 
   const handleSendFriendRequest = async (userTag: string) => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setFriendActionLoading(true)
@@ -480,7 +481,7 @@ export default function ChannelsPage() {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) {
       router.push("/auth/login")
       return
@@ -506,7 +507,7 @@ export default function ChannelsPage() {
   }, [router])
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token || !receiverId) { setMessages([]); return }
 
     const fetchConversation = async () => {
@@ -533,7 +534,7 @@ export default function ChannelsPage() {
   }, [receiverId, router])
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     const connect = () => {
@@ -671,7 +672,7 @@ export default function ChannelsPage() {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify(payload))
       } else {
-        const token = localStorage.getItem("access_token")
+        const token = getAccessToken()
         if (!token) { router.push("/auth/login"); return }
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages`, {
@@ -715,7 +716,7 @@ export default function ChannelsPage() {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "edit_message", message_id: editingMessageId, content: trimmed }))
       } else {
-        const token = localStorage.getItem("access_token")
+        const token = getAccessToken()
         if (!token) { router.push("/auth/login"); return }
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages/${editingMessageId}`, {
@@ -747,7 +748,7 @@ export default function ChannelsPage() {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "delete_message", message_id: messageId }))
       } else {
-        const token = localStorage.getItem("access_token")
+        const token = getAccessToken()
         if (!token) { router.push("/auth/login"); return }
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/direct-messages/${messageId}`, {
@@ -828,7 +829,7 @@ export default function ChannelsPage() {
 
     setMessageSearchResults(null)
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     const controller = new AbortController()

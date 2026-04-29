@@ -39,6 +39,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import UpgradeModal from "@/components/UpgradeModal"
@@ -194,7 +195,7 @@ export default function TeamPage() {
 
   const fetchTeamMembers = async (userId?: number) => {
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       const response = await fetch(
@@ -230,7 +231,7 @@ export default function TeamPage() {
 
   const fetchTeamChannels = async () => {
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       const response = await fetch(
@@ -254,7 +255,7 @@ export default function TeamPage() {
 
   const fetchFilesForTeamChannels = async (teamChannels: Channel[]) => {
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) return
 
       if (!teamChannels.length) {
@@ -316,7 +317,7 @@ export default function TeamPage() {
   useEffect(() => {
     const fetchTeamData = async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         if (!token) {
           router.push('/auth/login')
           return
@@ -420,7 +421,7 @@ export default function TeamPage() {
 
     setIsEditingTeam(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -474,7 +475,7 @@ export default function TeamPage() {
 
     setIsAddingMember(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -562,7 +563,7 @@ export default function TeamPage() {
 
     setIsUpdatingPermissions(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -618,7 +619,7 @@ export default function TeamPage() {
     }
 
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return
@@ -665,7 +666,7 @@ export default function TeamPage() {
 
     setIsCreatingChannel(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       if (!token) {
         router.push('/auth/login')
         return

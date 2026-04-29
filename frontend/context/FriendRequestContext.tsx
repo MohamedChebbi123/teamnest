@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { getAccessToken } from "@/lib/auth"
 
 export interface FriendRequestNotification {
   id: string
@@ -71,7 +72,7 @@ export function FriendRequestProvider({ children }: { children: React.ReactNode 
     const connect = () => {
       if (unmountedRef.current) return
 
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       if (!isTokenUsable(token)) return
 
       const ws = new WebSocket(

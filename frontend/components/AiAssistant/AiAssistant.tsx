@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import { X, Send, Loader2, Bot, User } from "lucide-react"
 import { cn, formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 interface Message {
   role: "user" | "assistant"
@@ -49,7 +50,7 @@ export default function AiAssistant() {
     const query = input.trim()
     if (!query || loading) return
 
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) return
 
     setInput("")

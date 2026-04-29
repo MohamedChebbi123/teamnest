@@ -433,9 +433,6 @@ def update_organization_service(
     if organization_description is not None:
         organization.organization_description = organization_description
 
-    if organization_plan:
-        organization.organization_plan = organization_plan
-
     if image:
         organization.organaization_picture = upload_organization_picture(image)
 

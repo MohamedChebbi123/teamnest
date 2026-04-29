@@ -8,6 +8,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Loader2, Mail, MailCheck, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken, clearAccessToken } from "@/lib/auth"
 
 export default function VerifyEmailPage() {
   const [email, setEmail] = useState("")
@@ -23,7 +24,7 @@ export default function VerifyEmailPage() {
     hasInitialized.current = true
 
     const fetchProfile = async () => {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       
       if (!token) {
         toast.error("Not authenticated", {
@@ -47,7 +48,7 @@ export default function VerifyEmailPage() {
             toast.error("Session expired", {
               description: "Please log in again"
             })
-            localStorage.removeItem("access_token")
+            clearAccessToken()
             router.push("/auth/login")
             return
           }

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Users, ArrowRight, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 
 interface Team {
   team_id: number
@@ -36,7 +37,7 @@ export default function OrganizationTeamsPage() {
       if (!organizationId) return
       setLoading(true)
       try {
-        const token = localStorage.getItem("access_token")
+        const token = getAccessToken()
         if (!token) {
           router.push("/auth/login")
           return

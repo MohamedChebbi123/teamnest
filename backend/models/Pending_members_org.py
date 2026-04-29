@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from sqlalchemy import Boolean, Column, DateTime,Integer,String,Text,ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from database.connection import Base
 
 class Pending_members_org(Base):
@@ -11,4 +11,4 @@ class Pending_members_org(Base):
     sent_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
     
     user=relationship("Users",backref="pending_orgs")
-    organization=relationship("Organization",backref="pending_members")
+    organization=relationship("Organization",backref=backref("pending_members", cascade="all, delete-orphan"))

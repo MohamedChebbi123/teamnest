@@ -113,7 +113,7 @@ def create_direct_message_notification(db: Session, receiver_id: int, message_id
     notif_kwargs = {
         "user_id": receiver_id,
         "type": "direct_message",
-        "message_id": message_id,
+        "dm_message_id": message_id,
         "created_at": datetime.now(UTC),
     }
 

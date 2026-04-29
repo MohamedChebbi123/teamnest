@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { useFriendRequests } from "@/context/FriendRequestContext"
 import { useDirectMessageNotifications } from "@/context/DirectMessageNotificationContext"
 import { useMentionNotifications } from "@/context/MentionNotificationContext"
+import { getAccessToken } from "@/lib/auth"
 import {
   Bell,
   Users,
@@ -69,7 +70,7 @@ export default function NotificationsPage() {
   }, [])
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
+    const token = getAccessToken()
     if (!token) { router.push("/auth/login"); return }
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile`, {
       headers: { Authorization: `Bearer ${token}` },

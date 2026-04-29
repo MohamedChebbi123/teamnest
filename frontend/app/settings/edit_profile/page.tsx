@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
+import { getAccessToken } from "@/lib/auth"
 import ImageCropDialog from "@/components/ImageCropDialog"
 
 interface UserProfile {
@@ -49,7 +50,7 @@ export default function EditProfile() {
 
     const fetchProfile = async () => {
         try {
-            const token = localStorage.getItem("access_token")
+            const token = getAccessToken()
             if (!token) {
                 toast.error("Please login first")
                 return
@@ -109,7 +110,7 @@ export default function EditProfile() {
         setUpdating(true)
 
         try {
-            const token = localStorage.getItem("access_token")
+            const token = getAccessToken()
             if (!token) {
                 toast.error("Please login first")
                 return
@@ -165,7 +166,7 @@ export default function EditProfile() {
         setUpdatingContact(true)
 
         try {
-            const token = localStorage.getItem("access_token")
+            const token = getAccessToken()
             if (!token) {
                 toast.error("Please login first")
                 return

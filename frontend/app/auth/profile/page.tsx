@@ -10,6 +10,7 @@ import { Loader2, Mail, Phone, Globe, Calendar, Tag, ShieldCheck, AlertCircle, E
 import { toast } from "sonner"
 import Image from "next/image"
 import Sidebar from "@/components/Sidebar/page"
+import { getAccessToken, clearAccessToken } from "@/lib/auth"
 
 interface UserProfile {
   user_id: number
@@ -40,7 +41,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("access_token")
+      const token = getAccessToken()
       
       if (!token) {
         setIsLoading(false)
@@ -71,7 +72,7 @@ export default function ProfilePage() {
             toast.error("Session expired", {
               description: "Please log in again"
             })
-            localStorage.removeItem("access_token")
+            clearAccessToken()
             router.replace("/auth/login")
             return
           }

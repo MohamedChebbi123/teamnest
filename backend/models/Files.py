@@ -19,3 +19,4 @@ class Files(Base):
 
     sender = relationship("Users", back_populates="files_sent")
     team = relationship("Teams", back_populates="files")
+    channel = relationship("Channels", back_populates="files")
