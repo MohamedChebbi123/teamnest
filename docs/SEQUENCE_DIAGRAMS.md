@@ -136,7 +136,7 @@ sequenceDiagram
     participant Cloud as Cloudinary
     participant Stripe
 
-    Note over Admin,API: ref : S'authentifier
+    Note over Admin,DB: ref : S'authentifier
 
     alt Email vérifié
         API->>DB: Vérifier statut
@@ -173,7 +173,7 @@ sequenceDiagram
     participant API as Plateforme
     participant DB as Base de données
 
-    Note over User,API: ref : S'authentifier
+    Note over User,DB: ref : S'authentifier
 
     alt Email vérifié
         API->>DB: Vérifier statut
@@ -199,7 +199,7 @@ sequenceDiagram
     participant API as Plateforme
     participant DB as Base de données
 
-    Note over Admin,API: ref : S'authentifier
+    Note over Admin,DB: ref : S'authentifier
 
     Admin->>API: Lister demandes
     API->>DB: Vérifier permissions
@@ -219,7 +219,7 @@ sequenceDiagram
     participant API as Plateforme
     participant DB as Base de données
 
-    Note over Admin,API: ref : S'authentifier
+    Note over Admin,DB: ref : S'authentifier
 
     Admin->>API: Décider demande
     API->>DB: Vérifier permissions
@@ -245,7 +245,7 @@ sequenceDiagram
     participant API as Plateforme
     participant DB as Base de données
 
-    Note over Admin,API: ref : S'authentifier
+    Note over Admin,DB: ref : S'authentifier
 
     Admin->>API: Créer équipe
     API->>DB: Vérifier permissions
@@ -278,7 +278,7 @@ sequenceDiagram
     participant DB as Base de données
     participant Vec as Pinecone
 
-    Note over UserA,WS: ref : S'authentifier
+    Note over UserA,DB: ref : S'authentifier
 
     UserA->>WS: Se connecter
     UserB->>WS: Se connecter
@@ -310,7 +310,7 @@ sequenceDiagram
     participant Cloud as Cloudinary
     participant Vec as Pinecone
 
-    Note over User,WS: ref : S'authentifier
+    Note over User,DB: ref : S'authentifier
 
     User->>WS: Téléverser fichier
     WS->>Cloud: Stocker fichier
@@ -345,7 +345,7 @@ sequenceDiagram
     participant DB as Base de données
     participant Notif as Notifications
 
-    Note over Manager,API: ref : S'authentifier
+    Note over Manager,DB: ref : S'authentifier
 
     Manager->>API: Créer tâche
     API->>DB: Vérifier permissions
@@ -369,7 +369,7 @@ sequenceDiagram
     participant DB as Base de données
     participant Notif as Notifications
 
-    Note over Assignee,API: ref : S'authentifier
+    Note over Assignee,DB: ref : S'authentifier
 
     Assignee->>API: Soumettre tâche
     alt Transition valide
@@ -392,7 +392,7 @@ sequenceDiagram
     participant DB as Base de données
     participant Notif as Notifications
 
-    Note over Manager,API: ref : S'authentifier
+    Note over Manager,DB: ref : S'authentifier
 
     Manager->>API: Évaluer tâche
     API->>DB: Vérifier permissions
@@ -421,7 +421,7 @@ sequenceDiagram
     participant Vec as Pinecone
     participant LLM
 
-    Note over User,API: ref : S'authentifier
+    Note over User,DB: ref : S'authentifier
 
     User->>API: Poser question
     API->>DB: Vérifier permissions
@@ -448,7 +448,7 @@ sequenceDiagram
     participant API as Plateforme
     participant DB as Base de données
 
-    Note over UserA,WS: ref : S'authentifier
+    Note over UserA,DB: ref : S'authentifier
 
     UserA->>WS: Se connecter
     UserB->>WS: Se connecter
@@ -482,7 +482,7 @@ sequenceDiagram
     participant DB as Base de données
     participant Friends as WebSocket Amis
 
-    Note over User,WS: ref : S'authentifier
+    Note over User,DB: ref : S'authentifier
 
     User->>FE: Ouvrir application
     FE->>WS: Se connecter
