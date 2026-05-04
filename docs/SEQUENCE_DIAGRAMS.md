@@ -322,24 +322,24 @@ sequenceDiagram
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+API: Connect
-    UserB->>+API: Connect
-    API-->>UserA: Connected
-    API-->>UserB: Connected
+    UserA->>+API: «WebSocket» Connect
+    UserB->>+API: «WebSocket» Connect
+    API-->>UserA: «WebSocket» Connected
+    API-->>UserB: «WebSocket» Connected
 
     loop Active session
-        UserA->>API: Send message
+        UserA->>API: «WebSocket» Send message
         API->>+DB: Check permissions
         DB-->>-API: OK
         API->>+DB: Save message
         DB-->>-API: Saved
         API->>+Vec: Index message
         Vec-->>-API: Indexed
-        API-->>UserB: Broadcast message
+        API-->>UserB: «WebSocket» Broadcast message
     end
 
-    UserA->>API: Disconnect
-    UserB->>API: Disconnect
+    UserA->>API: «WebSocket» Disconnect
+    UserB->>API: «WebSocket» Disconnect
     deactivate API
     deactivate API
 ```
@@ -358,7 +358,7 @@ sequenceDiagram
 
     Note over User,DB: ref: Authenticate
 
-    User->>+API: Upload file
+    User->>+API: «WebSocket» Upload file
     API->>API: Validate file
     API->>+Cloud: Store file
     Cloud-->>-API: URL
@@ -368,7 +368,7 @@ sequenceDiagram
         API->>+Vec: Index content
         Vec-->>-API: Indexed
     end
-    API-->>-User: File shared
+    API-->>-User: «WebSocket» File shared
 
     User->>+API: Download file
     API->>+DB: Check permissions
@@ -514,17 +514,17 @@ sequenceDiagram
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+API: Connect
-    UserB->>+API: Connect
+    UserA->>+API: «WebSocket» Connect
+    UserB->>+API: «WebSocket» Connect
 
     loop Active session
-        UserA->>API: Send message
+        UserA->>API: «WebSocket» Send message
         API->>+DB: Check block
         DB-->>-API: OK
         API->>+DB: Save message
         DB-->>-API: Saved
         opt UserB online
-            API-->>UserB: Broadcast message
+            API-->>UserB: «WebSocket» Broadcast message
         end
     end
 
@@ -533,8 +533,8 @@ sequenceDiagram
     DB-->>-API: Rows
     API-->>-UserA: List displayed
 
-    UserA->>API: Disconnect
-    UserB->>API: Disconnect
+    UserA->>API: «WebSocket» Disconnect
+    UserB->>API: «WebSocket» Disconnect
     deactivate API
     deactivate API
 ```
@@ -554,30 +554,30 @@ sequenceDiagram
     Note over User,DB: ref: Authenticate
 
     User->>+FE: Open app
-    FE->>+API: Connect
+    FE->>+API: «WebSocket» Connect
     API->>+DB: Mark online
     DB-->>-API: Saved
-    API-->>Friends: Broadcast presence
-    API-->>FE: Online friends list
+    API-->>Friends: «WebSocket» Broadcast presence
+    API-->>FE: «WebSocket» Online friends list
 
     loop Heartbeat
-        FE->>API: Ping
-        API-->>FE: Pong
+        FE->>API: «WebSocket» Ping
+        API-->>FE: «WebSocket» Pong
     end
 
     opt Status change
         User->>FE: Change status
-        FE->>API: Update
+        FE->>API: «WebSocket» Update
         API->>+DB: Save status
         DB-->>-API: Saved
-        API-->>Friends: Broadcast status
+        API-->>Friends: «WebSocket» Broadcast status
     end
 
-    FE->>API: Disconnect
+    FE->>API: «WebSocket» Disconnect
     alt Last session
         API->>+DB: Mark offline
         DB-->>-API: Saved
-        API-->>Friends: Broadcast offline
+        API-->>Friends: «WebSocket» Broadcast offline
     end
     deactivate API
     deactivate FE
