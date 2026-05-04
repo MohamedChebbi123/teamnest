@@ -322,24 +322,24 @@ sequenceDiagram
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+WS: Connect
-    UserB->>+WS: Connect
-    WS-->>UserA: Connected
-    WS-->>UserB: Connected
+    UserA->>+WS: «WS» Connect
+    UserB->>+WS: «WS» Connect
+    WS-->>UserA: «WS» Connected
+    WS-->>UserB: «WS» Connected
 
     loop Active session
-        UserA->>WS: Send message
+        UserA->>WS: «WS» Send message
         WS->>+DB: Check permissions
         DB-->>-WS: OK
         WS->>+DB: Save message
         DB-->>-WS: Saved
         WS->>+Vec: Index message
         Vec-->>-WS: Indexed
-        WS-->>UserB: Broadcast message
+        WS-->>UserB: «WS» Broadcast message
     end
 
-    UserA->>WS: Disconnect
-    UserB->>WS: Disconnect
+    UserA->>WS: «WS» Disconnect
+    UserB->>WS: «WS» Disconnect
     deactivate WS
     deactivate WS
 ```
@@ -359,7 +359,7 @@ sequenceDiagram
 
     Note over User,DB: ref: Authenticate
 
-    User->>+WS: Upload file
+    User->>+WS: «WS» Upload file
     WS->>WS: Validate file
     WS->>+Cloud: Store file
     Cloud-->>-WS: URL
@@ -369,7 +369,7 @@ sequenceDiagram
         WS->>+Vec: Index content
         Vec-->>-WS: Indexed
     end
-    WS-->>-User: File shared
+    WS-->>-User: «WS» File shared
 
     User->>+API: Download file
     API->>+DB: Check permissions
@@ -516,17 +516,17 @@ sequenceDiagram
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+WS: Connect
-    UserB->>+WS: Connect
+    UserA->>+WS: «WS» Connect
+    UserB->>+WS: «WS» Connect
 
     loop Active session
-        UserA->>WS: Send message
+        UserA->>WS: «WS» Send message
         WS->>+DB: Check block
         DB-->>-WS: OK
         WS->>+DB: Save message
         DB-->>-WS: Saved
         opt UserB online
-            WS-->>UserB: Broadcast message
+            WS-->>UserB: «WS» Broadcast message
         end
     end
 
@@ -535,8 +535,8 @@ sequenceDiagram
     DB-->>-API: Rows
     API-->>-UserA: List displayed
 
-    UserA->>WS: Disconnect
-    UserB->>WS: Disconnect
+    UserA->>WS: «WS» Disconnect
+    UserB->>WS: «WS» Disconnect
     deactivate WS
     deactivate WS
 ```
@@ -556,26 +556,26 @@ sequenceDiagram
     Note over User,DB: ref: Authenticate
 
     User->>+FE: Open app
-    FE->>+WS: Connect
+    FE->>+WS: «WS» Connect
     WS->>+DB: Mark online
     DB-->>-WS: Saved
     WS->>Friends: Broadcast presence
-    WS-->>FE: Online friends list
+    WS-->>FE: «WS» Online friends list
 
     loop Heartbeat
-        FE->>WS: Ping
-        WS-->>FE: Pong
+        FE->>WS: «WS» Ping
+        WS-->>FE: «WS» Pong
     end
 
     opt Status change
         User->>FE: Change status
-        FE->>WS: Update
+        FE->>WS: «WS» Update
         WS->>+DB: Save status
         DB-->>-WS: Saved
         WS->>Friends: Broadcast status
     end
 
-    FE->>WS: Disconnect
+    FE->>WS: «WS» Disconnect
     alt Last session
         WS->>+DB: Mark offline
         DB-->>-WS: Saved
