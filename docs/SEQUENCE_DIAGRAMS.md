@@ -70,35 +70,40 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
 
-    User->>+API: Login
+    User->>+FE: Enter credentials
+    FE->>+API: Login
     API->>+DB: Check credentials
     DB-->>-API: Result
     alt Valid credentials
         API->>API: Generate tokens
         API->>+DB: Save session
         DB-->>-API: Saved
-        API-->>User: Access tokens
+        API-->>FE: Access tokens
     else Invalid credentials
-        API-->>User: Error
+        API-->>FE: Error
     end
     deactivate API
+    FE-->>-User: Logged in / Error
 
     Note over User,API: Later — token expired
 
-    User->>+API: Refresh token
+    User->>+FE: Continue using app
+    FE->>+API: Refresh token
     API->>+DB: Check token
     DB-->>-API: Result
     alt Valid token
         API->>+DB: Renew token
         DB-->>-API: Saved
-        API-->>User: New tokens
+        API-->>FE: New tokens
     else Invalid token
-        API-->>User: Error
+        API-->>FE: Error
     end
     deactivate API
+    FE-->>-User: Continue / Re-login
 ```
 
 ---
@@ -108,11 +113,13 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Mail as Email Service
 
-    User->>+API: Forgot password
+    User->>+FE: Forgot password
+    FE->>+API: Forgot password
     opt User exists
         API->>API: Generate code
         API->>+DB: Save code
@@ -120,27 +127,32 @@ sequenceDiagram
         API->>+Mail: Send code
         Mail-->>-User: Email received
     end
-    API-->>-User: Confirmation
+    API-->>-FE: Confirmation
+    FE-->>-User: Check your email
 
-    User->>+API: Verify code
+    User->>+FE: Enter code
+    FE->>+API: Verify code
     API->>+DB: Check code
     DB-->>-API: Result
     alt Valid code
-        API-->>User: OK
+        API-->>FE: OK
     else Invalid code
-        API-->>User: Error
+        API-->>FE: Error
     end
     deactivate API
+    FE-->>-User: Result
 
-    User->>+API: Reset password
+    User->>+FE: Set new password
+    FE->>+API: Reset password
     alt Valid code
         API->>+DB: Update password
         DB-->>-API: Saved
-        API-->>User: Success
+        API-->>FE: Success
     else Invalid code
-        API-->>User: Error
+        API-->>FE: Error
     end
     deactivate API
+    FE-->>-User: Result
 ```
 
 ---
@@ -150,6 +162,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Admin
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Cloud as Cloudinary
@@ -164,21 +177,25 @@ sequenceDiagram
         API-->>Admin: Verify email
     end
 
-    Admin->>+API: Create organization
+    Admin->>+FE: Fill org form
+    FE->>+API: Create organization
     opt Logo provided
         API->>+Cloud: Upload logo
         Cloud-->>-API: Logo URL
     end
     API->>+DB: Save organization
     DB-->>-API: Saved
-    API-->>-Admin: Organization created
+    API-->>-FE: Organization created
+    FE-->>-Admin: Confirmation
 
-    Admin->>+API: Subscribe to plan
+    Admin->>+FE: Choose plan
+    FE->>+API: Subscribe to plan
     API->>+DB: Check permissions
     DB-->>-API: OK
     API->>+Stripe: Start payment
     Stripe-->>-API: Session URL
-    API-->>-Admin: Redirect to payment
+    API-->>-FE: Redirect to payment
+    FE-->>-Admin: Payment page
 
     Stripe->>+API: Payment notification
     API->>+DB: Update subscription
@@ -195,6 +212,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
 
@@ -207,17 +225,19 @@ sequenceDiagram
         API-->>User: Verify email
     end
 
-    User->>+API: Request to join
+    User->>+FE: Search & request
+    FE->>+API: Request to join
     API->>+DB: Check eligibility
     DB-->>-API: Result
     alt Eligible
         API->>+DB: Save request
         DB-->>-API: Saved
-        API-->>User: Request submitted
+        API-->>FE: Request submitted
     else Not eligible
-        API-->>User: Error
+        API-->>FE: Error
     end
     deactivate API
+    FE-->>-User: Result
 ```
 
 ### 5b. Admin lists pending requests
@@ -225,22 +245,25 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Admin
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
 
     Note over Admin,DB: ref: Authenticate
 
-    Admin->>+API: List requests
+    Admin->>+FE: Open requests page
+    FE->>+API: List requests
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Authorized
         API->>+DB: Load requests
         DB-->>-API: Rows
-        API-->>Admin: List displayed
+        API-->>FE: Requests
     else Unauthorized
-        API-->>Admin: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-Admin: List displayed
 ```
 
 ### 5c. Admin accepts or rejects
@@ -248,26 +271,29 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Admin
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
 
     Note over Admin,DB: ref: Authenticate
 
-    Admin->>+API: Decide on request
+    Admin->>+FE: Decide on request
+    FE->>+API: Submit decision
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Accepted
         API->>+DB: Add member
         DB-->>-API: Saved
-        API-->>Admin: OK
+        API-->>FE: OK
     else Rejected
         API->>+DB: Remove request
         DB-->>-API: Removed
-        API-->>Admin: OK
+        API-->>FE: OK
     else Unauthorized
-        API-->>Admin: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-Admin: Result
 ```
 
 ---
@@ -278,34 +304,39 @@ sequenceDiagram
 sequenceDiagram
     actor Admin
     actor Lead as Team Lead
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
 
     Note over Admin,DB: ref: Authenticate
 
-    Admin->>+API: Create team
+    Admin->>+FE: Create team
+    FE->>+API: Create team
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Authorized
         API->>+DB: Save team
         DB-->>-API: Saved
-        API-->>Admin: Team created
+        API-->>FE: Team created
     else Unauthorized
-        API-->>Admin: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-Admin: Result
 
-    Lead->>+API: Manage members
+    Lead->>+FE: Manage members
+    FE->>+API: Update members
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Authorized
         API->>+DB: Update members
         DB-->>-API: Saved
-        API-->>Lead: OK
+        API-->>FE: OK
     else Unauthorized
-        API-->>Lead: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-Lead: Result
 ```
 
 ---
@@ -316,30 +347,39 @@ sequenceDiagram
 sequenceDiagram
     actor UserA
     actor UserB
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Vec as Pinecone
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+API: «WebSocket» Connect
-    UserB->>+API: «WebSocket» Connect
-    API-->>UserA: «WebSocket» Connected
-    API-->>UserB: «WebSocket» Connected
+    UserA->>+FE: Open channel
+    FE->>+API: «WebSocket» Connect
+    API-->>FE: «WebSocket» Connected
+    FE-->>-UserA: Channel ready
+
+    UserB->>+FE: Open channel
+    FE->>+API: «WebSocket» Connect
+    API-->>FE: «WebSocket» Connected
 
     loop Active session
-        UserA->>API: «WebSocket» Send message
+        UserA->>FE: Type message
+        FE->>API: «WebSocket» Send message
         API->>+DB: Check permissions
         DB-->>-API: OK
         API->>+DB: Save message
         DB-->>-API: Saved
         API->>+Vec: Index message
         Vec-->>-API: Indexed
-        API-->>UserB: «WebSocket» Broadcast message
+        API-->>FE: «WebSocket» Broadcast message
+        FE-->>UserB: Display message
     end
 
-    UserA->>API: «WebSocket» Disconnect
-    UserB->>API: «WebSocket» Disconnect
+    UserA->>FE: Close channel
+    FE->>API: «WebSocket» Disconnect
+    UserB->>FE: Close channel
+    FE->>API: «WebSocket» Disconnect
     deactivate API
     deactivate API
 ```
@@ -351,6 +391,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Cloud as Cloudinary
@@ -358,7 +399,8 @@ sequenceDiagram
 
     Note over User,DB: ref: Authenticate
 
-    User->>+API: «WebSocket» Upload file
+    User->>+FE: Select file
+    FE->>+API: «WebSocket» Upload file
     API->>API: Validate file
     API->>+Cloud: Store file
     Cloud-->>-API: URL
@@ -368,9 +410,11 @@ sequenceDiagram
         API->>+Vec: Index content
         Vec-->>-API: Indexed
     end
-    API-->>-User: «WebSocket» File shared
+    API-->>-FE: «WebSocket» File shared
+    FE-->>-User: Upload complete
 
-    User->>+API: Download file
+    User->>+FE: Open file
+    FE->>+API: Download file
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Authorized
@@ -378,11 +422,12 @@ sequenceDiagram
         DB-->>-API: Row
         API->>+Cloud: Fetch content
         Cloud-->>-API: File data
-        API-->>User: File
+        API-->>FE: File
     else Unauthorized
-        API-->>User: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-User: Display file
 ```
 
 ---
@@ -395,13 +440,15 @@ sequenceDiagram
 sequenceDiagram
     actor Manager
     actor Assignee
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Notif as Notifications
 
     Note over Manager,DB: ref: Authenticate
 
-    Manager->>+API: Create task
+    Manager->>+FE: Fill task form
+    FE->>+API: Create task
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Authorized
@@ -409,11 +456,12 @@ sequenceDiagram
         DB-->>-API: Saved
         API->>+Notif: Notify assignee
         Notif-->>-Assignee: Task assigned
-        API-->>Manager: Task created
+        API-->>FE: Task created
     else Unauthorized
-        API-->>Manager: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-Manager: Result
 ```
 
 ### 9b. Assignee submits for review
@@ -422,23 +470,26 @@ sequenceDiagram
 sequenceDiagram
     actor Manager
     actor Assignee
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Notif as Notifications
 
     Note over Assignee,DB: ref: Authenticate
 
-    Assignee->>+API: Submit task
+    Assignee->>+FE: Mark as done
+    FE->>+API: Submit task
     alt Valid transition
         API->>+DB: Update status
         DB-->>-API: Saved
         API->>+Notif: Notify manager
         Notif-->>-Manager: Task submitted
-        API-->>Assignee: OK
+        API-->>FE: OK
     else Invalid transition
-        API-->>Assignee: Error
+        API-->>FE: Error
     end
     deactivate API
+    FE-->>-Assignee: Result
 ```
 
 ### 9c. Manager reviews (approve / reject)
@@ -447,13 +498,15 @@ sequenceDiagram
 sequenceDiagram
     actor Manager
     actor Assignee
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Notif as Notifications
 
     Note over Manager,DB: ref: Authenticate
 
-    Manager->>+API: Review task
+    Manager->>+FE: Review task
+    FE->>+API: Submit decision
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Approved
@@ -461,15 +514,16 @@ sequenceDiagram
         DB-->>-API: Saved
         API->>+Notif: Notify assignee
         Notif-->>-Assignee: Task approved
-        API-->>Manager: OK
+        API-->>FE: OK
     else Rejected
         API->>+DB: Update task
         DB-->>-API: Saved
         API->>+Notif: Notify assignee
         Notif-->>-Assignee: Task rejected
-        API-->>Manager: OK
+        API-->>FE: OK
     end
     deactivate API
+    FE-->>-Manager: Result
 ```
 
 ---
@@ -479,6 +533,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
     participant Vec as Pinecone
@@ -486,7 +541,8 @@ sequenceDiagram
 
     Note over User,DB: ref: Authenticate
 
-    User->>+API: Ask question
+    User->>+FE: Ask question
+    FE->>+API: Ask question
     API->>+DB: Check permissions
     DB-->>-API: OK
     alt Authorized
@@ -494,11 +550,12 @@ sequenceDiagram
         Vec-->>-API: Results
         API->>+LLM: Ask for answer
         LLM-->>-API: Answer
-        API-->>User: Display result
+        API-->>FE: Answer + sources
     else Unauthorized
-        API-->>User: Denied
+        API-->>FE: Denied
     end
     deactivate API
+    FE-->>-User: Display result
 ```
 
 ---
@@ -509,32 +566,41 @@ sequenceDiagram
 sequenceDiagram
     actor UserA
     actor UserB
+    participant FE as Frontend
     participant API as Backend
     participant DB as Database
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+API: «WebSocket» Connect
-    UserB->>+API: «WebSocket» Connect
+    UserA->>+FE: Open DM
+    FE->>+API: «WebSocket» Connect
+    UserB->>+FE: Open DM
+    FE->>+API: «WebSocket» Connect
 
     loop Active session
-        UserA->>API: «WebSocket» Send message
+        UserA->>FE: Type message
+        FE->>API: «WebSocket» Send message
         API->>+DB: Check block
         DB-->>-API: OK
         API->>+DB: Save message
         DB-->>-API: Saved
         opt UserB online
-            API-->>UserB: «WebSocket» Broadcast message
+            API-->>FE: «WebSocket» Broadcast message
+            FE-->>UserB: Display message
         end
     end
 
-    UserA->>+API: List conversations
+    UserA->>+FE: Open inbox
+    FE->>+API: List conversations
     API->>+DB: Load conversations
     DB-->>-API: Rows
-    API-->>-UserA: List displayed
+    API-->>-FE: Conversations
+    FE-->>-UserA: List displayed
 
-    UserA->>API: «WebSocket» Disconnect
-    UserB->>API: «WebSocket» Disconnect
+    UserA->>FE: Close DM
+    FE->>API: «WebSocket» Disconnect
+    UserB->>FE: Close DM
+    FE->>API: «WebSocket» Disconnect
     deactivate API
     deactivate API
 ```
@@ -559,6 +625,7 @@ sequenceDiagram
     DB-->>-API: Saved
     API-->>Friends: «WebSocket» Broadcast presence
     API-->>FE: «WebSocket» Online friends list
+    FE-->>-User: Friends shown
 
     loop Heartbeat
         FE->>API: «WebSocket» Ping
@@ -573,6 +640,7 @@ sequenceDiagram
         API-->>Friends: «WebSocket» Broadcast status
     end
 
+    User->>FE: Close app
     FE->>API: «WebSocket» Disconnect
     alt Last session
         API->>+DB: Mark offline
@@ -580,5 +648,4 @@ sequenceDiagram
         API-->>Friends: «WebSocket» Broadcast offline
     end
     deactivate API
-    deactivate FE
 ```
