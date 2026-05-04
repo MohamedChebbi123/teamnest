@@ -30,23 +30,33 @@ sequenceDiagram
     participant DB as Postgres
     participant Mail as Resend
 
-    User->>+FE: signup form
-    FE->>+API: POST /register
-    API->>API: validate · hash pw · gen user_tag
-    API->>DB: INSERT Users
-    API-->>-FE: created (or 4xx)
-    FE-->>-User: "check your email"
+    User->>+FE: Submit signup form
+    FE->>+API: Register account
+    API->>DB: Save user (unverified)
+    API-->>-FE: Account created
+    FE-->>-User: Account ready — verify to unlock actions
 
-    Note over API,Mail: Resend at any time via POST /resend-verification → Mail sends 6-digit code
+    Note over User,Mail: Email verification — required before any action, can be triggered anytime after login
 
-    User->>+FE: enter 6-digit code
-    FE->>+API: POST /verify-email
-    API->>+DB: SELECT verification_code
-    DB-->>-API: row
-    API->>API: compare code · check expiry
-    API->>DB: UPDATE is_verified=true
-    API-->>-FE: { is_verified } (or 400)
-    FE-->>-User: redirect to login
+    User->>+FE: Request verification code
+    FE->>+API: Send verification code
+    API->>DB: Save code
+    API->>Mail: Send code
+    Mail-->>User: Code email
+    API-->>-FE: Ok
+    FE-->>-User: Check your email
+
+    User->>+FE: Enter code
+    FE->>+API: Verify email
+    API->>DB: Check code
+    alt Code valid
+        API->>DB: Mark verified
+        API-->>FE: Email verified
+    else Invalid / expired
+        API-->>FE: 400
+    end
+    deactivate API
+    FE-->>-User: Verified
 ```
 
 ---
@@ -60,21 +70,27 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    User->>+API: POST /login
-    API->>+DB: SELECT user by email
-    DB-->>-API: row / none
-    API->>API: verify password · issue access + refresh (jti)
-    API->>DB: INSERT Refresh_tokens
-    API-->>-User: tokens (or 401)
+    User->>+API: Login
+    API->>DB: Verify credentials
+    alt Valid
+        API->>DB: Save refresh token
+        API-->>User: Tokens
+    else Invalid
+        API-->>User: 401
+    end
+    deactivate API
 
     Note over User,API: Later — access token expired
 
-    User->>+API: POST /refresh (cookie)
-    API->>+DB: SELECT Refresh_tokens by jti
-    DB-->>-API: row / none
-    API->>API: verify · detect reuse · rotate jti
-    API->>DB: revoke old (or all on reuse) · INSERT new
-    API-->>-User: new tokens (or 401)
+    User->>+API: Refresh token
+    API->>DB: Check refresh token
+    alt Valid
+        API->>DB: Rotate token
+        API-->>User: New tokens
+    else Invalid / reused
+        API-->>User: 401
+    end
+    deactivate API
 ```
 
 ---
@@ -89,25 +105,31 @@ sequenceDiagram
     participant DB as Postgres
     participant Mail as Resend
 
-    User->>+API: POST /forgot-password
-    opt user exists
-        API->>API: gen reset code (10min)
-        API->>DB: UPDATE reset_code
-        API->>Mail: send code
-        Mail-->>User: reset email
+    User->>+API: Request password reset
+    opt User exists
+        API->>DB: Save reset code
+        API->>Mail: Send reset code
+        Mail-->>User: Reset email
     end
-    API-->>-User: generic ok
+    API-->>-User: Generic ok
 
-    User->>+API: POST /verify-reset-code
-    API->>+DB: SELECT reset_code
-    DB-->>-API: row
-    API->>API: compare + check expiry
-    API-->>-User: ok (or 400)
+    User->>+API: Verify reset code
+    API->>DB: Check code
+    alt Valid
+        API-->>User: Ok
+    else Invalid / expired
+        API-->>User: 400
+    end
+    deactivate API
 
-    User->>+API: POST /reset-password
-    API->>API: re-validate · check strength · hash
-    API->>DB: UPDATE password_hashed · clear reset_code
-    API-->>-User: ok (or 400)
+    User->>+API: Reset password
+    alt Code valid
+        API->>DB: Update password
+        API-->>User: Ok
+    else Invalid
+        API-->>User: 400
+    end
+    deactivate API
 ```
 
 ---
@@ -124,18 +146,27 @@ sequenceDiagram
     participant Stripe
 
     alt Authenticated
-        Admin->>API: Authenticate request
-        API->>DB: Load user
-    else Not authenticated
+        Admin->>API: authenticated
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Admin: 401
     end
 
+    alt Email verified
+        API->>API: Check verified
+    else Not verified
+        API-->>Admin: 403 verify email
+    end
+
     Admin->>+API: Create organization
-    API->>Cloud: Upload logo
+    opt Has logo
+        API->>Cloud: Upload logo
+    end
     API->>DB: Save organization
     API-->>-Admin: Organization created
 
     Admin->>+API: Subscribe to plan
+    API->>API: Check permissions
     API->>Stripe: Start checkout
     API-->>-Admin: Redirect to checkout
 
@@ -157,18 +188,28 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         User->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>User: 401
     end
 
-    User->>+API: POST /organization/join {org_name, org_tag}
-    API->>+DB: verify org · check member · check pending
-    DB-->>-API: state
-    API->>DB: INSERT Pending_members_org
-    API-->>-User: { request_id } (or 404 / 409)
+    alt Email verified
+        API->>API: Check verified
+    else Not verified
+        API-->>User: 403 verify email
+    end
+
+    User->>+API: Request to join organization
+    API->>DB: Check eligibility
+    alt Eligible
+        API->>DB: Save join request
+        API-->>User: Request submitted
+    else Already member / duplicate / not found
+        API-->>User: 404 / 409
+    end
+    deactivate API
 ```
 
 ### 5b. Admin lists pending requests
@@ -180,18 +221,22 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         Admin->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Admin: 401
     end
 
-    Admin->>+API: GET /organization/{id}/join-requests
-    API->>API: assert OWNER/ADMIN
-    API->>+DB: SELECT Pending_members_org JOIN Users
-    DB-->>-API: rows
-    API-->>-Admin: list (or 403)
+    Admin->>+API: List join requests
+    API->>API: Check permissions
+    alt Authorized
+        API->>DB: Load pending requests
+        API-->>Admin: Requests list
+    else Forbidden
+        API-->>Admin: 403
+    end
+    deactivate API
 ```
 
 ### 5c. Admin accepts or rejects
@@ -203,22 +248,22 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         Admin->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Admin: 401
     end
 
-    Admin->>+API: POST /organization/{id}/join-requests/{rid}?action=&role_user=
-    API->>API: assert role · validate action · enforce seat limit
-    alt accepted
-        API->>DB: INSERT Organization_members · DELETE Pending
-        API-->>Admin: ok
-    else rejected
-        API->>DB: DELETE Pending_members_org
-        API-->>Admin: ok
-    else any guard fails
+    Admin->>+API: Decide on request
+    API->>API: Check permissions
+    alt Accepted
+        API->>DB: Add member · Remove request
+        API-->>Admin: Ok
+    else Rejected
+        API->>DB: Remove request
+        API-->>Admin: Ok
+    else Not allowed
         API-->>Admin: 400 / 403 / 404 / 409
     end
     deactivate API
@@ -236,22 +281,32 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         Admin->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Admin: 401
     end
 
-    Admin->>+API: POST /create_team
-    API->>API: assert ADMIN/OWNER
-    API->>DB: INSERT Teams + Team_association + Team_roles
-    API-->>-Admin: 200 (or 4xx)
+    Admin->>+API: Create team
+    API->>API: Check permissions
+    alt Authorized
+        API->>DB: Save team
+        API-->>Admin: Team created
+    else Forbidden
+        API-->>Admin: 403
+    end
+    deactivate API
 
-    Lead->>+API: add / remove member · update permissions
-    API->>API: assert TEAM_LEAD · validate target
-    API->>DB: write Team_association / Team_roles
-    API-->>-Lead: ok (or 4xx)
+    Lead->>+API: Manage team members
+    API->>API: Check permissions
+    alt Authorized
+        API->>DB: Update membership
+        API-->>Lead: Ok
+    else Forbidden
+        API-->>Lead: 403
+    end
+    deactivate API
 ```
 
 ---
@@ -267,28 +322,28 @@ sequenceDiagram
     participant DB as Postgres
     participant Vec as Pinecone
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         UserA->>WS: authenticated
-        WS->>DB: verify token · load user
-    else token invalid / expired
-        WS--xUserA: close 4401
+        WS->>DB: Authenticate request
+    else Unauthorized
+        WS--xUserA: Close 4401
     end
 
-    UserA->>+WS: connect
-    WS->>WS: verify JWT · assert membership
-    WS-->>UserA: connected (or close on auth/membership fail)
-    UserB->>+WS: connect
+    UserA->>+WS: Connect
+    UserB->>+WS: Connect
+    WS-->>UserA: Connected
+    WS-->>UserB: Connected
 
-    UserA->>WS: send / edit / delete / pin message
-    WS->>WS: authorize · sanitize
-    WS->>+DB: persist message
-    DB-->>-WS: ok
-    WS->>+Vec: index for search
-    Vec-->>-WS: ok
-    WS-->>UserB: broadcast update
+    loop Active session
+        UserA->>WS: Send message
+        WS->>WS: Check permissions
+        WS->>DB: Save message
+        WS->>Vec: Index message
+        WS-->>UserB: Broadcast message
+    end
 
-    UserA--xWS: disconnect
-    UserB--xWS: disconnect
+    UserA--xWS: Disconnect
+    UserB--xWS: Disconnect
     deactivate WS
     deactivate WS
 ```
@@ -307,27 +362,31 @@ sequenceDiagram
     participant Cloud as Cloudinary
     participant Vec as Pinecone
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         User->>WS: authenticated
-        WS->>DB: verify token · load user
-    else token invalid / expired
-        WS--xUser: close 4401
+        WS->>DB: Authenticate request
+    else Unauthorized
+        WS--xUser: Close 4401
     end
 
-    User->>+WS: send file (base64)
-    WS->>WS: validate mime + size
-    WS->>Cloud: upload
-    WS->>DB: INSERT Files + Messages
-    opt PDF / text
-        WS->>Vec: extract · chunk · upsert
+    User->>+WS: Upload file
+    WS->>Cloud: Store file
+    WS->>DB: Save file
+    opt Indexable file
+        WS->>Vec: Index content
     end
-    WS-->>-User: broadcast file message
+    WS-->>-User: File shared
 
-    User->>+API: GET /file/{id}/content
-    API->>API: assert team membership
-    API->>DB: SELECT File
-    API->>Cloud: fetch URL
-    API-->>-User: PDF stream (or 4xx)
+    User->>+API: Download file
+    API->>API: Check permissions
+    alt Authorized
+        API->>DB: Load file
+        API->>Cloud: Fetch file
+        API-->>User: File stream
+    else Forbidden
+        API-->>User: 403
+    end
+    deactivate API
 ```
 
 ---
@@ -345,19 +404,24 @@ sequenceDiagram
     participant DB as Postgres
     participant Notif as Notifications
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         Manager->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Manager: 401
     end
 
-    Manager->>+API: POST /org/{o}/team/{t}/tasks
-    API->>API: assert manager · assignee in team
-    API->>DB: INSERT Tasks + Task_assignees
-    API->>Notif: notify assignees
-    Notif-->>Assignee: push
-    API-->>-Manager: 200 (or 4xx)
+    Manager->>+API: Create task
+    API->>API: Check permissions
+    alt Authorized
+        API->>DB: Save task
+        API->>Notif: Notify assignees
+        Notif-->>Assignee: Task assigned
+        API-->>Manager: Task created
+    else Forbidden
+        API-->>Manager: 403
+    end
+    deactivate API
 ```
 
 ### 9b. Assignee submits for review
@@ -371,19 +435,23 @@ sequenceDiagram
     participant DB as Postgres
     participant Notif as Notifications
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         Assignee->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Assignee: 401
     end
 
-    Assignee->>+API: PATCH .../my-tasks/{task_id}/status submitted
-    API->>API: validate status transition
-    API->>DB: UPDATE Task_assignees status
-    API->>Notif: notify manager
-    Notif-->>Manager: push
-    API-->>-Assignee: ok (or 4xx)
+    Assignee->>+API: Submit task for review
+    alt Valid transition
+        API->>DB: Update task status
+        API->>Notif: Notify manager
+        Notif-->>Manager: Task submitted
+        API-->>Assignee: Ok
+    else Invalid
+        API-->>Assignee: 400
+    end
+    deactivate API
 ```
 
 ### 9c. Manager reviews (approve / reject)
@@ -397,19 +465,27 @@ sequenceDiagram
     participant DB as Postgres
     participant Notif as Notifications
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         Manager->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>Manager: 401
     end
 
-    Manager->>+API: PATCH .../tasks/{task_id}/review?action=
-    API->>API: assert manager · apply approve/reject
-    API->>DB: UPDATE Tasks / Task_assignees
-    API->>Notif: notify assignee
-    Notif-->>Assignee: push
-    API-->>-Manager: ok
+    Manager->>+API: Review task
+    API->>API: Check permissions
+    alt Approved
+        API->>DB: Update task
+        API->>Notif: Notify assignee
+        Notif-->>Assignee: Task approved
+        API-->>Manager: Ok
+    else Rejected
+        API->>DB: Update task
+        API->>Notif: Notify assignee
+        Notif-->>Assignee: Task rejected
+        API-->>Manager: Ok
+    end
+    deactivate API
 ```
 
 ---
@@ -425,23 +501,25 @@ sequenceDiagram
     participant Vec as Pinecone (tasks · docs · messages)
     participant LLM
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         User->>API: authenticated
-        API->>DB: verify token · load user
-    else token invalid / expired
+        API->>DB: Authenticate request
+    else Unauthorized
         API-->>User: 401
     end
 
-    User->>+API: POST /assistant {query, team_id, document_id?}
-    API->>DB: assert org_member + team_member
-    par parallel retrieval
-        API->>Vec: search (k=5 each, or k=8 if doc_id)
+    User->>+API: Ask assistant
+    API->>DB: Check permissions
+    alt Authorized
+        API->>Vec: Search context
+        Vec-->>API: Relevant hits
+        API->>LLM: Ask with context
+        LLM-->>API: Answer
+        API-->>User: Answer + sources
+    else Forbidden
+        API-->>User: 403
     end
-    Vec-->>API: hits
-    API->>API: filter · normalize · merge top 10
-    API->>+LLM: ask with context
-    LLM-->>-API: answer
-    API-->>-User: { answer, sources[] }
+    deactivate API
 ```
 
 ---
@@ -457,29 +535,30 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         UserA->>WS: authenticated
-        WS->>DB: verify token · load user
-    else token invalid / expired
-        WS--xUserA: close 4401
+        WS->>DB: Authenticate request
+    else Unauthorized
+        WS--xUserA: Close 4401
     end
 
-    UserA->>+WS: connect
-    UserB->>+WS: connect
+    UserA->>+WS: Connect
+    UserB->>+WS: Connect
 
-    UserA->>WS: send text / file message
-    WS->>DB: check Blocked_users · INSERT Direct_messages
-    opt UserB online
-        WS-->>UserB: broadcast
+    loop Active session
+        UserA->>WS: Send DM
+        WS->>DB: Check block · Save message
+        opt UserB online
+            WS-->>UserB: Broadcast message
+        end
     end
 
-    UserA->>+API: GET /direct-messages
-    API->>+DB: SELECT distinct partners + last msg
-    DB-->>-API: rows
-    API-->>-UserA: list
+    UserA->>+API: List conversations
+    API->>DB: Load conversations
+    API-->>-UserA: Conversations list
 
-    UserA--xWS: disconnect
-    UserB--xWS: disconnect
+    UserA--xWS: Disconnect
+    UserB--xWS: Disconnect
     deactivate WS
     deactivate WS
 ```
@@ -497,34 +576,35 @@ sequenceDiagram
     participant DB as Postgres
     participant Friends as Friends WS
 
-    alt ref — Authenticate (see §2 Login + Refresh)
+    alt Authenticated
         User->>WS: authenticated
-        WS->>DB: verify token · load user
-    else token invalid / expired
-        WS--xUser: close 4401
+        WS->>DB: Authenticate request
+    else Unauthorized
+        WS--xUser: Close 4401
     end
 
-    User->>+FE: open app
-    FE->>+WS: connect
-    WS->>WS: verify JWT · register socket
-    WS->>DB: SELECT Friends · UPDATE Users.status=online
-    WS->>Friends: broadcast user_online
-    WS-->>FE: list of online friends
+    User->>+FE: Open app
+    FE->>+WS: Connect
+    WS->>DB: Mark user online
+    WS->>Friends: Broadcast online
+    WS-->>FE: Online friends
 
-    loop heartbeat
-        FE->>WS: ping
-        WS-->>FE: pong
+    loop Heartbeat
+        FE->>WS: Ping
+        WS-->>FE: Pong
     end
 
-    User->>FE: change status (away / busy / …)
-    FE->>WS: set_status
-    WS->>DB: UPDATE Users.status
-    WS->>Friends: broadcast new status
+    opt Status change
+        User->>FE: Change status
+        FE->>WS: Update status
+        WS->>DB: Save status
+        WS->>Friends: Broadcast status
+    end
 
-    FE--xWS: disconnect
-    alt last socket
-        WS->>DB: UPDATE status=offline · last_seen_at
-        WS->>Friends: broadcast user_offline
+    FE--xWS: Disconnect
+    alt Last socket
+        WS->>DB: Mark user offline
+        WS->>Friends: Broadcast offline
     end
     deactivate WS
     deactivate FE
