@@ -153,7 +153,7 @@ sequenceDiagram
     end
 
     alt Email verified
-        API->>API: Check verified
+        API->>DB: Check verified
     else Not verified
         API-->>Admin: 403 verify email
     end
@@ -166,7 +166,7 @@ sequenceDiagram
     API-->>-Admin: Organization created
 
     Admin->>+API: Subscribe to plan
-    API->>API: Check permissions
+    API->>DB: Check permissions
     API->>Stripe: Start checkout
     API-->>-Admin: Redirect to checkout
 
@@ -196,7 +196,7 @@ sequenceDiagram
     end
 
     alt Email verified
-        API->>API: Check verified
+        API->>DB: Check verified
     else Not verified
         API-->>User: 403 verify email
     end
@@ -229,7 +229,7 @@ sequenceDiagram
     end
 
     Admin->>+API: List join requests
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Authorized
         API->>DB: Load pending requests
         API-->>Admin: Requests list
@@ -256,7 +256,7 @@ sequenceDiagram
     end
 
     Admin->>+API: Decide on request
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Accepted
         API->>DB: Add member · Remove request
         API-->>Admin: Ok
@@ -289,7 +289,7 @@ sequenceDiagram
     end
 
     Admin->>+API: Create team
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Authorized
         API->>DB: Save team
         API-->>Admin: Team created
@@ -299,7 +299,7 @@ sequenceDiagram
     deactivate API
 
     Lead->>+API: Manage team members
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Authorized
         API->>DB: Update membership
         API-->>Lead: Ok
@@ -336,7 +336,7 @@ sequenceDiagram
 
     loop Active session
         UserA->>WS: Send message
-        WS->>WS: Check permissions
+        WS->>DB: Check permissions
         WS->>DB: Save message
         WS->>Vec: Index message
         WS-->>UserB: Broadcast message
@@ -378,7 +378,7 @@ sequenceDiagram
     WS-->>-User: File shared
 
     User->>+API: Download file
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Authorized
         API->>DB: Load file
         API->>Cloud: Fetch file
@@ -412,7 +412,7 @@ sequenceDiagram
     end
 
     Manager->>+API: Create task
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Authorized
         API->>DB: Save task
         API->>Notif: Notify assignees
@@ -473,7 +473,7 @@ sequenceDiagram
     end
 
     Manager->>+API: Review task
-    API->>API: Check permissions
+    API->>DB: Check permissions
     alt Approved
         API->>DB: Update task
         API->>Notif: Notify assignee
