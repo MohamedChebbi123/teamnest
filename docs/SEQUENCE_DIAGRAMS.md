@@ -25,37 +25,42 @@ End-to-end flows that cross service boundaries. Each diagram shows the *shape* o
 sequenceDiagram
     actor User
     participant FE as Frontend
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Mail as Email Service
 
-    User->>FE: Submit signup
-    FE->>API: Create account
-    API->>DB: Save user
-    API-->>FE: Account created
-    FE-->>User: Verify your email
+    User->>+FE: Submit signup
+    FE->>+API: Create account
+    API->>+DB: Save user
+    DB-->>-API: Saved
+    API-->>-FE: Account created
+    FE-->>-User: Verify your email
 
     Note over User,Mail: Verification required before any action
 
-    User->>FE: Request code
-    FE->>API: Send code
+    User->>+FE: Request code
+    FE->>+API: Send code
     API->>API: Generate code
-    API->>DB: Save code
-    API->>Mail: Send email
-    Mail-->>User: Code received
-    API-->>FE: OK
-    FE-->>User: Code sent
+    API->>+DB: Save code
+    DB-->>-API: Saved
+    API->>+Mail: Send email
+    Mail-->>-User: Code received
+    API-->>-FE: OK
+    FE-->>-User: Code sent
 
-    User->>FE: Enter code
-    FE->>API: Verify email
-    API->>DB: Check code
+    User->>+FE: Enter code
+    FE->>+API: Verify email
+    API->>+DB: Check code
+    DB-->>-API: Result
     alt Valid code
-        API->>DB: Mark verified
+        API->>+DB: Mark verified
+        DB-->>-API: Saved
         API-->>FE: Email verified
     else Invalid code
         API-->>FE: Error
     end
-    FE-->>User: Account verified
+    deactivate API
+    FE-->>-User: Account verified
 ```
 
 ---
@@ -65,29 +70,35 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
 
-    User->>API: Login
-    API->>DB: Check credentials
+    User->>+API: Login
+    API->>+DB: Check credentials
+    DB-->>-API: Result
     alt Valid credentials
         API->>API: Generate tokens
-        API->>DB: Save session
+        API->>+DB: Save session
+        DB-->>-API: Saved
         API-->>User: Access tokens
     else Invalid credentials
         API-->>User: Error
     end
+    deactivate API
 
     Note over User,API: Later — token expired
 
-    User->>API: Refresh token
-    API->>DB: Check token
+    User->>+API: Refresh token
+    API->>+DB: Check token
+    DB-->>-API: Result
     alt Valid token
-        API->>DB: Renew token
+        API->>+DB: Renew token
+        DB-->>-API: Saved
         API-->>User: New tokens
     else Invalid token
         API-->>User: Error
     end
+    deactivate API
 ```
 
 ---
@@ -97,34 +108,39 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Mail as Email Service
 
-    User->>API: Forgot password
+    User->>+API: Forgot password
     opt User exists
         API->>API: Generate code
-        API->>DB: Save code
-        API->>Mail: Send code
-        Mail-->>User: Email received
+        API->>+DB: Save code
+        DB-->>-API: Saved
+        API->>+Mail: Send code
+        Mail-->>-User: Email received
     end
-    API-->>User: Confirmation
+    API-->>-User: Confirmation
 
-    User->>API: Verify code
-    API->>DB: Check code
+    User->>+API: Verify code
+    API->>+DB: Check code
+    DB-->>-API: Result
     alt Valid code
         API-->>User: OK
     else Invalid code
         API-->>User: Error
     end
+    deactivate API
 
-    User->>API: Reset password
+    User->>+API: Reset password
     alt Valid code
-        API->>DB: Update password
+        API->>+DB: Update password
+        DB-->>-API: Saved
         API-->>User: Success
     else Invalid code
         API-->>User: Error
     end
+    deactivate API
 ```
 
 ---
@@ -134,7 +150,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Admin
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Cloud as Cloudinary
     participant Stripe
@@ -142,26 +158,32 @@ sequenceDiagram
     Note over Admin,DB: ref: Authenticate
 
     alt Email verified
-        API->>DB: Check status
+        API->>+DB: Check status
+        DB-->>-API: Verified
     else Not verified
         API-->>Admin: Verify email
     end
 
-    Admin->>API: Create organization
+    Admin->>+API: Create organization
     opt Logo provided
-        API->>Cloud: Upload logo
+        API->>+Cloud: Upload logo
+        Cloud-->>-API: Logo URL
     end
-    API->>DB: Save organization
-    API-->>Admin: Organization created
+    API->>+DB: Save organization
+    DB-->>-API: Saved
+    API-->>-Admin: Organization created
 
-    Admin->>API: Subscribe to plan
-    API->>DB: Check permissions
-    API->>Stripe: Start payment
-    API-->>Admin: Redirect to payment
+    Admin->>+API: Subscribe to plan
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    API->>+Stripe: Start payment
+    Stripe-->>-API: Session URL
+    API-->>-Admin: Redirect to payment
 
-    Stripe->>API: Payment notification
-    API->>DB: Update subscription
-    API-->>Stripe: OK
+    Stripe->>+API: Payment notification
+    API->>+DB: Update subscription
+    DB-->>-API: Saved
+    API-->>-Stripe: OK
 ```
 
 ---
@@ -173,25 +195,29 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
 
     Note over User,DB: ref: Authenticate
 
     alt Email verified
-        API->>DB: Check status
+        API->>+DB: Check status
+        DB-->>-API: Verified
     else Not verified
         API-->>User: Verify email
     end
 
-    User->>API: Request to join
-    API->>DB: Check eligibility
+    User->>+API: Request to join
+    API->>+DB: Check eligibility
+    DB-->>-API: Result
     alt Eligible
-        API->>DB: Save request
+        API->>+DB: Save request
+        DB-->>-API: Saved
         API-->>User: Request submitted
     else Not eligible
         API-->>User: Error
     end
+    deactivate API
 ```
 
 ### 5b. Admin lists pending requests
@@ -199,19 +225,22 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Admin
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
 
     Note over Admin,DB: ref: Authenticate
 
-    Admin->>API: List requests
-    API->>DB: Check permissions
+    Admin->>+API: List requests
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Authorized
-        API->>DB: Load requests
+        API->>+DB: Load requests
+        DB-->>-API: Rows
         API-->>Admin: List displayed
     else Unauthorized
         API-->>Admin: Denied
     end
+    deactivate API
 ```
 
 ### 5c. Admin accepts or rejects
@@ -219,22 +248,26 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Admin
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
 
     Note over Admin,DB: ref: Authenticate
 
-    Admin->>API: Decide on request
-    API->>DB: Check permissions
+    Admin->>+API: Decide on request
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Accepted
-        API->>DB: Add member
+        API->>+DB: Add member
+        DB-->>-API: Saved
         API-->>Admin: OK
     else Rejected
-        API->>DB: Remove request
+        API->>+DB: Remove request
+        DB-->>-API: Removed
         API-->>Admin: OK
     else Unauthorized
         API-->>Admin: Denied
     end
+    deactivate API
 ```
 
 ---
@@ -245,28 +278,34 @@ sequenceDiagram
 sequenceDiagram
     actor Admin
     actor Lead as Team Lead
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
 
     Note over Admin,DB: ref: Authenticate
 
-    Admin->>API: Create team
-    API->>DB: Check permissions
+    Admin->>+API: Create team
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Authorized
-        API->>DB: Save team
+        API->>+DB: Save team
+        DB-->>-API: Saved
         API-->>Admin: Team created
     else Unauthorized
         API-->>Admin: Denied
     end
+    deactivate API
 
-    Lead->>API: Manage members
-    API->>DB: Check permissions
+    Lead->>+API: Manage members
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Authorized
-        API->>DB: Update members
+        API->>+DB: Update members
+        DB-->>-API: Saved
         API-->>Lead: OK
     else Unauthorized
         API-->>Lead: Denied
     end
+    deactivate API
 ```
 
 ---
@@ -283,21 +322,26 @@ sequenceDiagram
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>WS: Connect
-    UserB->>WS: Connect
+    UserA->>+WS: Connect
+    UserB->>+WS: Connect
     WS-->>UserA: Connected
     WS-->>UserB: Connected
 
     loop Active session
         UserA->>WS: Send message
-        WS->>DB: Check permissions
-        WS->>DB: Save message
-        WS->>Vec: Index message
+        WS->>+DB: Check permissions
+        DB-->>-WS: OK
+        WS->>+DB: Save message
+        DB-->>-WS: Saved
+        WS->>+Vec: Index message
+        Vec-->>-WS: Indexed
         WS-->>UserB: Broadcast message
     end
 
     UserA->>WS: Disconnect
     UserB->>WS: Disconnect
+    deactivate WS
+    deactivate WS
 ```
 
 ---
@@ -308,31 +352,38 @@ sequenceDiagram
 sequenceDiagram
     actor User
     participant WS as Channel WebSocket
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Cloud as Cloudinary
     participant Vec as Pinecone
 
     Note over User,DB: ref: Authenticate
 
-    User->>WS: Upload file
+    User->>+WS: Upload file
     WS->>WS: Validate file
-    WS->>Cloud: Store file
-    WS->>DB: Save file
+    WS->>+Cloud: Store file
+    Cloud-->>-WS: URL
+    WS->>+DB: Save file
+    DB-->>-WS: Saved
     opt Indexable file
-        WS->>Vec: Index content
+        WS->>+Vec: Index content
+        Vec-->>-WS: Indexed
     end
-    WS-->>User: File shared
+    WS-->>-User: File shared
 
-    User->>API: Download file
-    API->>DB: Check permissions
+    User->>+API: Download file
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Authorized
-        API->>DB: Load file
-        API->>Cloud: Fetch content
+        API->>+DB: Load file
+        DB-->>-API: Row
+        API->>+Cloud: Fetch content
+        Cloud-->>-API: File data
         API-->>User: File
     else Unauthorized
         API-->>User: Denied
     end
+    deactivate API
 ```
 
 ---
@@ -345,22 +396,25 @@ sequenceDiagram
 sequenceDiagram
     actor Manager
     actor Assignee
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Notif as Notifications
 
     Note over Manager,DB: ref: Authenticate
 
-    Manager->>API: Create task
-    API->>DB: Check permissions
+    Manager->>+API: Create task
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Authorized
-        API->>DB: Save task
-        API->>Notif: Notify assignee
-        Notif-->>Assignee: Task assigned
+        API->>+DB: Save task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-->>-Assignee: Task assigned
         API-->>Manager: Task created
     else Unauthorized
         API-->>Manager: Denied
     end
+    deactivate API
 ```
 
 ### 9b. Assignee submits for review
@@ -369,21 +423,23 @@ sequenceDiagram
 sequenceDiagram
     actor Manager
     actor Assignee
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Notif as Notifications
 
     Note over Assignee,DB: ref: Authenticate
 
-    Assignee->>API: Submit task
+    Assignee->>+API: Submit task
     alt Valid transition
-        API->>DB: Update status
-        API->>Notif: Notify manager
-        Notif-->>Manager: Task submitted
+        API->>+DB: Update status
+        DB-->>-API: Saved
+        API->>+Notif: Notify manager
+        Notif-->>-Manager: Task submitted
         API-->>Assignee: OK
     else Invalid transition
         API-->>Assignee: Error
     end
+    deactivate API
 ```
 
 ### 9c. Manager reviews (approve / reject)
@@ -392,25 +448,29 @@ sequenceDiagram
 sequenceDiagram
     actor Manager
     actor Assignee
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Notif as Notifications
 
     Note over Manager,DB: ref: Authenticate
 
-    Manager->>API: Review task
-    API->>DB: Check permissions
+    Manager->>+API: Review task
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Approved
-        API->>DB: Update task
-        API->>Notif: Notify assignee
-        Notif-->>Assignee: Task approved
+        API->>+DB: Update task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-->>-Assignee: Task approved
         API-->>Manager: OK
     else Rejected
-        API->>DB: Update task
-        API->>Notif: Notify assignee
-        Notif-->>Assignee: Task rejected
+        API->>+DB: Update task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-->>-Assignee: Task rejected
         API-->>Manager: OK
     end
+    deactivate API
 ```
 
 ---
@@ -420,24 +480,26 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
     participant Vec as Pinecone
     participant LLM
 
     Note over User,DB: ref: Authenticate
 
-    User->>API: Ask question
-    API->>DB: Check permissions
+    User->>+API: Ask question
+    API->>+DB: Check permissions
+    DB-->>-API: OK
     alt Authorized
-        API->>Vec: Search context
-        Vec-->>API: Results
-        API->>LLM: Ask for answer
-        LLM-->>API: Answer
+        API->>+Vec: Search context
+        Vec-->>-API: Results
+        API->>+LLM: Ask for answer
+        LLM-->>-API: Answer
         API-->>User: Display result
     else Unauthorized
         API-->>User: Denied
     end
+    deactivate API
 ```
 
 ---
@@ -449,29 +511,34 @@ sequenceDiagram
     actor UserA
     actor UserB
     participant WS as DM WebSocket
-    participant API as Platform
+    participant API as Backend
     participant DB as Database
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>WS: Connect
-    UserB->>WS: Connect
+    UserA->>+WS: Connect
+    UserB->>+WS: Connect
 
     loop Active session
         UserA->>WS: Send message
-        WS->>DB: Check block
-        WS->>DB: Save message
+        WS->>+DB: Check block
+        DB-->>-WS: OK
+        WS->>+DB: Save message
+        DB-->>-WS: Saved
         opt UserB online
             WS-->>UserB: Broadcast message
         end
     end
 
-    UserA->>API: List conversations
-    API->>DB: Load conversations
-    API-->>UserA: List displayed
+    UserA->>+API: List conversations
+    API->>+DB: Load conversations
+    DB-->>-API: Rows
+    API-->>-UserA: List displayed
 
     UserA->>WS: Disconnect
     UserB->>WS: Disconnect
+    deactivate WS
+    deactivate WS
 ```
 
 ---
@@ -488,9 +555,10 @@ sequenceDiagram
 
     Note over User,DB: ref: Authenticate
 
-    User->>FE: Open app
-    FE->>WS: Connect
-    WS->>DB: Mark online
+    User->>+FE: Open app
+    FE->>+WS: Connect
+    WS->>+DB: Mark online
+    DB-->>-WS: Saved
     WS->>Friends: Broadcast presence
     WS-->>FE: Online friends list
 
@@ -502,13 +570,17 @@ sequenceDiagram
     opt Status change
         User->>FE: Change status
         FE->>WS: Update
-        WS->>DB: Save status
+        WS->>+DB: Save status
+        DB-->>-WS: Saved
         WS->>Friends: Broadcast status
     end
 
     FE->>WS: Disconnect
     alt Last session
-        WS->>DB: Mark offline
+        WS->>+DB: Mark offline
+        DB-->>-WS: Saved
         WS->>Friends: Broadcast offline
     end
+    deactivate WS
+    deactivate FE
 ```
