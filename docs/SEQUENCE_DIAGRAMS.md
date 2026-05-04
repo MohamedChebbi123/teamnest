@@ -123,24 +123,25 @@ sequenceDiagram
     participant Cloud as Cloudinary
     participant Stripe
 
-    opt ref — Authenticate (see §2 Login + Refresh)
-        Admin->>API: authenticated
+    alt Authenticated
+        Admin->>API: Authenticate request
+        API->>DB: Load user
+    else Not authenticated
+        API-->>Admin: 401
     end
 
-    Admin->>+API: POST /create_organization
-    API->>Cloud: upload logo
-    API->>DB: INSERT Organization + Organization_members (OWNER)
-    API-->>-Admin: { org_id }
+    Admin->>+API: Create organization
+    API->>Cloud: Upload logo
+    API->>DB: Save organization
+    API-->>-Admin: Organization created
 
-    Admin->>+API: POST /organization/{id}/subscribe
-    API->>API: assert OWNER · plan != PRO
-    API->>Stripe: checkout.Session.create
-    API-->>-Admin: redirect to Checkout (or 4xx)
+    Admin->>+API: Subscribe to plan
+    API->>Stripe: Start checkout
+    API-->>-Admin: Redirect to checkout
 
-    Stripe->>+API: POST /stripe/webhook (signed)
-    API->>API: verify signature · handle event
-    API->>DB: UPSERT Organization_payments · UPDATE plan
-    API-->>-Stripe: 200 (or 400)
+    Stripe->>+API: Payment webhook
+    API->>DB: Update subscription
+    API-->>-Stripe: 200
 ```
 
 ---
@@ -156,8 +157,11 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         User->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>User: 401
     end
 
     User->>+API: POST /organization/join {org_name, org_tag}
@@ -176,8 +180,11 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         Admin->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>Admin: 401
     end
 
     Admin->>+API: GET /organization/{id}/join-requests
@@ -196,8 +203,11 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         Admin->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>Admin: 401
     end
 
     Admin->>+API: POST /organization/{id}/join-requests/{rid}?action=&role_user=
@@ -226,8 +236,11 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         Admin->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>Admin: 401
     end
 
     Admin->>+API: POST /create_team
@@ -254,8 +267,11 @@ sequenceDiagram
     participant DB as Postgres
     participant Vec as Pinecone
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         UserA->>WS: authenticated
+        WS->>DB: verify token · load user
+    else token invalid / expired
+        WS--xUserA: close 4401
     end
 
     UserA->>+WS: connect
@@ -291,8 +307,11 @@ sequenceDiagram
     participant Cloud as Cloudinary
     participant Vec as Pinecone
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         User->>WS: authenticated
+        WS->>DB: verify token · load user
+    else token invalid / expired
+        WS--xUser: close 4401
     end
 
     User->>+WS: send file (base64)
@@ -326,8 +345,11 @@ sequenceDiagram
     participant DB as Postgres
     participant Notif as Notifications
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         Manager->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>Manager: 401
     end
 
     Manager->>+API: POST /org/{o}/team/{t}/tasks
@@ -349,8 +371,11 @@ sequenceDiagram
     participant DB as Postgres
     participant Notif as Notifications
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         Assignee->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>Assignee: 401
     end
 
     Assignee->>+API: PATCH .../my-tasks/{task_id}/status submitted
@@ -372,8 +397,11 @@ sequenceDiagram
     participant DB as Postgres
     participant Notif as Notifications
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         Manager->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>Manager: 401
     end
 
     Manager->>+API: PATCH .../tasks/{task_id}/review?action=
@@ -397,8 +425,11 @@ sequenceDiagram
     participant Vec as Pinecone (tasks · docs · messages)
     participant LLM
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         User->>API: authenticated
+        API->>DB: verify token · load user
+    else token invalid / expired
+        API-->>User: 401
     end
 
     User->>+API: POST /assistant {query, team_id, document_id?}
@@ -426,8 +457,11 @@ sequenceDiagram
     participant API as Platform
     participant DB as Postgres
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         UserA->>WS: authenticated
+        WS->>DB: verify token · load user
+    else token invalid / expired
+        WS--xUserA: close 4401
     end
 
     UserA->>+WS: connect
@@ -463,8 +497,11 @@ sequenceDiagram
     participant DB as Postgres
     participant Friends as Friends WS
 
-    opt ref — Authenticate (see §2 Login + Refresh)
+    alt ref — Authenticate (see §2 Login + Refresh)
         User->>WS: authenticated
+        WS->>DB: verify token · load user
+    else token invalid / expired
+        WS--xUser: close 4401
     end
 
     User->>+FE: open app
