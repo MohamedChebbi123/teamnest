@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="650" viewBox="0 0 900 650" font-family="Arial, sans-serif">
+  <style>
+    .actor-line { stroke: #222; stroke-width: 2; fill: none; }
+    .actor-label { font-size: 13px; text-anchor: middle; fill: #222; }
+    .boundary { fill: #fafafa; stroke: #333; stroke-width: 2; }
+    .boundary-title { font-size: 16px; font-weight: bold; text-anchor: middle; fill: #222; }
+    .usecase { fill: #e8f0fe; stroke: #1a73e8; stroke-width: 1.5; }
+    .uc-label { font-size: 12px; text-anchor: middle; fill: #111; }
+    .assoc { stroke: #444; stroke-width: 1.2; fill: none; }
+    .dep { stroke: #444; stroke-width: 1.2; fill: none; stroke-dasharray: 5,4; }
+    .stereo { font-size: 10px; fill: #555; text-anchor: middle; font-style: italic; }
+    .diagram-title { font-size: 18px; font-weight: bold; text-anchor: middle; fill: #111; }
+  </style>
+
+  <text x="450" y="28" class="diagram-title">1. Authentication Core</text>
+
+  <g>
+    <circle cx="80" cy="120" r="14" class="actor-line"/>
+    <line x1="80" y1="134" x2="80" y2="175" class="actor-line"/>
+    <line x1="55" y1="150" x2="105" y2="150" class="actor-line"/>
+    <line x1="80" y1="175" x2="55" y2="210" class="actor-line"/>
+    <line x1="80" y1="175" x2="105" y2="210" class="actor-line"/>
+    <text x="80" y="232" class="actor-label">Guest</text>
+  </g>
+
+  <g>
+    <circle cx="80" cy="400" r="14" class="actor-line"/>
+    <line x1="80" y1="414" x2="80" y2="455" class="actor-line"/>
+    <line x1="55" y1="430" x2="105" y2="430" class="actor-line"/>
+    <line x1="80" y1="455" x2="55" y2="490" class="actor-line"/>
+    <line x1="80" y1="455" x2="105" y2="490" class="actor-line"/>
+    <text x="80" y="512" class="actor-label">Authenticated User</text>
+  </g>
+
+  <g>
+    <circle cx="820" cy="180" r="14" class="actor-line"/>
+    <line x1="820" y1="194" x2="820" y2="235" class="actor-line"/>
+    <line x1="795" y1="210" x2="845" y2="210" class="actor-line"/>
+    <line x1="820" y1="235" x2="795" y2="270" class="actor-line"/>
+    <line x1="820" y1="235" x2="845" y2="270" class="actor-line"/>
+    <text x="820" y="292" class="actor-label">Email Service</text>
+    <text x="820" y="308" class="stereo">«external»</text>
+  </g>
+
+  <rect x="200" y="60" width="500" height="560" rx="8" class="boundary"/>
+  <text x="450" y="82" class="boundary-title">Auth Service</text>
+
+  <ellipse cx="340" cy="140" rx="100" ry="26" class="usecase"/>
+  <text x="340" y="144" class="uc-label">Register Account</text>
+
+  <ellipse cx="560" cy="140" rx="100" ry="26" class="usecase"/>
+  <text x="560" y="144" class="uc-label">Verify Email</text>
+
+  <ellipse cx="560" cy="220" rx="115" ry="26" class="usecase"/>
+  <text x="560" y="224" class="uc-label">Resend Verification Code</text>
+
+  <ellipse cx="340" cy="320" rx="80" ry="26" class="usecase"/>
+  <text x="340" y="324" class="uc-label">Login</text>
+
+  <ellipse cx="340" cy="400" rx="80" ry="26" class="usecase"/>
+  <text x="340" y="404" class="uc-label">Logout</text>
+
+  <ellipse cx="560" cy="400" rx="105" ry="26" class="usecase"/>
+  <text x="560" y="404" class="uc-label">Logout All Sessions</text>
+
+  <ellipse cx="450" cy="500" rx="115" ry="26" class="usecase"/>
+  <text x="450" y="504" class="uc-label">Refresh Access Token</text>
+
+  <line x1="100" y1="180" x2="245" y2="145" class="assoc"/>
+  <line x1="100" y1="180" x2="270" y2="320" class="assoc"/>
+
+  <line x1="100" y1="430" x2="265" y2="403" class="assoc"/>
+  <line x1="100" y1="430" x2="455" y2="403" class="assoc"/>
+  <line x1="100" y1="430" x2="345" y2="500" class="assoc"/>
+
+  <line x1="100" y1="180" x2="460" y2="140" class="assoc"/>
+  <line x1="100" y1="180" x2="445" y2="220" class="assoc"/>
+
+  <line x1="800" y1="220" x2="660" y2="145" class="assoc"/>
+  <line x1="800" y1="220" x2="675" y2="220" class="assoc"/>
+
+  <line x1="440" y1="140" x2="460" y2="140" class="dep"/>
+  <text x="450" y="132" class="stereo">«include»</text>
+
+  <line x1="560" y1="166" x2="560" y2="194" class="dep"/>
+  <text x="595" y="184" class="stereo">«extend»</text>
+</svg>

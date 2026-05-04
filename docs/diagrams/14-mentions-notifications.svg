@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="950" height="600" viewBox="0 0 950 600" font-family="Arial, sans-serif">
+  <style>
+    .actor-line { stroke: #222; stroke-width: 2; fill: none; }
+    .actor-label { font-size: 13px; text-anchor: middle; fill: #222; }
+    .boundary { fill: #fafafa; stroke: #333; stroke-width: 2; }
+    .boundary-title { font-size: 16px; font-weight: bold; text-anchor: middle; fill: #222; }
+    .usecase { fill: #e8f0fe; stroke: #1a73e8; stroke-width: 1.5; }
+    .uc-label { font-size: 12px; text-anchor: middle; fill: #111; }
+    .assoc { stroke: #444; stroke-width: 1.2; fill: none; }
+    .dep { stroke: #444; stroke-width: 1.2; fill: none; stroke-dasharray: 5,4; }
+    .stereo { font-size: 10px; fill: #555; text-anchor: middle; font-style: italic; }
+    .diagram-title { font-size: 18px; font-weight: bold; text-anchor: middle; fill: #111; }
+  </style>
+
+  <text x="475" y="28" class="diagram-title">2. Mentions, Announcements &amp; Notifications</text>
+
+  <g>
+    <circle cx="80" cy="150" r="14" class="actor-line"/>
+    <line x1="80" y1="164" x2="80" y2="205" class="actor-line"/>
+    <line x1="55" y1="180" x2="105" y2="180" class="actor-line"/>
+    <line x1="80" y1="205" x2="55" y2="240" class="actor-line"/>
+    <line x1="80" y1="205" x2="105" y2="240" class="actor-line"/>
+    <text x="80" y="262" class="actor-label">Channel Member</text>
+  </g>
+
+  <g>
+    <circle cx="80" cy="330" r="14" class="actor-line"/>
+    <line x1="80" y1="344" x2="80" y2="385" class="actor-line"/>
+    <line x1="55" y1="360" x2="105" y2="360" class="actor-line"/>
+    <line x1="80" y1="385" x2="55" y2="420" class="actor-line"/>
+    <line x1="80" y1="385" x2="105" y2="420" class="actor-line"/>
+    <text x="80" y="442" class="actor-label">Announcer</text>
+  </g>
+
+  <g>
+    <circle cx="80" cy="490" r="14" class="actor-line"/>
+    <line x1="80" y1="504" x2="80" y2="545" class="actor-line"/>
+    <line x1="55" y1="520" x2="105" y2="520" class="actor-line"/>
+    <line x1="80" y1="545" x2="55" y2="580" class="actor-line"/>
+    <line x1="80" y1="545" x2="105" y2="580" class="actor-line"/>
+    <text x="80" y="600" class="actor-label">Mentioned User</text>
+  </g>
+
+  <rect x="220" y="60" width="700" height="510" rx="8" class="boundary"/>
+  <text x="570" y="82" class="boundary-title">Message Service</text>
+
+  <ellipse cx="400" cy="140" rx="135" ry="28" class="usecase"/>
+  <text x="400" y="136" class="uc-label">Mention Users (@tag)</text>
+  <text x="400" y="152" class="stereo">(in message)</text>
+
+  <ellipse cx="730" cy="140" rx="155" ry="28" class="usecase"/>
+  <text x="730" y="136" class="uc-label">Send Announcement</text>
+  <text x="730" y="152" class="stereo">(broadcast)</text>
+
+  <ellipse cx="565" cy="290" rx="155" ry="28" class="usecase"/>
+  <text x="565" y="286" class="uc-label">Trigger Notifications</text>
+  <text x="565" y="302" class="stereo">(@mention / broadcast)</text>
+
+  <ellipse cx="400" cy="450" rx="145" ry="28" class="usecase"/>
+  <text x="400" y="446" class="uc-label">Receive Notifications</text>
+  <text x="400" y="462" class="stereo">(WebSocket)</text>
+
+  <ellipse cx="730" cy="450" rx="155" ry="28" class="usecase"/>
+  <text x="730" y="454" class="uc-label">Mark Notifications as Seen</text>
+
+  <line x1="100" y1="190" x2="270" y2="148" class="assoc"/>
+
+  <line x1="100" y1="370" x2="580" y2="148" class="assoc"/>
+
+  <line x1="100" y1="530" x2="260" y2="455" class="assoc"/>
+  <line x1="100" y1="530" x2="580" y2="455" class="assoc"/>
+
+  <line x1="400" y1="168" x2="510" y2="265" class="dep"/>
+  <text x="425" y="220" class="stereo">«include»</text>
+
+  <line x1="730" y1="168" x2="620" y2="265" class="dep"/>
+  <text x="710" y="220" class="stereo">«include»</text>
+</svg>

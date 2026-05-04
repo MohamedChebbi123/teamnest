@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="350" viewBox="0 0 800 350" font-family="Arial, sans-serif">
+  <style>
+    .actor-line { stroke: #222; stroke-width: 2; fill: none; }
+    .actor-label { font-size: 13px; text-anchor: middle; fill: #222; }
+    .boundary { fill: #fafafa; stroke: #333; stroke-width: 2; }
+    .boundary-title { font-size: 16px; font-weight: bold; text-anchor: middle; fill: #222; }
+    .usecase { fill: #e8f0fe; stroke: #1a73e8; stroke-width: 1.5; }
+    .uc-label { font-size: 12px; text-anchor: middle; fill: #111; }
+    .assoc { stroke: #444; stroke-width: 1.2; fill: none; }
+    .diagram-title { font-size: 18px; font-weight: bold; text-anchor: middle; fill: #111; }
+  </style>
+
+  <text x="400" y="28" class="diagram-title">4. User Info Access</text>
+
+  <g>
+    <circle cx="90" cy="160" r="14" class="actor-line"/>
+    <line x1="90" y1="174" x2="90" y2="215" class="actor-line"/>
+    <line x1="65" y1="190" x2="115" y2="190" class="actor-line"/>
+    <line x1="90" y1="215" x2="65" y2="250" class="actor-line"/>
+    <line x1="90" y1="215" x2="115" y2="250" class="actor-line"/>
+    <text x="90" y="272" class="actor-label">Authenticated User</text>
+  </g>
+
+  <rect x="240" y="70" width="500" height="220" rx="8" class="boundary"/>
+  <text x="490" y="92" class="boundary-title">Auth Service</text>
+
+  <ellipse cx="490" cy="180" rx="160" ry="32" class="usecase"/>
+  <text x="490" y="184" class="uc-label">Get Another User Public Info</text>
+
+  <line x1="110" y1="200" x2="335" y2="180" class="assoc"/>
+</svg>
