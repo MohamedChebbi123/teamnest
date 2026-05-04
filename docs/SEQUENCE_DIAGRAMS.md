@@ -316,32 +316,32 @@ sequenceDiagram
 sequenceDiagram
     actor UserA
     actor UserB
-    participant WS as Channel WebSocket
+    participant API as Backend
     participant DB as Database
     participant Vec as Pinecone
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+WS: «WS» Connect
-    UserB->>+WS: «WS» Connect
-    WS-->>UserA: «WS» Connected
-    WS-->>UserB: «WS» Connected
+    UserA->>+API: Connect
+    UserB->>+API: Connect
+    API-->>UserA: Connected
+    API-->>UserB: Connected
 
     loop Active session
-        UserA->>WS: «WS» Send message
-        WS->>+DB: Check permissions
-        DB-->>-WS: OK
-        WS->>+DB: Save message
-        DB-->>-WS: Saved
-        WS->>+Vec: Index message
-        Vec-->>-WS: Indexed
-        WS-->>UserB: «WS» Broadcast message
+        UserA->>API: Send message
+        API->>+DB: Check permissions
+        DB-->>-API: OK
+        API->>+DB: Save message
+        DB-->>-API: Saved
+        API->>+Vec: Index message
+        Vec-->>-API: Indexed
+        API-->>UserB: Broadcast message
     end
 
-    UserA->>WS: «WS» Disconnect
-    UserB->>WS: «WS» Disconnect
-    deactivate WS
-    deactivate WS
+    UserA->>API: Disconnect
+    UserB->>API: Disconnect
+    deactivate API
+    deactivate API
 ```
 
 ---
@@ -351,7 +351,6 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant WS as Channel WebSocket
     participant API as Backend
     participant DB as Database
     participant Cloud as Cloudinary
@@ -359,17 +358,17 @@ sequenceDiagram
 
     Note over User,DB: ref: Authenticate
 
-    User->>+WS: «WS» Upload file
-    WS->>WS: Validate file
-    WS->>+Cloud: Store file
-    Cloud-->>-WS: URL
-    WS->>+DB: Save file
-    DB-->>-WS: Saved
+    User->>+API: Upload file
+    API->>API: Validate file
+    API->>+Cloud: Store file
+    Cloud-->>-API: URL
+    API->>+DB: Save file
+    DB-->>-API: Saved
     opt Indexable file
-        WS->>+Vec: Index content
-        Vec-->>-WS: Indexed
+        API->>+Vec: Index content
+        Vec-->>-API: Indexed
     end
-    WS-->>-User: «WS» File shared
+    API-->>-User: File shared
 
     User->>+API: Download file
     API->>+DB: Check permissions
@@ -510,23 +509,22 @@ sequenceDiagram
 sequenceDiagram
     actor UserA
     actor UserB
-    participant WS as DM WebSocket
     participant API as Backend
     participant DB as Database
 
     Note over UserA,DB: ref: Authenticate
 
-    UserA->>+WS: «WS» Connect
-    UserB->>+WS: «WS» Connect
+    UserA->>+API: Connect
+    UserB->>+API: Connect
 
     loop Active session
-        UserA->>WS: «WS» Send message
-        WS->>+DB: Check block
-        DB-->>-WS: OK
-        WS->>+DB: Save message
-        DB-->>-WS: Saved
+        UserA->>API: Send message
+        API->>+DB: Check block
+        DB-->>-API: OK
+        API->>+DB: Save message
+        DB-->>-API: Saved
         opt UserB online
-            WS-->>UserB: «WS» Broadcast message
+            API-->>UserB: Broadcast message
         end
     end
 
@@ -535,10 +533,10 @@ sequenceDiagram
     DB-->>-API: Rows
     API-->>-UserA: List displayed
 
-    UserA->>WS: «WS» Disconnect
-    UserB->>WS: «WS» Disconnect
-    deactivate WS
-    deactivate WS
+    UserA->>API: Disconnect
+    UserB->>API: Disconnect
+    deactivate API
+    deactivate API
 ```
 
 ---
@@ -548,39 +546,39 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
+    actor Friends
     participant FE as Frontend
-    participant WS as Presence WebSocket
+    participant API as Backend
     participant DB as Database
-    participant Friends as Friends WebSocket
 
     Note over User,DB: ref: Authenticate
 
     User->>+FE: Open app
-    FE->>+WS: «WS» Connect
-    WS->>+DB: Mark online
-    DB-->>-WS: Saved
-    WS->>Friends: Broadcast presence
-    WS-->>FE: «WS» Online friends list
+    FE->>+API: Connect
+    API->>+DB: Mark online
+    DB-->>-API: Saved
+    API-->>Friends: Broadcast presence
+    API-->>FE: Online friends list
 
     loop Heartbeat
-        FE->>WS: «WS» Ping
-        WS-->>FE: «WS» Pong
+        FE->>API: Ping
+        API-->>FE: Pong
     end
 
     opt Status change
         User->>FE: Change status
-        FE->>WS: «WS» Update
-        WS->>+DB: Save status
-        DB-->>-WS: Saved
-        WS->>Friends: Broadcast status
+        FE->>API: Update
+        API->>+DB: Save status
+        DB-->>-API: Saved
+        API-->>Friends: Broadcast status
     end
 
-    FE->>WS: «WS» Disconnect
+    FE->>API: Disconnect
     alt Last session
-        WS->>+DB: Mark offline
-        DB-->>-WS: Saved
-        WS->>Friends: Broadcast offline
+        API->>+DB: Mark offline
+        DB-->>-API: Saved
+        API-->>Friends: Broadcast offline
     end
-    deactivate WS
+    deactivate API
     deactivate FE
 ```
