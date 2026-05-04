@@ -23,40 +23,38 @@ End-to-end flows that cross service boundaries. Each diagram shows the *shape* o
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
     participant FE as Frontend
-    participant API as Platform
-    participant DB as Postgres
-    participant Mail as Resend
+    participant API as Plateforme
+    participant DB as Base de données
+    participant Mail as Service Email
 
-    User->>+FE: Submit signup form
-    FE->>+API: Register account
-    API->>DB: Save user (unverified)
-    API-->>-FE: Account created
-    FE-->>-User: Account ready — verify to unlock actions
+    User->>FE: Soumettre inscription
+    FE->>API: Créer compte
+    API->>DB: Enregistrer utilisateur
+    API-->>FE: Compte créé
+    FE-->>User: Vérifier votre email
 
-    Note over User,Mail: Email verification — required before any action, can be triggered anytime after login
+    Note over User,Mail: Vérification requise avant toute action
 
-    User->>+FE: Request verification code
-    FE->>+API: Send verification code
-    API->>DB: Save code
-    API->>Mail: Send code
-    Mail-->>User: Code email
-    API-->>-FE: Ok
-    FE-->>-User: Check your email
+    User->>FE: Demander code
+    FE->>API: Envoyer code
+    API->>DB: Enregistrer code
+    API->>Mail: Envoyer email
+    Mail-->>User: Code reçu
+    API-->>FE: OK
+    FE-->>User: Code envoyé
 
-    User->>+FE: Enter code
-    FE->>+API: Verify email
-    API->>DB: Check code
-    alt Code valid
-        API->>DB: Mark verified
-        API-->>FE: Email verified
-    else Invalid / expired
-        API-->>FE: 400
+    User->>FE: Saisir code
+    FE->>API: Vérifier email
+    API->>DB: Vérifier code
+    alt Code valide
+        API->>DB: Marquer vérifié
+        API-->>FE: Email vérifié
+    else Code invalide
+        API-->>FE: Erreur
     end
-    deactivate API
-    FE-->>-User: Verified
+    FE-->>User: Compte vérifié
 ```
 
 ---
@@ -65,32 +63,29 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
-    participant API as Platform
-    participant DB as Postgres
+    participant API as Plateforme
+    participant DB as Base de données
 
-    User->>+API: Login
-    API->>DB: Verify credentials
-    alt Valid
-        API->>DB: Save refresh token
-        API-->>User: Tokens
-    else Invalid
-        API-->>User: 401
+    User->>API: Se connecter
+    API->>DB: Vérifier identifiants
+    alt Identifiants valides
+        API->>DB: Enregistrer session
+        API-->>User: Jetons d'accès
+    else Identifiants invalides
+        API-->>User: Erreur
     end
-    deactivate API
 
-    Note over User,API: Later — access token expired
+    Note over User,API: Plus tard — jeton expiré
 
-    User->>+API: Refresh token
-    API->>DB: Check refresh token
-    alt Valid
-        API->>DB: Rotate token
-        API-->>User: New tokens
-    else Invalid / reused
-        API-->>User: 401
+    User->>API: Rafraîchir jeton
+    API->>DB: Vérifier jeton
+    alt Jeton valide
+        API->>DB: Renouveler jeton
+        API-->>User: Nouveaux jetons
+    else Jeton invalide
+        API-->>User: Erreur
     end
-    deactivate API
 ```
 
 ---
@@ -99,37 +94,34 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
-    participant API as Platform
-    participant DB as Postgres
-    participant Mail as Resend
+    participant API as Plateforme
+    participant DB as Base de données
+    participant Mail as Service Email
 
-    User->>+API: Request password reset
-    opt User exists
-        API->>DB: Save reset code
-        API->>Mail: Send reset code
-        Mail-->>User: Reset email
+    User->>API: Mot de passe oublié
+    opt Utilisateur existe
+        API->>DB: Enregistrer code
+        API->>Mail: Envoyer code
+        Mail-->>User: Email reçu
     end
-    API-->>-User: Generic ok
+    API-->>User: Confirmation
 
-    User->>+API: Verify reset code
-    API->>DB: Check code
-    alt Valid
-        API-->>User: Ok
-    else Invalid / expired
-        API-->>User: 400
+    User->>API: Vérifier code
+    API->>DB: Vérifier code
+    alt Code valide
+        API-->>User: OK
+    else Code invalide
+        API-->>User: Erreur
     end
-    deactivate API
 
-    User->>+API: Reset password
-    alt Code valid
-        API->>DB: Update password
-        API-->>User: Ok
-    else Invalid
-        API-->>User: 400
+    User->>API: Réinitialiser mot de passe
+    alt Code valide
+        API->>DB: Modifier mot de passe
+        API-->>User: Succès
+    else Code invalide
+        API-->>User: Erreur
     end
-    deactivate API
 ```
 
 ---
@@ -138,41 +130,35 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Admin
-    participant API as Platform
-    participant DB as Postgres
+    participant API as Plateforme
+    participant DB as Base de données
     participant Cloud as Cloudinary
     participant Stripe
 
-    alt Authenticated
-        Admin->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Admin: 401
+    Note over Admin,API: ref : S'authentifier
+
+    alt Email vérifié
+        API->>DB: Vérifier statut
+    else Non vérifié
+        API-->>Admin: Vérifier email
     end
 
-    alt Email verified
-        API->>DB: Check verified
-    else Not verified
-        API-->>Admin: 403 verify email
+    Admin->>API: Créer organisation
+    opt Logo fourni
+        API->>Cloud: Téléverser logo
     end
+    API->>DB: Enregistrer organisation
+    API-->>Admin: Organisation créée
 
-    Admin->>+API: Create organization
-    opt Has logo
-        API->>Cloud: Upload logo
-    end
-    API->>DB: Save organization
-    API-->>-Admin: Organization created
+    Admin->>API: Souscrire abonnement
+    API->>DB: Vérifier permissions
+    API->>Stripe: Démarrer paiement
+    API-->>Admin: Rediriger vers paiement
 
-    Admin->>+API: Subscribe to plan
-    API->>DB: Check permissions
-    API->>Stripe: Start checkout
-    API-->>-Admin: Redirect to checkout
-
-    Stripe->>+API: Payment webhook
-    API->>DB: Update subscription
-    API-->>-Stripe: 200
+    Stripe->>API: Notification paiement
+    API->>DB: Modifier abonnement
+    API-->>Stripe: OK
 ```
 
 ---
@@ -183,90 +169,69 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
-    participant API as Platform
-    participant DB as Postgres
+    participant API as Plateforme
+    participant DB as Base de données
 
-    alt Authenticated
-        User->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>User: 401
+    Note over User,API: ref : S'authentifier
+
+    alt Email vérifié
+        API->>DB: Vérifier statut
+    else Non vérifié
+        API-->>User: Vérifier email
     end
 
-    alt Email verified
-        API->>DB: Check verified
-    else Not verified
-        API-->>User: 403 verify email
+    User->>API: Demander adhésion
+    API->>DB: Vérifier éligibilité
+    alt Éligible
+        API->>DB: Enregistrer demande
+        API-->>User: Demande envoyée
+    else Non éligible
+        API-->>User: Erreur
     end
-
-    User->>+API: Request to join organization
-    API->>DB: Check eligibility
-    alt Eligible
-        API->>DB: Save join request
-        API-->>User: Request submitted
-    else Already member / duplicate / not found
-        API-->>User: 404 / 409
-    end
-    deactivate API
 ```
 
 ### 5b. Admin lists pending requests
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Admin
-    participant API as Platform
-    participant DB as Postgres
+    participant API as Plateforme
+    participant DB as Base de données
 
-    alt Authenticated
-        Admin->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Admin: 401
-    end
+    Note over Admin,API: ref : S'authentifier
 
-    Admin->>+API: List join requests
-    API->>DB: Check permissions
-    alt Authorized
-        API->>DB: Load pending requests
-        API-->>Admin: Requests list
-    else Forbidden
-        API-->>Admin: 403
+    Admin->>API: Lister demandes
+    API->>DB: Vérifier permissions
+    alt Autorisé
+        API->>DB: Récupérer demandes
+        API-->>Admin: Liste affichée
+    else Non autorisé
+        API-->>Admin: Refusé
     end
-    deactivate API
 ```
 
 ### 5c. Admin accepts or rejects
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Admin
-    participant API as Platform
-    participant DB as Postgres
+    participant API as Plateforme
+    participant DB as Base de données
 
-    alt Authenticated
-        Admin->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Admin: 401
-    end
+    Note over Admin,API: ref : S'authentifier
 
-    Admin->>+API: Decide on request
-    API->>DB: Check permissions
-    alt Accepted
-        API->>DB: Add member · Remove request
-        API-->>Admin: Ok
-    else Rejected
-        API->>DB: Remove request
-        API-->>Admin: Ok
-    else Not allowed
-        API-->>Admin: 400 / 403 / 404 / 409
+    Admin->>API: Décider demande
+    API->>DB: Vérifier permissions
+    alt Acceptée
+        API->>DB: Ajouter membre
+        API-->>Admin: OK
+    else Rejetée
+        API->>DB: Supprimer demande
+        API-->>Admin: OK
+    else Non autorisé
+        API-->>Admin: Refusé
     end
-    deactivate API
 ```
 
 ---
@@ -275,38 +240,30 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Admin
-    actor Lead as Team Lead
-    participant API as Platform
-    participant DB as Postgres
+    actor Lead as Chef d'équipe
+    participant API as Plateforme
+    participant DB as Base de données
 
-    alt Authenticated
-        Admin->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Admin: 401
+    Note over Admin,API: ref : S'authentifier
+
+    Admin->>API: Créer équipe
+    API->>DB: Vérifier permissions
+    alt Autorisé
+        API->>DB: Enregistrer équipe
+        API-->>Admin: Équipe créée
+    else Non autorisé
+        API-->>Admin: Refusé
     end
 
-    Admin->>+API: Create team
-    API->>DB: Check permissions
-    alt Authorized
-        API->>DB: Save team
-        API-->>Admin: Team created
-    else Forbidden
-        API-->>Admin: 403
+    Lead->>API: Gérer membres
+    API->>DB: Vérifier permissions
+    alt Autorisé
+        API->>DB: Modifier membres
+        API-->>Lead: OK
+    else Non autorisé
+        API-->>Lead: Refusé
     end
-    deactivate API
-
-    Lead->>+API: Manage team members
-    API->>DB: Check permissions
-    alt Authorized
-        API->>DB: Update membership
-        API-->>Lead: Ok
-    else Forbidden
-        API-->>Lead: 403
-    end
-    deactivate API
 ```
 
 ---
@@ -315,37 +272,29 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor UserA
     actor UserB
-    participant WS as Channel WebSocket
-    participant DB as Postgres
+    participant WS as WebSocket Canal
+    participant DB as Base de données
     participant Vec as Pinecone
 
-    alt Authenticated
-        UserA->>WS: authenticated
-        WS->>DB: Authenticate request
-    else Unauthorized
-        WS--xUserA: Close 4401
+    Note over UserA,WS: ref : S'authentifier
+
+    UserA->>WS: Se connecter
+    UserB->>WS: Se connecter
+    WS-->>UserA: Connecté
+    WS-->>UserB: Connecté
+
+    loop Session active
+        UserA->>WS: Envoyer message
+        WS->>DB: Vérifier permissions
+        WS->>DB: Enregistrer message
+        WS->>Vec: Indexer message
+        WS-->>UserB: Diffuser message
     end
 
-    UserA->>+WS: Connect
-    UserB->>+WS: Connect
-    WS-->>UserA: Connected
-    WS-->>UserB: Connected
-
-    loop Active session
-        UserA->>WS: Send message
-        WS->>DB: Check permissions
-        WS->>DB: Save message
-        WS->>Vec: Index message
-        WS-->>UserB: Broadcast message
-    end
-
-    UserA--xWS: Disconnect
-    UserB--xWS: Disconnect
-    deactivate WS
-    deactivate WS
+    UserA->>WS: Déconnexion
+    UserB->>WS: Déconnexion
 ```
 
 ---
@@ -354,39 +303,32 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
-    participant WS as Channel WebSocket
-    participant API as Platform
-    participant DB as Postgres
+    participant WS as WebSocket Canal
+    participant API as Plateforme
+    participant DB as Base de données
     participant Cloud as Cloudinary
     participant Vec as Pinecone
 
-    alt Authenticated
-        User->>WS: authenticated
-        WS->>DB: Authenticate request
-    else Unauthorized
-        WS--xUser: Close 4401
-    end
+    Note over User,WS: ref : S'authentifier
 
-    User->>+WS: Upload file
-    WS->>Cloud: Store file
-    WS->>DB: Save file
-    opt Indexable file
-        WS->>Vec: Index content
+    User->>WS: Téléverser fichier
+    WS->>Cloud: Stocker fichier
+    WS->>DB: Enregistrer fichier
+    opt Fichier indexable
+        WS->>Vec: Indexer contenu
     end
-    WS-->>-User: File shared
+    WS-->>User: Fichier partagé
 
-    User->>+API: Download file
-    API->>DB: Check permissions
-    alt Authorized
-        API->>DB: Load file
-        API->>Cloud: Fetch file
-        API-->>User: File stream
-    else Forbidden
-        API-->>User: 403
+    User->>API: Télécharger fichier
+    API->>DB: Vérifier permissions
+    alt Autorisé
+        API->>DB: Récupérer fichier
+        API->>Cloud: Récupérer contenu
+        API-->>User: Fichier
+    else Non autorisé
+        API-->>User: Refusé
     end
-    deactivate API
 ```
 
 ---
@@ -397,95 +339,74 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Manager
-    actor Assignee
-    participant API as Platform
-    participant DB as Postgres
+    actor Assignee as Assigné
+    participant API as Plateforme
+    participant DB as Base de données
     participant Notif as Notifications
 
-    alt Authenticated
-        Manager->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Manager: 401
-    end
+    Note over Manager,API: ref : S'authentifier
 
-    Manager->>+API: Create task
-    API->>DB: Check permissions
-    alt Authorized
-        API->>DB: Save task
-        API->>Notif: Notify assignees
-        Notif-->>Assignee: Task assigned
-        API-->>Manager: Task created
-    else Forbidden
-        API-->>Manager: 403
+    Manager->>API: Créer tâche
+    API->>DB: Vérifier permissions
+    alt Autorisé
+        API->>DB: Enregistrer tâche
+        API->>Notif: Notifier assigné
+        Notif-->>Assignee: Tâche assignée
+        API-->>Manager: Tâche créée
+    else Non autorisé
+        API-->>Manager: Refusé
     end
-    deactivate API
 ```
 
 ### 9b. Assignee submits for review
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Manager
-    actor Assignee
-    participant API as Platform
-    participant DB as Postgres
+    actor Assignee as Assigné
+    participant API as Plateforme
+    participant DB as Base de données
     participant Notif as Notifications
 
-    alt Authenticated
-        Assignee->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Assignee: 401
-    end
+    Note over Assignee,API: ref : S'authentifier
 
-    Assignee->>+API: Submit task for review
-    alt Valid transition
-        API->>DB: Update task status
-        API->>Notif: Notify manager
-        Notif-->>Manager: Task submitted
-        API-->>Assignee: Ok
-    else Invalid
-        API-->>Assignee: 400
+    Assignee->>API: Soumettre tâche
+    alt Transition valide
+        API->>DB: Modifier statut
+        API->>Notif: Notifier manager
+        Notif-->>Manager: Tâche soumise
+        API-->>Assignee: OK
+    else Transition invalide
+        API-->>Assignee: Erreur
     end
-    deactivate API
 ```
 
 ### 9c. Manager reviews (approve / reject)
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Manager
-    actor Assignee
-    participant API as Platform
-    participant DB as Postgres
+    actor Assignee as Assigné
+    participant API as Plateforme
+    participant DB as Base de données
     participant Notif as Notifications
 
-    alt Authenticated
-        Manager->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>Manager: 401
-    end
+    Note over Manager,API: ref : S'authentifier
 
-    Manager->>+API: Review task
-    API->>DB: Check permissions
-    alt Approved
-        API->>DB: Update task
-        API->>Notif: Notify assignee
-        Notif-->>Assignee: Task approved
-        API-->>Manager: Ok
-    else Rejected
-        API->>DB: Update task
-        API->>Notif: Notify assignee
-        Notif-->>Assignee: Task rejected
-        API-->>Manager: Ok
+    Manager->>API: Évaluer tâche
+    API->>DB: Vérifier permissions
+    alt Approuvée
+        API->>DB: Modifier tâche
+        API->>Notif: Notifier assigné
+        Notif-->>Assignee: Tâche approuvée
+        API-->>Manager: OK
+    else Rejetée
+        API->>DB: Modifier tâche
+        API->>Notif: Notifier assigné
+        Notif-->>Assignee: Tâche rejetée
+        API-->>Manager: OK
     end
-    deactivate API
 ```
 
 ---
@@ -494,32 +415,25 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
-    participant API as Platform
-    participant DB as Postgres
-    participant Vec as Pinecone (tasks · docs · messages)
+    participant API as Plateforme
+    participant DB as Base de données
+    participant Vec as Pinecone
     participant LLM
 
-    alt Authenticated
-        User->>API: authenticated
-        API->>DB: Authenticate request
-    else Unauthorized
-        API-->>User: 401
-    end
+    Note over User,API: ref : S'authentifier
 
-    User->>+API: Ask assistant
-    API->>DB: Check permissions
-    alt Authorized
-        API->>Vec: Search context
-        Vec-->>API: Relevant hits
-        API->>LLM: Ask with context
-        LLM-->>API: Answer
-        API-->>User: Answer + sources
-    else Forbidden
-        API-->>User: 403
+    User->>API: Poser question
+    API->>DB: Vérifier permissions
+    alt Autorisé
+        API->>Vec: Rechercher contexte
+        Vec-->>API: Résultats
+        API->>LLM: Demander réponse
+        LLM-->>API: Réponse
+        API-->>User: Afficher résultat
+    else Non autorisé
+        API-->>User: Refusé
     end
-    deactivate API
 ```
 
 ---
@@ -528,39 +442,32 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor UserA
     actor UserB
-    participant WS as DM WebSocket
-    participant API as Platform
-    participant DB as Postgres
+    participant WS as WebSocket DM
+    participant API as Plateforme
+    participant DB as Base de données
 
-    alt Authenticated
-        UserA->>WS: authenticated
-        WS->>DB: Authenticate request
-    else Unauthorized
-        WS--xUserA: Close 4401
-    end
+    Note over UserA,WS: ref : S'authentifier
 
-    UserA->>+WS: Connect
-    UserB->>+WS: Connect
+    UserA->>WS: Se connecter
+    UserB->>WS: Se connecter
 
-    loop Active session
-        UserA->>WS: Send DM
-        WS->>DB: Check block · Save message
-        opt UserB online
-            WS-->>UserB: Broadcast message
+    loop Session active
+        UserA->>WS: Envoyer message
+        WS->>DB: Vérifier blocage
+        WS->>DB: Enregistrer message
+        opt UserB en ligne
+            WS-->>UserB: Diffuser message
         end
     end
 
-    UserA->>+API: List conversations
-    API->>DB: Load conversations
-    API-->>-UserA: Conversations list
+    UserA->>API: Lister conversations
+    API->>DB: Récupérer conversations
+    API-->>UserA: Liste affichée
 
-    UserA--xWS: Disconnect
-    UserB--xWS: Disconnect
-    deactivate WS
-    deactivate WS
+    UserA->>WS: Déconnexion
+    UserB->>WS: Déconnexion
 ```
 
 ---
@@ -569,43 +476,35 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor User
     participant FE as Frontend
-    participant WS as Connectivity WS
-    participant DB as Postgres
-    participant Friends as Friends WS
+    participant WS as WebSocket Présence
+    participant DB as Base de données
+    participant Friends as WebSocket Amis
 
-    alt Authenticated
-        User->>WS: authenticated
-        WS->>DB: Authenticate request
-    else Unauthorized
-        WS--xUser: Close 4401
-    end
+    Note over User,WS: ref : S'authentifier
 
-    User->>+FE: Open app
-    FE->>+WS: Connect
-    WS->>DB: Mark user online
-    WS->>Friends: Broadcast online
-    WS-->>FE: Online friends
+    User->>FE: Ouvrir application
+    FE->>WS: Se connecter
+    WS->>DB: Marquer en ligne
+    WS->>Friends: Diffuser présence
+    WS-->>FE: Liste amis en ligne
 
-    loop Heartbeat
+    loop Battement
         FE->>WS: Ping
         WS-->>FE: Pong
     end
 
-    opt Status change
-        User->>FE: Change status
-        FE->>WS: Update status
-        WS->>DB: Save status
-        WS->>Friends: Broadcast status
+    opt Changement statut
+        User->>FE: Modifier statut
+        FE->>WS: Mettre à jour
+        WS->>DB: Enregistrer statut
+        WS->>Friends: Diffuser statut
     end
 
-    FE--xWS: Disconnect
-    alt Last socket
-        WS->>DB: Mark user offline
-        WS->>Friends: Broadcast offline
+    FE->>WS: Déconnexion
+    alt Dernière session
+        WS->>DB: Marquer hors ligne
+        WS->>Friends: Diffuser hors ligne
     end
-    deactivate WS
-    deactivate FE
 ```
