@@ -43,8 +43,8 @@ sequenceDiagram
     API->>API: Generate code
     API->>+DB: Save code
     DB-->>-API: Saved
-    API->>+Mail: Send email
-    Mail-->>-User: Code received
+    API-)Mail: Send email
+    Mail-)User: Code received
     API-->>-FE: OK
     FE-->>-User: Code sent
 
@@ -96,6 +96,7 @@ sequenceDiagram
     API->>+DB: Check token
     DB-->>-API: Result
     alt Valid token
+        API->>API: Generate tokens
         API->>+DB: Renew token
         DB-->>-API: Saved
         API-->>FE: New tokens
@@ -124,8 +125,8 @@ sequenceDiagram
         API->>API: Generate code
         API->>+DB: Save code
         DB-->>-API: Saved
-        API->>+Mail: Send code
-        Mail-->>-User: Email received
+        API-)Mail: Send code
+        Mail-)User: Email received
     end
     API-->>-FE: Confirmation
     FE-->>-User: Check your email
@@ -145,6 +146,7 @@ sequenceDiagram
     User->>+FE: Set new password
     FE->>+API: Reset password
     alt Valid code
+        API->>API: Hash password
         API->>+DB: Update password
         DB-->>-API: Saved
         API-->>FE: Success
@@ -198,6 +200,7 @@ sequenceDiagram
     FE-->>-Admin: Payment page
 
     Stripe->>+API: Payment notification
+    API->>API: Verify signature
     API->>+DB: Update subscription
     DB-->>-API: Saved
     API-->>-Stripe: OK
@@ -370,10 +373,9 @@ sequenceDiagram
         DB-->>-API: OK
         API->>+DB: Save message
         DB-->>-API: Saved
-        API->>+Vec: Index message
-        Vec-->>-API: Indexed
-        API-->>FE: «WebSocket» Broadcast message
-        FE-->>UserB: Display message
+        API-)Vec: Index message
+        API-)FE: «WebSocket» Broadcast message
+        FE-)UserB: Display message
     end
 
     UserA->>FE: Close channel
@@ -407,8 +409,7 @@ sequenceDiagram
     API->>+DB: Save file
     DB-->>-API: Saved
     opt Indexable file
-        API->>+Vec: Index content
-        Vec-->>-API: Indexed
+        API-)Vec: Index content
     end
     API-->>-FE: «WebSocket» File shared
     FE-->>-User: Upload complete
@@ -455,7 +456,8 @@ sequenceDiagram
         API->>+DB: Save task
         DB-->>-API: Saved
         API->>+Notif: Notify assignee
-        Notif-->>-Assignee: Task assigned
+        Notif-)Assignee: Task assigned
+        deactivate Notif
         API-->>FE: Task created
     else Unauthorized
         API-->>FE: Denied
@@ -479,11 +481,13 @@ sequenceDiagram
 
     Assignee->>+FE: Mark as done
     FE->>+API: Submit task
+    API->>API: Validate transition
     alt Valid transition
         API->>+DB: Update status
         DB-->>-API: Saved
         API->>+Notif: Notify manager
-        Notif-->>-Manager: Task submitted
+        Notif-)Manager: Task submitted
+        deactivate Notif
         API-->>FE: OK
     else Invalid transition
         API-->>FE: Error
@@ -513,13 +517,15 @@ sequenceDiagram
         API->>+DB: Update task
         DB-->>-API: Saved
         API->>+Notif: Notify assignee
-        Notif-->>-Assignee: Task approved
+        Notif-)Assignee: Task approved
+        deactivate Notif
         API-->>FE: OK
     else Rejected
         API->>+DB: Update task
         DB-->>-API: Saved
         API->>+Notif: Notify assignee
-        Notif-->>-Assignee: Task rejected
+        Notif-)Assignee: Task rejected
+        deactivate Notif
         API-->>FE: OK
     end
     deactivate API
@@ -548,6 +554,7 @@ sequenceDiagram
     alt Authorized
         API->>+Vec: Search context
         Vec-->>-API: Results
+        API->>API: Build prompt
         API->>+LLM: Ask for answer
         LLM-->>-API: Answer
         API-->>FE: Answer + sources
@@ -585,8 +592,8 @@ sequenceDiagram
         API->>+DB: Save message
         DB-->>-API: Saved
         opt UserB online
-            API-->>FE: «WebSocket» Broadcast message
-            FE-->>UserB: Display message
+            API-)FE: «WebSocket» Broadcast message
+            FE-)UserB: Display message
         end
     end
 
@@ -623,8 +630,8 @@ sequenceDiagram
     FE->>+API: «WebSocket» Connect
     API->>+DB: Mark online
     DB-->>-API: Saved
-    API-->>Friends: «WebSocket» Broadcast presence
-    API-->>FE: «WebSocket» Online friends list
+    API-)Friends: «WebSocket» Broadcast presence
+    API-)FE: «WebSocket» Online friends list
     FE-->>-User: Friends shown
 
     loop Heartbeat
@@ -637,7 +644,7 @@ sequenceDiagram
         FE->>API: «WebSocket» Update
         API->>+DB: Save status
         DB-->>-API: Saved
-        API-->>Friends: «WebSocket» Broadcast status
+        API-)Friends: «WebSocket» Broadcast status
     end
 
     User->>FE: Close app
@@ -645,7 +652,7 @@ sequenceDiagram
     alt Last session
         API->>+DB: Mark offline
         DB-->>-API: Saved
-        API-->>Friends: «WebSocket» Broadcast offline
+        API-)Friends: «WebSocket» Broadcast offline
     end
     deactivate API
 ```
