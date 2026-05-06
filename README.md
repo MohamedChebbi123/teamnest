@@ -17,6 +17,7 @@ TeamNest lets organizations create teams, run channel-based and direct conversat
 - [Running the app](#running-the-app)
 - [Testing](#testing)
 - [API overview](#api-overview)
+- [Class diagrams](#class-diagrams)
 - [Notes](#notes)
 
 ---
@@ -322,6 +323,543 @@ All endpoints are documented at `/docs` (Swagger) and `/redoc` once the backend 
 | `/assistant/*` | `assistant_router` | AI assistant queries |
 | `/logs/*` | `logs_router` | Audit log access |
 | `/search/*` | `search_router` | Cross-entity search |
+
+---
+
+## Class diagrams
+
+UML class diagrams of the SQLAlchemy ORM models in [backend/models/](backend/models/). Each class shows its **attributes** (only the meaningful ones — verbose audit timestamps and code/expiry pairs are dropped) and its **important methods** (the operations from [backend/services/](backend/services/) that act on it). Diagrams are split by domain; classes appearing as foreign-key targets in another domain are shown as stub classes (PK only).
+
+### Identity and Auth
+
+```mermaid
+classDiagram
+    class Users {
+        +int user_id PK
+        +str first_name
+        +str last_name
+        +str email UK
+        +str phone_number
+        +str password_hashed
+        +str avatar_url
+        +str user_tag
+        +bool is_verified
+        +bool profile_completed
+        +str status
+        --
+        +register(data, db)
+        +login(credentials, db)
+        +verify_email(code, db)
+        +resend_verification(db)
+        +send_password_reset_code(db)
+        +reset_password(code, new_pwd, db)
+        +change_password(current, new, db)
+        +update_profile(data, db)
+        +update_avatar(image, db)
+        +set_status(status, db)
+        +get_online_status(user_ids, db)$
+        +get_by_id(user_id, db)$
+    }
+
+    class Refresh_tokens {
+        +str jti PK
+        +int user_id FK
+        +datetime expires_at
+        +datetime revoked_at
+        +str replaced_by_jti
+        +str user_agent
+        --
+        +issue(user_id, db)$
+        +rotate(token, db)
+        +revoke()
+        +revoke_all_for_user(user_id, db)$
+    }
+
+    Users "1" --> "*" Refresh_tokens : owns
+```
+
+### Organization, Members, Billing
+
+```mermaid
+classDiagram
+    class Organization {
+        +int organization_id PK
+        +str organization_name UK
+        +str organization_description
+        +str organization_plan
+        +int owner_id FK
+        --
+        +create(data, user, db)$
+        +update(org_id, data, user, db)
+        +delete(org_id, user, db)
+        +fetch_for_user(user, db)$
+    }
+
+    class Organization_members {
+        +int id PK
+        +int memmber_id FK
+        +int org_id FK
+        +str role_user
+        --
+        +add_to_org(org_id, members, user, db)$
+        +join_org(data, user, db)$
+        +list(org_id, user, db)
+    }
+
+    class Organization_payments {
+        +int subscription_id PK
+        +int organization_id FK
+        +str stripe_subscription_id
+        +str stripe_price_id
+        +str status
+        --
+        +create_subscription(org_id, user, db)$
+        +confirm_upgrade(org_id, session_id, user, db)$
+        +handle_stripe_webhook(payload, sig, db)$
+        +cancel_subscription(org_id, user, db)$
+    }
+
+    class Pending_members_org {
+        +int id PK
+        +int user_id FK
+        +int org_id FK
+        --
+        +list_for_org(org_id, user, db)$
+        +accept_or_reject(request_id, action, user, db)
+    }
+
+    class Users {
+        +int user_id PK
+    }
+
+    Users "1" --> "*" Organization : owns
+    Organization "1" --> "*" Organization_members
+    Users "1" --> "*" Organization_members
+    Organization "1" --> "*" Organization_payments
+    Organization "1" --> "*" Pending_members_org
+    Users "1" --> "*" Pending_members_org
+```
+
+### Teams and Roles
+
+```mermaid
+classDiagram
+    class Teams {
+        +int team_id PK
+        +str team_name
+        +int team_size
+        +str description
+        +datetime created_at
+        +int org_id FK
+    }
+
+    class Team_association {
+        +int team_id PK_FK
+        +int user_id PK_FK
+    }
+
+    class Team_roles {
+        +int team_role_id PK
+        +int user_id FK
+        +int team_id FK
+        +str role
+        +bool can_create_channels
+        +bool can_send_messages
+        +bool can_delete_messages
+        +bool can_manage_roles
+        +bool can_kick_members
+        +bool can_make_announcement
+        +bool can_manage_tasks
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class Organization {
+        +int organization_id PK
+    }
+
+    class Users {
+        +int user_id PK
+    }
+
+    class TeamService {
+        <<service>>
+        +create_team(data, user, db)
+        +fetch_teams_service(org_id, user, db)
+        +delete_team_service(team_id, user, db)
+        +update_team_service(team_id, data, user, db)
+        +add_memebers_to_teams(team_id, data, user, db)
+        +fetch_team_members_service(team_id, user, db)
+        +update_member_permissions_service(team_id, member_id, data, user, db)
+        +kick_member_service(team_id, member_id, user, db)
+        +fetch_user_team_service(user, db)
+        +create_channels_for_teams_service(org_id, team_id, data, user, db)
+        +fetch_channels_for_teams_service(org_id, team_id, user, db)
+        +fetch_members_info(org_id, team_id, target_id, user, db)
+        +revoke_permissions_from_team_memebers(...)
+        +fetch_files_for_team_channel_service(...)
+        +view_pdf(org_id, team_id, file_id, user, db)
+    }
+
+    Organization "1" --> "*" Teams
+    Teams "1" --> "*" Team_association
+    Users "1" --> "*" Team_association
+    Teams "1" --> "*" Team_roles
+    Users "1" --> "*" Team_roles
+    TeamService ..> Teams : uses
+    TeamService ..> Team_association : uses
+    TeamService ..> Team_roles : uses
+```
+
+### Channels and Messages
+
+```mermaid
+classDiagram
+    class Channels {
+        +int channel_id PK
+        +str channel_name
+        +str channel_mode
+        +str channel_category
+        +str description
+        +datetime created_at
+        +int team_id FK
+        +int org_id FK
+    }
+
+    class Messages {
+        +int message_id PK
+        +str message_content
+        +int sender_id FK
+        +int channel_id FK
+        +bool is_deleted
+        +int parent_id FK
+        +datetime edited_at
+        +datetime sent_at
+    }
+
+    class Pinned_messages {
+        +int id PK
+        +int message_id FK
+        +int channel_id FK
+        +int pinned_by FK
+        +datetime pinned_at
+    }
+
+    class Teams {
+        +int team_id PK
+    }
+
+    class Organization {
+        +int organization_id PK
+    }
+
+    class Users {
+        +int user_id PK
+    }
+
+    class ChannelService {
+        <<service>>
+        +create_channel_service(data, org_id, user, db)
+        +fetch_channels_service(org_id, user, db)
+        +fetch_single_channel_service(channel_id, user, db)
+        +update_channel_service(channel_id, data, user, db)
+        +delete_channel_service(channel_id, user, db)
+    }
+
+    class MessageService {
+        <<service>>
+        +fetch_message_service(...)
+        +edit_message_service(message_id, data, user, db)
+        +delete_message_service(message_id, user, db)
+        +send_messages_realtime(ws, ...)
+        +send_file_realtime_service(...)
+        +search_messages_service(...)
+        +pin_message_service(message_id, org_id, user, db)
+        +unpin_message_service(message_id, org_id, user, db)
+        +fetch_pinned_messages_service(channel_id, org_id, user, db)
+        +fetch_user_notifications_service(user, db)
+        +mark_notifications_seen_service(user, db, ids)
+        +fetch_voice_participants_service(channel_id, org_id, user, db)
+        +notifications_ws_endpoint(ws, ...)
+        +voice_websocket_endpoint(ws, ...)
+    }
+
+    Teams "1" --> "*" Channels
+    Organization "1" --> "*" Channels
+    Channels "1" --> "*" Messages
+    Users "1" --> "*" Messages : sends
+    Messages "1" --> "*" Messages : replies
+    Channels "1" --> "*" Pinned_messages
+    Messages "1" --> "*" Pinned_messages
+    Users "1" --> "*" Pinned_messages : pins
+    ChannelService ..> Channels : uses
+    MessageService ..> Messages : uses
+    MessageService ..> Pinned_messages : uses
+```
+
+### Direct Messages and Group Chat
+
+```mermaid
+classDiagram
+    class Direct_messages {
+        +int id PK
+        +int sender_id FK
+        +int receiver_id FK
+        +str content
+        +bool is_deleted
+        +datetime sent_at
+        +datetime edited_at
+        +int parent_id
+    }
+
+    class Group_chat {
+        +int id PK
+        +str group_name
+        +str group_description
+        +str group_image
+        +int owned_by FK
+    }
+
+    class Group_chat_members {
+        +int id PK
+        +int user_id FK
+        +int group_chat_id FK
+        +datetime joined_at
+    }
+
+    class Group_chat_messages {
+        +int id PK
+        +int parent_id FK
+        +int group_chat_id FK
+        +int sender_id FK
+        +datetime edited_at
+        +str content
+        +bool is_deleted
+        +datetime sent_at
+    }
+
+    class Users {
+        +int user_id PK
+    }
+
+    class DirectMessageService {
+        <<service>>
+        +messages_users_service(data, user, db)
+        +send_direct_file_service(...)
+        +fetch_direct_messages_service(...)
+        +search_direct_messages_service(...)
+        +fetch_direct_conversations_service(user, db)
+        +edit_direct_message_service(message_id, content, user, db)
+        +delete_direct_message_service(message_id, user, db)
+        +send_direct_messages_realtime(ws, ...)
+        +can_direct_message(db, sender_id, receiver_id)
+    }
+
+    class GroupChatService {
+        <<service>>
+        +create_group_chat(...)
+        +get_friends_for_group_chat(group_id, user, db)
+        +add_members_to_group_chat(group_id, member_ids, user, db)
+        +get_my_group_chats(user, db)
+        +edit_group_chat_service(...)
+        +delete_group_chat_service(group_id, user, db)
+        +fetch_group_messages_service(group_id, user, db)
+        +edit_group_message_service(group_id, msg_id, content, user, db)
+        +delete_group_message_service(group_id, msg_id, user, db)
+        +group_chat_websocket_service(ws, ...)
+    }
+
+    Users "1" --> "*" Direct_messages : sends
+    Users "1" --> "*" Direct_messages : receives
+    Users "1" --> "*" Group_chat : owns
+    Group_chat "1" --> "*" Group_chat_members
+    Users "1" --> "*" Group_chat_members
+    Group_chat "1" --> "*" Group_chat_messages
+    Users "1" --> "*" Group_chat_messages : sends
+    Group_chat_messages "1" --> "*" Group_chat_messages : replies
+    DirectMessageService ..> Direct_messages : uses
+    GroupChatService ..> Group_chat : uses
+    GroupChatService ..> Group_chat_members : uses
+    GroupChatService ..> Group_chat_messages : uses
+```
+
+### Tasks
+
+```mermaid
+classDiagram
+    class Tasks {
+        +int id PK
+        +str title
+        +str description
+        +int team_id FK
+        +int created_by FK
+        +int parent_task_id FK
+        +str subtask_group
+        +str priority
+        +str status
+        +bool is_deleted
+        +datetime updated_at
+        +bool finished
+        +datetime due_date
+        +datetime created_at
+    }
+
+    class Task_assignees {
+        +int id PK
+        +int task_id FK
+        +int user_id FK
+        +datetime assigned_at
+    }
+
+    class Task_attachments {
+        +int id PK
+        +int task_id FK
+        +str file_url
+        +str file_name
+        +int uploaded_by
+        +datetime uploaded_at
+    }
+
+    class Teams {
+        +int team_id PK
+    }
+
+    class Users {
+        +int user_id PK
+    }
+
+    class TaskService {
+        <<service>>
+        +create_tasks_service(team_id, org_id, data, user, db)
+        +fetch_team_tasks_service(team_id, org_id, user, db)
+        +edit_task_service(task_id, team_id, org_id, data, user, db)
+        +delete_task_service(task_id, team_id, org_id, user, db)
+        +fetch_my_tasks_service(team_id, org_id, user, db)
+        +update_my_task_status_service(task_id, ..., user, db)
+        +review_tasks(task_id, action, team_id, org_id, user, db)
+        +add_task_attachment_service(task_id, ..., data, user, db)
+        +delete_task_attachment_service(task_id, attachment_id, ..., user, db)
+    }
+
+    Teams "1" --> "*" Tasks
+    Users "1" --> "*" Tasks : creates
+    Tasks "1" --> "*" Tasks : subtasks
+    Tasks "1" --> "*" Task_assignees
+    Users "1" --> "*" Task_assignees
+    Tasks "1" --> "*" Task_attachments
+    TaskService ..> Tasks : uses
+    TaskService ..> Task_assignees : uses
+    TaskService ..> Task_attachments : uses
+```
+
+### Social (Friends and Blocking)
+
+```mermaid
+classDiagram
+    class Friends {
+        +int id PK
+        +int user_id FK
+        +int friend_id FK
+        +datetime added_at
+    }
+
+    class Pending_friends_request {
+        +int id PK
+        +int sender_id FK
+        +int receiver_id FK
+        +str status
+        +datetime sent_at
+    }
+
+    class Blocked_users {
+        +int id PK
+        +int blocker_id FK
+        +int blocked_id FK
+        +datetime blocked_at
+    }
+
+    class Users {
+        +int user_id PK
+    }
+
+    class FriendsService {
+        <<service>>
+        +send_friend_request_service(user, db, user_tag, receiver_id)
+        +accept_or_reject_friend_service(request_id, action, user, db)
+        +remove_friend_service(friend_id, user, db)
+        +get_friends_service(user, db)
+        +get_pending_requests_service(user, db)
+        +block_user_service(blocked_id, user, db)
+        +unblock_user_service(blocked_id, user, db)
+        +get_blocked_users_service(user, db)
+    }
+
+    Users "1" --> "*" Friends : user
+    Users "1" --> "*" Friends : friend
+    Users "1" --> "*" Pending_friends_request : sends
+    Users "1" --> "*" Pending_friends_request : receives
+    Users "1" --> "*" Blocked_users : blocks
+    Users "1" --> "*" Blocked_users : blocked
+    FriendsService ..> Friends : uses
+    FriendsService ..> Pending_friends_request : uses
+    FriendsService ..> Blocked_users : uses
+```
+
+### Cross-cutting (Notifications, Files, Logs)
+
+```mermaid
+classDiagram
+    class Notifications {
+        +int id PK
+        +int user_id FK
+        +str type
+        +int message_id FK
+        +int dm_message_id FK
+        +bool is_seen
+        +datetime created_at
+    }
+
+    class Files {
+        +int id PK
+        +str file_name
+        +str file_url
+        +int sender_id FK
+        +int team_id FK
+        +int channel_id FK
+        +int org_id FK
+        +int file_size
+        +bool is_deleted
+        +datetime sent_at
+    }
+
+    class Logs {
+        +int id PK
+        +int org_id FK
+        +int actor_id FK
+        +str action
+        +int target_id
+        +str target_type
+        +str log_metadata
+        +datetime created_at
+    }
+
+    class Users { +int user_id PK }
+    class Messages { +int message_id PK }
+    class Direct_messages { +int id PK }
+    class Teams { +int team_id PK }
+    class Channels { +int channel_id PK }
+    class Organization { +int organization_id PK }
+
+    Users "1" --> "*" Notifications
+    Messages "1" --> "*" Notifications
+    Direct_messages "1" --> "*" Notifications
+    Users "1" --> "*" Files : sends
+    Teams "1" --> "*" Files
+    Channels "1" --> "*" Files
+    Organization "1" --> "*" Files
+    Organization "1" --> "*" Logs
+    Users "1" --> "*" Logs : actor
+```
 
 ---
 

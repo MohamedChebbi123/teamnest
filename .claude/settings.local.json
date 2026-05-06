@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"websocket\\\\|WebSocket\\\\|socket\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
+      "Bash(grep -r \"stripe\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
+      "Bash(grep -r \"email\\\\|smtp\\\\|mail\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
+      "Bash(find \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\" -type f \\\\\\( -name \"vercel.json\" -o -name \"render.yaml\" -o -name \".env\" \\\\\\))",
+      "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\\\\\\\\utils\")",
+      "Bash(grep -r \"pinecone\\\\|groq\\\\|llama\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
+      "Bash(grep -r \"cloudinary\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")"
+    ]
+  }
+}
