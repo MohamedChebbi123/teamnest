@@ -1,113 +1,113 @@
-# TeamNest — Spécification des besoins
+# TeamNest — Requirements Specification
 
-## 1. Acteurs et besoins fonctionnels
+## 1. Actors and Functional Requirements
 
-### Visiteur
-Le visiteur a la possibilité de :
-- Consulter la page d'accueil de la plateforme
-- S'inscrire avec une adresse e-mail et un mot de passe
-- Vérifier son adresse e-mail via un code reçu par e-mail
-- Se connecter à son compte
-- Demander la réinitialisation de son mot de passe
-- Recevoir un code de réinitialisation par e-mail
+### Visitor
+The visitor has the ability to:
+- Browse the platform's landing page
+- Sign up with an email address and password
+- Verify their email address using a code sent by email
+- Log in to their account
+- Request a password reset
+- Receive a reset code by email
 
-### Membre
-Le membre a la possibilité de :
-- Compléter son profil (avatar, pays, numéro de téléphone)
-- Modifier son mot de passe
-- Se déconnecter d'une session ou de tous ses appareils
-- Définir son statut (en ligne, absent, ne pas déranger)
-- Créer une organisation
-- Rejoindre une organisation sur invitation
-- Créer et gérer ses conversations directes (1:1)
-- Créer un groupe de discussion et y ajouter des membres
-- Envoyer, modifier et supprimer ses messages
-- Joindre des fichiers (images, PDF, documents) à ses messages
-- Rechercher des messages dans un canal ou une conversation
-- Envoyer une demande d'ami
-- Accepter ou refuser une demande d'ami
-- Bloquer ou débloquer un utilisateur
-- Recevoir des notifications en temps réel (mentions, DM, demandes d'ami, tâches)
-- Marquer ses notifications comme lues
-- Consulter et mettre à jour le statut des tâches qui lui sont assignées
-- Joindre des fichiers à une tâche
-- Poser des questions à l'assistant IA basé sur les documents de son organisation
-- Effectuer une recherche transversale (utilisateurs, canaux, messages, fichiers)
+### Member
+The member has the ability to:
+- Complete their profile (avatar, country, phone number)
+- Change their password
+- Log out from the current session or from all devices
+- Set their status (online, away, do not disturb)
+- Create an organization
+- Join an organization upon invitation
+- Create and manage direct conversations (1:1)
+- Create a group chat and add members to it
+- Send, edit, and delete their own messages
+- Attach files (images, PDFs, documents) to their messages
+- Search messages within a channel or conversation
+- Send a friend request
+- Accept or reject a friend request
+- Block or unblock a user
+- Receive real-time notifications (mentions, DMs, friend requests, tasks)
+- Mark notifications as read
+- View and update the status of tasks assigned to them
+- Attach files to a task
+- Ask the AI assistant questions grounded in their organization's documents
+- Perform a cross-entity search (users, channels, messages, files)
 
-### Administrateur d'équipe
-L'administrateur d'équipe a la possibilité de :
-- Créer une équipe au sein d'une organisation
-- Ajouter des membres à une équipe
-- Attribuer des permissions granulaires à chaque membre (créer des canaux, supprimer des messages, gérer les tâches, expulser, faire des annonces)
-- Expulser un membre d'une équipe
-- Créer, modifier et supprimer des canaux
-- Épingler ou désépingler un message
-- Créer des tâches avec date d'échéance et priorité
-- Assigner une ou plusieurs personnes à une tâche
-- Réviser (approuver ou rejeter) les tâches terminées
-- Téléverser des documents (PDF) pour l'indexation par l'assistant IA
+### Team Admin
+The team admin has the ability to:
+- Create a team within an organization
+- Add members to a team
+- Assign granular permissions to each member (create channels, delete messages, manage tasks, kick, make announcements)
+- Kick a member from a team
+- Create, edit, and delete channels
+- Pin or unpin a message
+- Create tasks with a due date and priority
+- Assign one or more people to a task
+- Review (approve or reject) finished tasks
+- Upload documents (PDFs) for indexing by the AI assistant
 
-### Propriétaire d'organisation
-Le propriétaire d'organisation a la possibilité de :
-- Créer une organisation et en définir les paramètres
-- Inviter de nouveaux membres
-- Consulter et traiter les demandes d'adhésion en attente
-- Accepter ou rejeter une demande d'adhésion
-- Souscrire à un abonnement payant via Stripe Checkout
-- Annuler son abonnement
-- Consulter le journal d'audit des actions sensibles de l'organisation
+### Organization Owner
+The organization owner has the ability to:
+- Create an organization and define its settings
+- Invite new members
+- View and process pending join requests
+- Accept or reject a join request
+- Subscribe to a paid plan via Stripe Checkout
+- Cancel their subscription
+- View the audit log of sensitive actions in the organization
 
-### Système
-Le système a la responsabilité de :
-- Gérer les connexions WebSocket et la présence en ligne
-- Diffuser les messages en temps réel aux destinataires connectés
-- Envoyer les e-mails de vérification et de réinitialisation
-- Stocker les fichiers téléversés sur Cloudinary
-- Analyser les PDF et générer les embeddings dans Pinecone
-- Interroger le modèle Groq pour les réponses de l'assistant IA
-- Vérifier et traiter les webhooks Stripe (abonnement, annulation, échec de paiement)
-- Enregistrer les actions sensibles dans le journal d'audit
-- Faire pivoter les jetons de rafraîchissement à chaque appel `/refresh`
+### System
+The system is responsible for:
+- Managing WebSocket connections and online presence
+- Broadcasting messages in real time to connected recipients
+- Sending verification and password-reset emails
+- Storing uploaded files on Cloudinary
+- Parsing PDFs and generating embeddings in Pinecone
+- Querying the Groq model for AI assistant responses
+- Verifying and processing Stripe webhooks (subscription, cancellation, payment failure)
+- Recording sensitive actions in the audit log
+- Rotating refresh tokens on every `/refresh` call
 
 ---
 
-## 2. Besoins non fonctionnels
+## 2. Non-Functional Requirements
 
-### Sécurité
-- Mots de passe hachés avec bcrypt
-- Jetons JWT signés (HS256) avec une durée de vie courte
-- Jetons de rafraîchissement stockés hachés et renouvelés à chaque utilisation
-- Cookies de rafraîchissement `HttpOnly`, `Secure` et `SameSite` en production
-- Contrôle d'accès basé sur les rôles (RBAC) appliqué à chaque endpoint
-- Connexions WebSocket protégées par un jeton JWT obligatoire
+### Security
+- Passwords hashed with bcrypt
+- JWT tokens signed (HS256) with a short lifetime
+- Refresh tokens stored hashed and rotated on every use
+- Refresh cookies set `HttpOnly`, `Secure`, and `SameSite` in production
+- Role-based access control (RBAC) enforced on every endpoint
+- WebSocket connections protected by a mandatory JWT token
 
 ### Performance
-- Latence de livraison des messages temps réel inférieure à 300 ms en local
-- Pool de connexions à la base dimensionné pour la charge concurrente (`DB_POOL_SIZE=50`, overflow 100)
+- Real-time message delivery latency under 300 ms on a local network
+- Database connection pool sized for concurrent load (`DB_POOL_SIZE=50`, overflow 100)
 
-### Fiabilité
-- Reconnexion gracieuse des WebSockets avec rechargement paginé de l'historique
-- Webhooks Stripe idempotents et signature vérifiée
-- Migrations de schéma versionnées via Alembic
+### Reliability
+- Graceful WebSocket reconnection with paginated history reload
+- Idempotent Stripe webhooks with verified signatures
+- Schema migrations versioned through Alembic
 
-### Maintenabilité
-- Architecture en couches : `router → service → modèle` pour chaque domaine
-- Routeurs minces (validation et dépendances d'authentification uniquement)
-- Documentation OpenAPI auto-générée disponible sur `/docs` et `/redoc`
+### Maintainability
+- Layered architecture: `router → service → model` for every domain
+- Thin routers (only validation and authentication dependencies)
+- Auto-generated OpenAPI documentation available at `/docs` and `/redoc`
 
-### Testabilité
-- Suites pytest pour l'authentification, le CRUD, les amis/DM, les permissions, la présence et la recherche
-- Tests exécutés sur une base de données isolée
+### Testability
+- Pytest suites covering authentication, CRUD, friends/DMs, permissions, presence, and search
+- Tests run against an isolated database
 
-### Utilisabilité
-- Interface en thèmes clair et sombre
-- Visite guidée d'intégration (driver.js) pour les nouveaux utilisateurs
+### Usability
+- Light and dark theme support
+- Onboarding tour (driver.js) for first-time users
 
-### Portabilité
-- Compatible PostgreSQL, MySQL et SQLite via SQLAlchemy
+### Portability
+- Compatible with PostgreSQL, MySQL, and SQLite through SQLAlchemy
 
-### Confidentialité
-- Les réponses de l'assistant IA sont strictement limitées aux documents de l'organisation de l'utilisateur
+### Privacy
+- AI assistant responses are strictly scoped to the documents of the user's own organization
 
-### Observabilité
-- Journal d'audit enregistrant l'acteur, l'action, la cible et les métadonnées pour les opérations sensibles
+### Observability
+- Audit log records the actor, action, target, and metadata for sensitive operations
