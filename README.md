@@ -4,6 +4,8 @@ A full-stack team collaboration platform combining real-time messaging, project 
 
 TeamNest lets organizations create teams, run channel-based and direct conversations (text, files, voice), assign and track tasks, and ask an in-app AI assistant questions grounded in their own documents.
 
+> Looking for the academic introduction (context, problem statement, objectives, methodology, plan)? See [INTRODUCTION.md](INTRODUCTION.md).
+
 ---
 
 ## Table of contents
