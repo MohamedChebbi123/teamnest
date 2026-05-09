@@ -7,7 +7,8 @@
       "Bash(find \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\" -type f \\\\\\( -name \"vercel.json\" -o -name \"render.yaml\" -o -name \".env\" \\\\\\))",
       "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\\\\\\\\utils\")",
       "Bash(grep -r \"pinecone\\\\|groq\\\\|llama\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
-      "Bash(grep -r \"cloudinary\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")"
+      "Bash(grep -r \"cloudinary\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
+      "Bash(findstr \"routers\")"
     ]
   }
 }
