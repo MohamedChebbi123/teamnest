@@ -17,101 +17,101 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 ## Tags
 
 - **Sprints:** `[S1]` Auth & Profile · `[S2]` Orgs & Teams · `[S3]` Channels & Messaging · `[S4]` DMs, Group Chats & Friends · `[S5]` Tasks & Notifications · `[S6]` AI, Search, Logs & Billing.
-- **Priority:** **Must** · **Should** · **Could**.
+- **Priority:** **High** · **Medium** · **Low**.
 
 ---
 
 # Visitor
 
-- **US-1.0** *(Must, [S1])* — As a **visitor**, I want to browse the landing page, so that I can learn what TeamNest offers.
-- **US-1.1** *(Must, [S1])* — As a **visitor**, I want to sign up with my name, email and password, so that I can create an account.
+- **US-1.0** *(High, [S1])* — As a **visitor**, I want to browse the landing page, so that I can learn what TeamNest offers.
+- **US-1.1** *(High, [S1])* — As a **visitor**, I want to sign up with my name, email and password, so that I can create an account.
 
 ---
 
 # User
 
-- **US-1.2** *(Must, [S1])* — As a **user**, I want to verify my email with a code, so that my account is activated.
-- **US-1.3** *(Must, [S1])* — As a **user**, I want to resend the verification code, so that I'm not blocked if it expires.
-- **US-1.7** *(Should, [S1])* — As a **user**, I want to change my password, so that I can rotate it.
-- **US-1.8** *(Should, [S1])* — As a **user**, I want to add my avatar, country and phone, so that teammates can recognize me.
-- **US-1.9** *(Should, [S1])* — As a **user**, I want to edit my profile, so that it stays current.
-- **US-1.10** *(Could, [S1])* — As a **user**, I want to set my status (online / away / busy / offline), so that others know my availability.
-- **US-1.11** *(Could, [S1])* — As a **user**, I want a guided tour of the app, so that I learn the basics quickly.
-- **US-1.12** *(Could, [S1])* — As a **user**, I want to switch between light and dark mode, so that the look matches my preference.
-- **US-5.1** *(Must, [S4])* — As a **user**, I want to send a direct message, so that we can talk privately.
-- **US-5.2** *(Should, [S4])* — As a **user**, I want to edit, delete and attach files in my DMs, so that I have full control of my chats.
-- **US-5.3** *(Must, [S4])* — As a **user**, I want to create a group chat, so that small groups can talk outside org channels.
-- **US-5.4** *(Must, [S4])* — As a **user**, I want to chat in a group in real time, so that the group can collaborate.
-- **US-5.5** *(Should, [S4])* — As a **user**, I want to see typing indicators in DMs, so that I know when a contact is responding.
-- **US-6.1** *(Should, [S4])* — As a **user**, I want to send friend requests, so that I can connect with others.
-- **US-6.2** *(Should, [S4])* — As a **user**, I want to accept or reject friend requests, so that I curate my contacts.
-- **US-6.3** *(Could, [S4])* — As a **user**, I want to block or unblock a user, so that I can stop unwanted contact.
+- **US-1.2** *(High, [S1])* — As a **user**, I want to verify my email with a code, so that my account is activated.
+- **US-1.3** *(High, [S1])* — As a **user**, I want to resend the verification code, so that I'm not blocked if it expires.
+- **US-1.7** *(Medium, [S1])* — As a **user**, I want to change my password, so that I can rotate it.
+- **US-1.8** *(Medium, [S1])* — As a **user**, I want to add my avatar, country and phone, so that teammates can recognize me.
+- **US-1.9** *(Medium, [S1])* — As a **user**, I want to edit my profile, so that it stays current.
+- **US-1.10** *(Low, [S1])* — As a **user**, I want to set my status (online / away / busy / offline), so that others know my availability.
+- **US-1.11** *(Low, [S1])* — As a **user**, I want a guided tour of the app, so that I learn the basics quickly.
+- **US-1.12** *(Low, [S1])* — As a **user**, I want to switch between light and dark mode, so that the look matches my preference.
+- **US-5.1** *(High, [S4])* — As a **user**, I want to send a direct message, so that we can talk privately.
+- **US-5.2** *(Medium, [S4])* — As a **user**, I want to edit, delete and attach files in my DMs, so that I have full control of my chats.
+- **US-5.3** *(High, [S4])* — As a **user**, I want to create a group chat, so that small groups can talk outside org channels.
+- **US-5.4** *(High, [S4])* — As a **user**, I want to chat in a group in real time, so that the group can collaborate.
+- **US-5.5** *(Medium, [S4])* — As a **user**, I want to see typing indicators in DMs, so that I know when a contact is responding.
+- **US-6.1** *(Medium, [S4])* — As a **user**, I want to send friend requests, so that I can connect with others.
+- **US-6.2** *(Medium, [S4])* — As a **user**, I want to accept or reject friend requests, so that I curate my contacts.
+- **US-6.3** *(Low, [S4])* — As a **user**, I want to block or unblock a user, so that I can stop unwanted contact.
 
 ---
 
 # Member
 
-- **US-1.5** *(Must, [S1])* — As a **member**, I want to log out from one device or all devices, so that I can secure my account.
-- **US-1.6** *(Must, [S1])* — As a **member**, I want to reset my password by email, so that I can recover access.
-- **US-2.1** *(Must, [S2])* — As a **member**, I want to create an organization, so that I can host my workspace.
-- **US-2.3** *(Must, [S2])* — As a **member**, I want to join an organization with an invite, so that I can collaborate.
-- **US-3.5** *(Must, [S2])* — As a **member**, I want to see all my teams, so that I can navigate quickly.
-- **US-4.1** *(Must, [S3])* — As a **member**, I want to create channels for my organization or a team, so that conversations are organized by topic.
-- **US-8.1** *(Must, [S5])* — As a **member**, I want real-time notifications for mentions, DMs, friend requests and task updates, so that I don't miss anything.
-- **US-8.2** *(Should, [S5])* — As a **member**, I want to view my notifications and mark them as seen, so that I stay organized.
-- **US-9.1** *(Should, [S6])* — As a **member**, I want to ask the AI questions about my organization, so that I get quick answers.
-- **US-9.2** *(Could, [S6])* — As a **member**, I want the AI to use my team's documents, so that answers come from our own files.
-- **US-9.3** *(Could, [S6])* — As a **member**, I want to view a PDF inline and ask the AI about it, so that I can pull answers from long files.
-- **US-10.1** *(Must, [S6])* — As a **member**, I want to search across users, channels, messages and files, so that I find things fast.
+- **US-1.5** *(High, [S1])* — As a **member**, I want to log out from one device or all devices, so that I can secure my account.
+- **US-1.6** *(High, [S1])* — As a **member**, I want to reset my password by email, so that I can recover access.
+- **US-2.1** *(High, [S2])* — As a **member**, I want to create an organization, so that I can host my workspace.
+- **US-2.3** *(High, [S2])* — As a **member**, I want to join an organization with an invite, so that I can collaborate.
+- **US-3.5** *(High, [S2])* — As a **member**, I want to see all my teams, so that I can navigate quickly.
+- **US-4.1** *(High, [S3])* — As a **member**, I want to create channels for my organization or a team, so that conversations are organized by topic.
+- **US-8.1** *(High, [S5])* — As a **member**, I want real-time notifications for mentions, DMs, friend requests and task updates, so that I don't miss anything.
+- **US-8.2** *(Medium, [S5])* — As a **member**, I want to view my notifications and mark them as seen, so that I stay organized.
+- **US-9.1** *(Medium, [S6])* — As a **member**, I want to ask the AI questions about my organization, so that I get quick answers.
+- **US-9.2** *(Low, [S6])* — As a **member**, I want the AI to use my team's documents, so that answers come from our own files.
+- **US-9.3** *(Low, [S6])* — As a **member**, I want to view a PDF inline and ask the AI about it, so that I can pull answers from long files.
+- **US-10.1** *(High, [S6])* — As a **member**, I want to search across users, channels, messages and files, so that I find things fast.
 
 ---
 
 # Org Owner / Admin
 
-- **US-2.2** *(Must, [S2])* — As an **org admin**, I want to invite members by email, so that they can join.
-- **US-2.4** *(Must, [S2])* — As an **org admin**, I want to accept or reject join requests, so that I control who gets in.
-- **US-2.5** *(Should, [S2])* — As an **org admin**, I want to update or delete the organization, so that I can manage it.
-- **US-2.6** *(Must, [S2])* — As an **org admin**, I want to view all members, so that I have an overview.
-- **US-3.1** *(Must, [S2])* — As an **org admin**, I want to create teams, so that I can group members by project.
-- **US-3.2** *(Must, [S2])* — As an **org admin / team lead**, I want to add members to a team, so that they get access to its channels and tasks.
-- **US-2.7** *(Must, [S6])* — As an **org admin**, I want to subscribe to a paid plan and cancel it, so that I can unlock plan limits.
-- **US-11.1** *(Should, [S6])* — As an **org admin**, I want to see an activity log, so that I have an audit trail.
-- **US-11.2** *(Could, [S6])* — As an **org admin**, I want to undo a logged action, so that I can recover from a mistake.
+- **US-2.2** *(High, [S2])* — As an **org admin**, I want to invite members by email, so that they can join.
+- **US-2.4** *(High, [S2])* — As an **org admin**, I want to accept or reject join requests, so that I control who gets in.
+- **US-2.5** *(Medium, [S2])* — As an **org admin**, I want to update or delete the organization, so that I can manage it.
+- **US-2.6** *(High, [S2])* — As an **org admin**, I want to view all members, so that I have an overview.
+- **US-3.1** *(High, [S2])* — As an **org admin**, I want to create teams, so that I can group members by project.
+- **US-3.2** *(High, [S2])* — As an **org admin / team lead**, I want to add members to a team, so that they get access to its channels and tasks.
+- **US-2.7** *(High, [S6])* — As an **org admin**, I want to subscribe to a paid plan and cancel it, so that I can unlock plan limits.
+- **US-11.1** *(Medium, [S6])* — As an **org admin**, I want to see an activity log, so that I have an audit trail.
+- **US-11.2** *(Low, [S6])* — As an **org admin**, I want to undo a logged action, so that I can recover from a mistake.
 
 ---
 
 # Team Lead
 
-- **US-3.3** *(Should, [S2])* — As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear.
-- **US-3.4** *(Should, [S2])* — As a **team lead**, I want to remove a member from a team, so that I can take out people who shouldn't be there.
-- **US-4.11** *(Should, [S3])* — As a **team lead**, I want to create channels inside my team, so that the team has its own conversation spaces.
-- **US-7.1** *(Must, [S5])* — As a **team lead**, I want to create tasks with title, description, assignees and due date, so that work is tracked.
-- **US-7.2** *(Must, [S5])* — As a **team lead**, I want to edit or delete a task, so that I can adjust scope.
-- **US-7.5** *(Should, [S5])* — As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.
-- **US-7.7** *(Should, [S5])* — As a **team lead**, I want to break a task into subtasks, so that I can split large work.
+- **US-3.3** *(Medium, [S2])* — As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear.
+- **US-3.4** *(Medium, [S2])* — As a **team lead**, I want to remove a member from a team, so that I can take out people who shouldn't be there.
+- **US-4.11** *(Medium, [S3])* — As a **team lead**, I want to create channels inside my team, so that the team has its own conversation spaces.
+- **US-7.1** *(High, [S5])* — As a **team lead**, I want to create tasks with title, description, assignees and due date, so that work is tracked.
+- **US-7.2** *(High, [S5])* — As a **team lead**, I want to edit or delete a task, so that I can adjust scope.
+- **US-7.5** *(Medium, [S5])* — As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.
+- **US-7.7** *(Medium, [S5])* — As a **team lead**, I want to break a task into subtasks, so that I can split large work.
 
 ---
 
 # Team Member
 
-- **US-3.6** *(Could, [S2])* — As a **team member**, I want to view another member's info, so that I know their role.
-- **US-4.2** *(Must, [S3])* — As a **team member**, I want to update or delete channels I manage, so that I can keep them tidy.
-- **US-4.3** *(Must, [S3])* — As a **team member**, I want to chat in channels in real time, so that conversations feel instant.
-- **US-4.4** *(Must, [S3])* — As a **team member**, I want to edit or delete my own messages, so that I can fix mistakes.
-- **US-4.5** *(Should, [S3])* — As a **team member**, I want to pin messages, so that important info is easy to find.
-- **US-4.6** *(Should, [S3])* — As a **team member**, I want to search messages in a channel, so that I can find past discussions.
-- **US-4.7** *(Must, [S3])* — As a **team member**, I want to load older messages on scroll, so that history loads smoothly.
-- **US-4.8** *(Should, [S3])* — As a **team member**, I want to share files in channels, so that documents stay with the conversation.
-- **US-4.9** *(Should, [S3])* — As a **team member**, I want to reply to a specific message, so that threads stay readable.
-- **US-4.10** *(Could, [S3])* — As a **team member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
-- **US-7.6** *(Should, [S5])* — As a **team member**, I want to add or remove task attachments, so that files travel with the work.
+- **US-3.6** *(Low, [S2])* — As a **team member**, I want to view another member's info, so that I know their role.
+- **US-4.2** *(High, [S3])* — As a **team member**, I want to update or delete channels I manage, so that I can keep them tidy.
+- **US-4.3** *(High, [S3])* — As a **team member**, I want to chat in channels in real time, so that conversations feel instant.
+- **US-4.4** *(High, [S3])* — As a **team member**, I want to edit or delete my own messages, so that I can fix mistakes.
+- **US-4.5** *(Medium, [S3])* — As a **team member**, I want to pin messages, so that important info is easy to find.
+- **US-4.6** *(Medium, [S3])* — As a **team member**, I want to search messages in a channel, so that I can find past discussions.
+- **US-4.7** *(High, [S3])* — As a **team member**, I want to load older messages on scroll, so that history loads smoothly.
+- **US-4.8** *(Medium, [S3])* — As a **team member**, I want to share files in channels, so that documents stay with the conversation.
+- **US-4.9** *(Medium, [S3])* — As a **team member**, I want to reply to a specific message, so that threads stay readable.
+- **US-4.10** *(Low, [S3])* — As a **team member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
+- **US-7.6** *(Medium, [S5])* — As a **team member**, I want to add or remove task attachments, so that files travel with the work.
 
 ---
 
 # Assignee
 
-- **US-7.3** *(Must, [S5])* — As an **assignee**, I want to see my tasks, so that I know what's on my plate.
-- **US-7.4** *(Must, [S5])* — As an **assignee**, I want to update my task status, so that the team sees progress.
+- **US-7.3** *(High, [S5])* — As an **assignee**, I want to see my tasks, so that I know what's on my plate.
+- **US-7.4** *(High, [S5])* — As an **assignee**, I want to update my task status, so that the team sees progress.
 
 ---
 
