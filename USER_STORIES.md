@@ -51,7 +51,6 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 
 # Member
 
-- **US-1.4** *(Must, [S1])* — As a **member**, I want to log in and stay signed in, so that I don't re-enter credentials each visit.
 - **US-1.5** *(Must, [S1])* — As a **member**, I want to log out from one device or all devices, so that I can secure my account.
 - **US-1.6** *(Must, [S1])* — As a **member**, I want to reset my password by email, so that I can recover access.
 - **US-2.1** *(Must, [S2])* — As a **member**, I want to create an organization, so that I can host my workspace.
@@ -85,7 +84,7 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 
 - **US-3.3** *(Should, [S2])* — As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear.
 - **US-3.4** *(Should, [S2])* — As a **team lead**, I want to remove a member from a team, so that I can take out people who shouldn't be there.
-- **US-4.1b** *(Should, [S3])* — As a **team lead**, I want to create channels inside my team, so that the team has its own conversation spaces.
+- **US-4.11** *(Should, [S3])* — As a **team lead**, I want to create channels inside my team, so that the team has its own conversation spaces.
 - **US-7.1** *(Must, [S5])* — As a **team lead**, I want to create tasks with title, description, assignees and due date, so that work is tracked.
 - **US-7.2** *(Must, [S5])* — As a **team lead**, I want to edit or delete a task, so that I can adjust scope.
 - **US-7.5** *(Should, [S5])* — As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.
@@ -104,7 +103,7 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 - **US-4.7** *(Must, [S3])* — As a **team member**, I want to load older messages on scroll, so that history loads smoothly.
 - **US-4.8** *(Should, [S3])* — As a **team member**, I want to share files in channels, so that documents stay with the conversation.
 - **US-4.9** *(Should, [S3])* — As a **team member**, I want to reply to a specific message, so that threads stay readable.
-- **US-4.11** *(Could, [S3])* — As a **team member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
+- **US-4.10** *(Could, [S3])* — As a **team member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
 - **US-7.6** *(Should, [S5])* — As a **team member**, I want to add or remove task attachments, so that files travel with the work.
 
 ---
@@ -137,8 +136,8 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 **Goal:** teams hold live conversations in channels with pinning, search and file sharing.
 
 - **Member:** US-4.1
-- **Team Lead:** US-4.1b
-- **Team Member:** US-4.2, US-4.3, US-4.4, US-4.5, US-4.6, US-4.7, US-4.8, US-4.9, US-4.11
+- **Team Lead:** US-4.11
+- **Team Member:** US-4.2, US-4.3, US-4.4, US-4.5, US-4.6, US-4.7, US-4.8, US-4.9, US-4.10
 
 ## Sprint 4 — DMs, Group Chats & Friends (Weeks 7–8)
 **Goal:** users have 1:1 and group conversations and manage their personal network.
