@@ -50,15 +50,6 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 - **US-2.3** *(Must, [S2])* — As a **member**, I want to join an organization with an invite, so that I can collaborate.
 - **US-3.5** *(Must, [S2])* — As a **member**, I want to see all my teams, so that I can navigate quickly.
 - **US-4.1** *(Must, [S3])* — As a **member**, I want to create channels for my organization or a team, so that conversations are organized by topic.
-- **US-4.2** *(Must, [S3])* — As a **member**, I want to update or delete channels I manage, so that I can keep them tidy.
-- **US-4.3** *(Must, [S3])* — As a **member**, I want to chat in channels in real time, so that conversations feel instant.
-- **US-4.4** *(Must, [S3])* — As a **member**, I want to edit or delete my own messages, so that I can fix mistakes.
-- **US-4.5** *(Should, [S3])* — As a **member**, I want to pin messages, so that important info is easy to find.
-- **US-4.6** *(Should, [S3])* — As a **member**, I want to search messages in a channel, so that I can find past discussions.
-- **US-4.7** *(Must, [S3])* — As a **member**, I want to load older messages on scroll, so that history loads smoothly.
-- **US-4.8** *(Should, [S3])* — As a **member**, I want to share files in channels, so that documents stay with the conversation.
-- **US-4.9** *(Should, [S3])* — As a **member**, I want to reply to a specific message, so that threads stay readable.
-- **US-4.11** *(Could, [S3])* — As a **member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
 - **US-5.1** *(Must, [S4])* — As a **member**, I want to send a direct message, so that we can talk privately.
 - **US-5.2** *(Should, [S4])* — As a **member**, I want to edit, delete and attach files in my DMs, so that I have full control of my chats.
 - **US-5.3** *(Must, [S4])* — As a **member**, I want to create a group chat, so that small groups can talk outside org channels.
@@ -67,7 +58,6 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 - **US-6.1** *(Should, [S4])* — As a **member**, I want to send friend requests, so that I can connect with others.
 - **US-6.2** *(Should, [S4])* — As a **member**, I want to accept or reject friend requests, so that I curate my contacts.
 - **US-6.3** *(Could, [S4])* — As a **member**, I want to block or unblock a user, so that I can stop unwanted contact.
-- **US-7.6** *(Should, [S5])* — As a **member**, I want to add or remove task attachments, so that files travel with the work.
 - **US-8.1** *(Must, [S5])* — As a **member**, I want real-time notifications for mentions, DMs, friend requests and task updates, so that I don't miss anything.
 - **US-8.2** *(Should, [S5])* — As a **member**, I want to view my notifications and mark them as seen, so that I stay organized.
 - **US-9.1** *(Should, [S6])* — As a **member**, I want to ask the AI questions about my organization, so that I get quick answers.
@@ -106,6 +96,16 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 # Team Member
 
 - **US-3.6** *(Could, [S2])* — As a **team member**, I want to view another member's info, so that I know their role.
+- **US-4.2** *(Must, [S3])* — As a **team member**, I want to update or delete channels I manage, so that I can keep them tidy.
+- **US-4.3** *(Must, [S3])* — As a **team member**, I want to chat in channels in real time, so that conversations feel instant.
+- **US-4.4** *(Must, [S3])* — As a **team member**, I want to edit or delete my own messages, so that I can fix mistakes.
+- **US-4.5** *(Should, [S3])* — As a **team member**, I want to pin messages, so that important info is easy to find.
+- **US-4.6** *(Should, [S3])* — As a **team member**, I want to search messages in a channel, so that I can find past discussions.
+- **US-4.7** *(Must, [S3])* — As a **team member**, I want to load older messages on scroll, so that history loads smoothly.
+- **US-4.8** *(Should, [S3])* — As a **team member**, I want to share files in channels, so that documents stay with the conversation.
+- **US-4.9** *(Should, [S3])* — As a **team member**, I want to reply to a specific message, so that threads stay readable.
+- **US-4.11** *(Could, [S3])* — As a **team member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
+- **US-7.6** *(Should, [S5])* — As a **team member**, I want to add or remove task attachments, so that files travel with the work.
 
 ---
 
@@ -136,8 +136,9 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 ## Sprint 3 — Channels & Real-time Messaging (Weeks 5–6)
 **Goal:** teams hold live conversations in channels with pinning, search and file sharing.
 
-- **Member:** US-4.1, US-4.2, US-4.3, US-4.4, US-4.5, US-4.6, US-4.7, US-4.8, US-4.9, US-4.11
+- **Member:** US-4.1
 - **Team Lead:** US-4.1b
+- **Team Member:** US-4.2, US-4.3, US-4.4, US-4.5, US-4.6, US-4.7, US-4.8, US-4.9, US-4.11
 
 ## Sprint 4 — DMs, Group Chats & Friends (Weeks 7–8)
 **Goal:** users have 1:1 and group conversations and manage their personal network.
@@ -149,7 +150,8 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 
 - **Team Lead:** US-7.1, US-7.2, US-7.5, US-7.7
 - **Assignee:** US-7.3, US-7.4
-- **Member:** US-7.6, US-8.1, US-8.2
+- **Team Member:** US-7.6
+- **Member:** US-8.1, US-8.2
 
 ## Sprint 6 — AI Assistant, Search, Logs & Billing (Weeks 11–12)
 **Goal:** add cross-cutting capabilities — AI help, global search, audit trail and paid plans.
