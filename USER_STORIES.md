@@ -25,6 +25,8 @@ This document is structured as **Actor (Role) → User Story**. Each story is ta
 
 The Visitor is anyone reaching TeamNest without an account. The goal is to convert them into a verified user.
 
+- **US-1.0** *(Must, [S1])* — As a **visitor**, I want to browse the public landing page (product overview, features, pricing, calls-to-action), so that I can understand what TeamNest offers before signing up.
+  - *Acceptance:* landing page is reachable without authentication; primary CTAs link to register/login; page is responsive on mobile and desktop.
 - **US-1.1** *(Must, [S1])* — As a **visitor**, I want to register with my first name, last name, email and password, so that I can create a TeamNest account.
   - *Acceptance:* email format validated, password hashed, verification email sent, duplicate emails rejected.
 
@@ -170,7 +172,7 @@ The same backlog, grouped by sprint for planning. Each sprint delivers a vertica
 **Goal:** anyone can create a verified account and manage their profile securely.
 **Definition of Done:** all auth endpoints covered by tests; JWT + refresh flow end-to-end; emails delivered.
 
-- **Visitor:** US-1.1
+- **Visitor:** US-1.0, US-1.1
 - **New User:** US-1.2, US-1.3, US-1.8
 - **Member:** US-1.4, US-1.5, US-1.6, US-1.7, US-1.9, US-1.10
 
