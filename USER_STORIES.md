@@ -113,8 +113,9 @@ Stories are grouped by **Actor (Role)**. Each is tagged with a sprint (S1–S6) 
 # Team Member
 
 - **US-15.1** *(Low, [S2])* — As a **team member**, I want to view a teammate's profile, so that I know their role.
-- **US-15.2** *(Low, [S3])* — As a **team member**, I want a file list per team channel with inline PDF viewing, so that I can find and read attachments easily.
-- **US-15.3** *(Medium, [S5])* — As a **team member**, I want to add or remove task attachments, so that files travel with the work.
+- **US-15.2** *(High, [S3])* — As a **team member**, I want to chat in my team's channels, so that I can collaborate with my team.
+- **US-15.3** *(Low, [S3])* — As a **team member**, I want a file list per team channel with inline PDF viewing, so that I can find and read attachments easily.
+- **US-15.4** *(Medium, [S5])* — As a **team member**, I want to add or remove task attachments, so that files travel with the work.
 
 ---
 
@@ -147,7 +148,7 @@ Stories are grouped by **Actor (Role)**. Each is tagged with a sprint (S1–S6) 
 
 - **Member:** US-7.1 → US-7.9
 - **Team Lead:** US-13.5
-- **Team Member:** US-15.2
+- **Team Member:** US-15.2, US-15.3
 
 ## Sprint 4 — DMs, Group Chats & Friends (Weeks 7–8)
 **Goal:** users have 1:1 and small-group conversations and manage their personal network.
@@ -158,7 +159,7 @@ Stories are grouped by **Actor (Role)**. Each is tagged with a sprint (S1–S6) 
 **Goal:** teams plan and track work and stay informed via real-time notifications.
 
 - **Team Lead:** US-14.1, US-14.2, US-14.3, US-14.4
-- **Team Member:** US-15.3
+- **Team Member:** US-15.4
 - **Assignee:** US-16.1, US-16.2
 - **Member:** US-8.1, US-8.2
 
