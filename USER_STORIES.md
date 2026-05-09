@@ -65,7 +65,8 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 - **US-4.7** *(Must, [S3])* — As a **member**, I want to load older messages on scroll, so that history loads smoothly.
 - **US-4.8** *(Should, [S3])* — As a **member**, I want to share files in channels, so that documents stay with the conversation.
 - **US-4.9** *(Should, [S3])* — As a **member**, I want to reply to a specific message, so that threads stay readable.
-- **US-4.11** *(Could, [S3])* — As a **member**, I want a file list per channel, so that I can find attachments without scrolling chat.
+- **US-4.1** *(Must, [S3])* — As a **member**, I want to create channels for my organization or a team, so that conversations are organized by topic.
+- **US-4.11** *(Could, [S3])* — As a **member**, I want a file list for each team channel, so that I can find attachments without scrolling chat.
 
 ## Direct messages & group chats
 
@@ -73,7 +74,7 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 - **US-5.2** *(Should, [S4])* — As a **member**, I want to edit, delete and attach files in my DMs, so that I have full control of my chats.
 - **US-5.3** *(Must, [S4])* — As a **member**, I want to create a group chat, so that small groups can talk outside org channels.
 - **US-5.4** *(Must, [S4])* — As a **member**, I want to chat in a group in real time, so that the group can collaborate.
-- **US-5.5** *(Should, [S4])* — As a **member**, I want typing indicators and read receipts in DMs, so that I know if someone's typing or has seen my message.
+- **US-5.5** *(Should, [S4])* — As a **member**, I want to see typing indicators in DMs, so that I know when a contact is responding.
 
 ## Friends
 
@@ -104,7 +105,6 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 - **US-2.6** *(Must, [S2])* — As an **org admin**, I want to view all members, so that I have an overview.
 - **US-3.1** *(Must, [S2])* — As an **org admin**, I want to create teams, so that I can group members by project.
 - **US-3.2** *(Must, [S2])* — As an **org admin / team lead**, I want to add members to a team, so that they get access to its channels and tasks.
-- **US-4.1** *(Must, [S3])* — As an **org admin / team lead**, I want to create channels, so that conversations are organized by topic.
 - **US-2.7** *(Must, [S6])* — As an **org admin**, I want to subscribe to a paid plan and cancel it, so that I can unlock plan limits.
 - **US-11.1** *(Should, [S6])* — As an **org admin**, I want to see an activity log, so that I have an audit trail.
 - **US-11.2** *(Could, [S6])* — As an **org admin**, I want to undo a logged action, so that I can recover from a mistake.
@@ -115,6 +115,7 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 
 - **US-3.3** *(Should, [S2])* — As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear.
 - **US-3.4** *(Should, [S2])* — As a **team lead**, I want to remove a member from a team, so that I can take out people who shouldn't be there.
+- **US-4.1b** *(Should, [S3])* — As a **team lead**, I want to create channels inside my team, so that the team has its own conversation spaces.
 - **US-7.1** *(Must, [S5])* — As a **team lead**, I want to create tasks with title, description, assignees and due date, so that work is tracked.
 - **US-7.2** *(Must, [S5])* — As a **team lead**, I want to edit or delete a task, so that I can adjust scope.
 - **US-7.5** *(Should, [S5])* — As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.
@@ -125,7 +126,6 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 # Team Member
 
 - **US-3.6** *(Could, [S2])* — As a **team member**, I want to view another member's info, so that I know their role.
-- **US-4.10** *(Could, [S3])* — As a **team member**, I want to join a voice channel and mute myself, so that we can talk by voice.
 
 ---
 
@@ -156,9 +156,8 @@ Stories are grouped by **Actor (Role)**. Each is tagged with the sprint that del
 ## Sprint 3 — Channels & Real-time Messaging (Weeks 5–6)
 **Goal:** teams hold live conversations in channels with pinning, search and file sharing.
 
-- **Org Admin / Team Lead:** US-4.1
-- **Member:** US-4.2, US-4.3, US-4.4, US-4.5, US-4.6, US-4.7, US-4.8, US-4.9, US-4.11
-- **Team Member:** US-4.10
+- **Member:** US-4.1, US-4.2, US-4.3, US-4.4, US-4.5, US-4.6, US-4.7, US-4.8, US-4.9, US-4.11
+- **Team Lead:** US-4.1b
 
 ## Sprint 4 — DMs, Group Chats & Friends (Weeks 7–8)
 **Goal:** users have 1:1 and group conversations and manage their personal network.
