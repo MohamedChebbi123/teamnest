@@ -4,6 +4,35 @@ This document describes the architecture of TeamNest using the [C4 model](https:
 
 ---
 
+## Overview
+
+A minimal view of the system: one frontend, one backend, one database, and the external services the backend talks to.
+
+```mermaid
+flowchart LR
+    user([User])
+
+    web[Next.js<br/>Frontend]
+    api[FastAPI<br/>Backend]
+    db[(PostgreSQL)]
+
+    ext[/External services<br/>Stripe · Resend · Cloudinary<br/>Groq · Pinecone/]
+
+    user -- HTTPS / WSS --> web
+    web -- REST · WebSocket --> api
+    api --> db
+    api --> ext
+
+    classDef person fill:#08427b,stroke:#052e56,color:#fff
+    classDef app fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef extCls fill:#999,stroke:#6b6b6b,color:#fff
+    class user person
+    class web,api,db app
+    class ext extCls
+```
+
+---
+
 ## Level 1 — System Context
 
 Shows the actors using TeamNest and the external systems it depends on. Business-level view; no technologies or protocols.

@@ -1,0 +1,185 @@
+# Sprint 5 — Tasks & Notifications
+
+**Weeks 9–10**
+
+---
+
+## Introduction
+
+Conversations alone don't ship work — teams need a way to **track** it. Sprint 5 adds the **task management** half of TeamNest: team leads create tasks scoped to a team with assignees, due dates, attachments, and a subtask breakdown; assignees update status and submit for review; team leads approve or reject. Every status transition raises a **notification** delivered in real time over the existing WebSocket infrastructure (built in Sprint 3 for messaging, extended in Sprint 4 for presence). This sprint also formalizes the broader notifications surface — mentions from Sprint 3, DMs and friend events from Sprint 4, and task events from this sprint all flow through one notifications inbox.
+
+---
+
+## Sprint Goal
+
+> **Teams plan and track work and stay informed via real-time notifications.**
+
+By the end of Sprint 5, a team lead can create a task with assignees and a due date, edit or delete it, split it into subtasks, and approve or reject submissions. Assignees see their own task list, update status, submit for review, and add or remove attachments. Members receive real-time notifications for mentions, DMs, friend events and task events, and can mark them as seen.
+
+---
+
+## User Stories
+
+### Team Lead
+
+| ID        | Priority | Story                                                                                                              |
+| --------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| US-14.1   | High     | As a **team lead**, I want to create tasks with assignees and a due date, so that work is tracked.                 |
+| US-14.2   | High     | As a **team lead**, I want to edit or delete a task, so that I can adjust scope.                                   |
+| US-14.3   | Medium   | As a **team lead**, I want to break a task into subtasks, so that I can split large work.                          |
+| US-14.4   | Medium   | As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.                      |
+
+### Team Member
+
+| ID        | Priority | Story                                                                                                              |
+| --------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| US-15.4   | Medium   | As a **team member**, I want to add or remove task attachments, so that files travel with the work.                |
+
+### Assignee
+
+| ID        | Priority | Story                                                                                                              |
+| --------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| US-16.1   | High     | As an **assignee**, I want to see my tasks, so that I know what's on my plate.                                     |
+| US-16.2   | High     | As an **assignee**, I want to update my task status (and submit for review), so that the team sees progress.       |
+
+### Member — Notifications
+
+| ID       | Priority | Story                                                                                                              |
+| -------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| US-8.1   | High     | As a **member**, I want real-time notifications for mentions, DMs, friends and tasks, so that I don't miss anything. |
+| US-8.2   | Medium   | As a **member**, I want to view notifications and mark them as seen, so that I stay organized.                     |
+
+---
+
+## Related Diagrams
+
+### C4 — Task domain (component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    cloud[/Cloudinary/]
+
+    subgraph task [Task domain]
+        taskRouter[tasks_router.py<br/>Task endpoints]
+        taskSvc[task_service.py<br/>Lifecycle · assignments · attachments]
+        cloudUtil[utils/cloudinary_handler.py<br/>Task attachments]
+        wsMgr[utils/Websocket_manager.py<br/>Notifies assignees in real time]
+        taskData[Data Access<br/>SQLAlchemy · Tasks model]
+    end
+
+    web -- "REST" --> taskRouter
+    taskRouter --> taskSvc
+    taskSvc --> taskData
+    taskSvc --> cloudUtil
+    taskSvc --> wsMgr
+    taskData -- "SQL" --> db
+    cloudUtil --> cloud
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class taskRouter,taskSvc,cloudUtil,wsMgr,taskData component
+    class cloud ext
+```
+
+### Sequence — Task Lifecycle (US-14.x, US-15.4, US-16.x, US-8.1, US-8.2)
+
+**9a. Manager creates a task → assignee is notified (US-14.1, US-8.1)**
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor Assignee
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Notif as Notifications
+
+    Note over Manager,DB: ref: Authenticate
+
+    Manager->>+FE: Fill task form
+    FE->>+API: Create task
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+DB: Save task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-)Assignee: Task assigned
+        deactivate Notif
+        API-->>FE: Task created
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Manager: Result
+```
+
+**9b. Assignee submits for review (US-16.1, US-16.2)**
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor Assignee
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Notif as Notifications
+
+    Note over Assignee,DB: ref: Authenticate
+
+    Assignee->>+FE: Mark as done
+    FE->>+API: Submit task
+    API->>API: Validate transition
+    alt Valid transition
+        API->>+DB: Update status
+        DB-->>-API: Saved
+        API->>+Notif: Notify manager
+        Notif-)Manager: Task submitted
+        deactivate Notif
+        API-->>FE: OK
+    else Invalid transition
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-Assignee: Result
+```
+
+**9c. Manager approves or rejects (US-14.4)**
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor Assignee
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Notif as Notifications
+
+    Note over Manager,DB: ref: Authenticate
+
+    Manager->>+FE: Review task
+    FE->>+API: Submit decision
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Approved
+        API->>+DB: Update task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-)Assignee: Task approved
+        deactivate Notif
+        API-->>FE: OK
+    else Rejected
+        API->>+DB: Update task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-)Assignee: Task rejected
+        deactivate Notif
+        API-->>FE: OK
+    end
+    deactivate API
+    FE-->>-Manager: Result
+```
