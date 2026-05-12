@@ -44,6 +44,65 @@ By the end of Sprint 1, a brand-new visitor can land on the marketing page, sign
 
 ---
 
+## Subtasks
+
+**US-1.1 — Landing page**
+- [ ] Design landing layout (hero, features, footer)
+- [ ] Implement responsive Next.js page components
+- [ ] Wire CTA buttons to signup / login routes
+
+**US-1.2 — Register**
+- [ ] Build registration form UI with client-side validation
+- [ ] Implement `POST /auth/register` endpoint
+- [ ] Hash password (bcrypt) and persist user row
+
+**US-2.1 — Verify email**
+- [ ] Generate and store 6-digit verification code
+- [ ] Implement `POST /auth/verify-email` endpoint
+- [ ] Flip `is_verified` flag on success
+
+**US-2.2 — Resend verification code**
+- [ ] Add `POST /auth/resend-code` endpoint with rate-limit
+- [ ] Wire "Resend" button on verification screen
+
+**US-2.3 — Stay signed in**
+- [ ] Issue JWT access + refresh tokens on login
+- [ ] Implement refresh-token rotation endpoint
+- [ ] Persist sessions table in DB
+
+**US-2.4 — Logout from one or all devices**
+- [ ] Add `POST /auth/logout` (current session)
+- [ ] Add `POST /auth/logout-all` (invalidate all sessions)
+- [ ] Revoke matching refresh tokens in DB
+
+**US-2.5 — Reset password by email**
+- [ ] `POST /auth/forgot-password` issues reset code via Resend
+- [ ] `POST /auth/reset-password` verifies code + updates hash
+- [ ] Reset-password UI flow (request → enter code → new password)
+
+**US-2.6 — Change password**
+- [ ] `POST /auth/change-password` with old-password verification
+- [ ] Re-hash and persist new password
+
+**US-2.7 — Edit profile**
+- [ ] `PATCH /users/me` for name, country, phone
+- [ ] Avatar upload via Cloudinary handler
+- [ ] Profile-edit form UI
+
+**US-2.8 — Set presence**
+- [ ] Add `presence` enum field on user
+- [ ] WebSocket broadcast on presence change
+
+**US-2.9 — Light/dark theme**
+- [ ] Add theme toggle component
+- [ ] Persist preference (localStorage + user setting)
+
+**US-2.10 — Guided tour**
+- [ ] Integrate tour library (e.g. Driver.js / Shepherd)
+- [ ] Define onboarding step list for first login
+
+---
+
 ## Related Diagrams
 
 ### C4 — Auth domain (component view)

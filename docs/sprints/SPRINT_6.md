@@ -40,6 +40,45 @@ By the end of Sprint 6, a member can ask the AI assistant about their organizati
 
 ---
 
+## Subtasks
+
+**US-9.1 — Ask the AI about my org**
+- [ ] `POST /assistant/ask` endpoint
+- [ ] Retrieve context from Pinecone (messages + files)
+- [ ] Build prompt and call Groq LLM (llama-3.3-70b)
+
+**US-9.2 — AI uses uploaded documents**
+- [ ] Document chunking via LlamaIndex
+- [ ] Embed chunks and store in Pinecone with org namespace
+
+**US-9.3 — Open PDF inline and ask the AI about it**
+- [ ] Inline PDF viewer with selectable page range
+- [ ] Pass active document scope into RAG context
+
+**US-10.1 — Search across org messages**
+- [ ] Vector similarity search endpoint over Pinecone
+- [ ] Global search bar UI in app header
+- [ ] Hydrate result rows from DB with channel context
+
+**US-12.2 — Subscribe to the Pro plan**
+- [ ] Stripe Checkout session endpoint
+- [ ] Stripe webhook handler updates org subscription
+- [ ] Plan-selection UI on billing page
+
+**US-12.3 — Cancel the Pro subscription**
+- [ ] Call Stripe `subscriptions.cancel`
+- [ ] Webhook downgrade flow resets plan limits
+
+**US-12.4 — View the activity log**
+- [ ] `activity_log` table + `GET /activity-log` endpoint
+- [ ] Filterable log UI (actor, action type, date range)
+
+**US-12.5 — Undo a reversible logged action**
+- [ ] Per-action reversal handlers (with safety guard)
+- [ ] Undo button on eligible log entries
+
+---
+
 ## Related Diagrams
 
 ### C4 — Assistant domain (RAG component view)

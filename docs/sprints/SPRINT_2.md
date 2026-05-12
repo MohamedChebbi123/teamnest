@@ -61,6 +61,69 @@ By the end of Sprint 2, an authenticated user can spin up a workspace, invite pe
 
 ---
 
+## Subtasks
+
+**US-6.1 — Create an organization**
+- [ ] Org creation form UI (name, description, logo)
+- [ ] `POST /organizations` endpoint
+- [ ] Optional logo upload via Cloudinary
+
+**US-6.2 — Join org with invite**
+- [ ] Invite-acceptance endpoint resolving token → membership
+- [ ] Join-via-invite-link landing UI
+
+**US-6.3 — See all org members**
+- [ ] `GET /organizations/{id}/members` with pagination
+- [ ] Members list UI with search filter
+
+**US-6.4 — See teams in my org**
+- [ ] `GET /organizations/{id}/teams` endpoint
+- [ ] Teams grid/list UI with navigation
+
+**US-11.1 — Invite members by email**
+- [ ] `POST /invitations` endpoint generating invite token
+- [ ] Send invite email via Resend
+- [ ] Invite form UI (single + bulk)
+
+**US-11.2 — Accept or reject join requests**
+- [ ] `GET /organizations/{id}/join-requests` for admins
+- [ ] Accept / reject endpoints with permission check
+- [ ] Admin review UI with bulk actions
+
+**US-11.3 — Update organization**
+- [ ] `PATCH /organizations/{id}` for metadata edits
+- [ ] Org-settings form UI
+
+**US-11.4 — Create teams**
+- [ ] `POST /teams` scoped to organization
+- [ ] Team-creation modal with lead selector
+
+**US-12.1 — Delete organization**
+- [ ] `DELETE /organizations/{id}` restricted to owner
+- [ ] Cascade cleanup of teams, channels, memberships
+
+**US-13.1 — Update or delete team**
+- [ ] `PATCH /teams/{id}` and `DELETE /teams/{id}`
+- [ ] Team-settings page with destructive-action confirm
+
+**US-13.2 — Add members to team**
+- [ ] `POST /teams/{id}/members` endpoint
+- [ ] Member-picker UI sourcing org directory
+
+**US-13.3 — Grant or revoke member permissions**
+- [ ] Permission/role field on team membership
+- [ ] Role-update endpoint with lead-only guard
+
+**US-13.4 — Kick a member**
+- [ ] `DELETE /teams/{id}/members/{userId}` endpoint
+- [ ] Confirmation dialog before removal
+
+**US-15.1 — View teammate profile**
+- [ ] `GET /users/{id}` returning public profile fields
+- [ ] Teammate profile page UI
+
+---
+
 ## Related Diagrams
 
 ### C4 — Organization domain (component view)

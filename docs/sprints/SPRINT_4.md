@@ -48,6 +48,56 @@ By the end of Sprint 4, any signed-in user — with or without an organization �
 
 ---
 
+## Subtasks
+
+**US-3.1 — Send a direct message**
+- [ ] `POST /direct-messages` endpoint
+- [ ] WebSocket `/ws/direct-messages` broadcast to recipient
+- [ ] DM thread UI
+
+**US-3.2 — Edit, delete and attach files in DMs**
+- [ ] `PATCH` / `DELETE /direct-messages/{id}` with owner check
+- [ ] File attach via Cloudinary handler
+
+**US-3.3 — Search a DM thread**
+- [ ] Thread-scoped search endpoint
+- [ ] Search input + result highlighting in DM UI
+
+**US-3.4 — Typing indicators in DMs**
+- [ ] WS `typing` event (start / stop)
+- [ ] Typing-dots indicator component
+
+**US-3.5 — List my DM conversations**
+- [ ] `GET /direct-messages/conversations` with last-message preview
+- [ ] DM inbox UI with unread badges
+
+**US-4.1 — Send a friend request**
+- [ ] `POST /friend-requests` endpoint
+- [ ] Friend search + request UI
+
+**US-4.2 — Accept, reject or remove friends**
+- [ ] Accept / reject / remove endpoints
+- [ ] Friends list UI with status filters
+
+**US-4.3 — Block or unblock users**
+- [ ] `POST /blocks` and `DELETE /blocks/{id}` endpoints
+- [ ] Block check enforced on DM send
+
+**US-5.1 — Create a group chat**
+- [ ] `POST /group-chats` with member list
+- [ ] Group-creation modal with member picker
+
+**US-5.2 — Add, edit or delete a group chat**
+- [ ] `PATCH` / `DELETE /group-chats/{id}` + member endpoints
+- [ ] Group settings UI
+
+**US-5.3 — Real-time group messages**
+- [ ] WebSocket `/ws/group-chats` broadcast
+- [ ] Edit / delete endpoints with owner check
+- [ ] Reuse message-renderer component
+
+---
+
 ## Related Diagrams
 
 ### C4 — Messaging domain (component view)

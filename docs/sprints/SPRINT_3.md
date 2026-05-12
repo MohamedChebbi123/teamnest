@@ -49,6 +49,60 @@ By the end of Sprint 3, members can create channels (general or announcement) in
 
 ---
 
+## Subtasks
+
+**US-7.1 — Create org channels (general / announcement)**
+- [ ] `POST /channels` with channel-type enum
+- [ ] Channel-creation modal in UI
+
+**US-7.2 — Real-time chat in channels**
+- [ ] WebSocket `/ws/messages` connection lifecycle
+- [ ] Broadcast send → all channel subscribers
+- [ ] Persist messages to DB on send
+
+**US-7.3 — Edit or delete own messages**
+- [ ] `PATCH /messages/{id}` and `DELETE /messages/{id}` with owner check
+- [ ] Inline edit + delete-confirm UI
+
+**US-7.4 — Load older messages on scroll**
+- [ ] Cursor-paginated history endpoint
+- [ ] Infinite-scroll handler in chat view
+
+**US-7.5 — Reply to a message**
+- [ ] `parent_message_id` field on messages
+- [ ] Reply / thread UI rendering
+
+**US-7.6 — Pin and unpin messages**
+- [ ] `POST /messages/{id}/pin` and unpin endpoint
+- [ ] Pinned-messages panel in channel UI
+
+**US-7.7 — Search messages in a channel**
+- [ ] Full-text search endpoint (Postgres FTS)
+- [ ] Channel search bar with result list
+
+**US-7.8 — Share files in channels**
+- [ ] Upload pipeline via Cloudinary handler
+- [ ] Attachment chip rendering in messages
+- [ ] Index file contents in Pinecone
+
+**US-7.9 — Mention teammates with @tag**
+- [ ] Mention parser on message send
+- [ ] Notification fan-out to mentioned users
+
+**US-13.5 — Create channels in my team**
+- [ ] Team-scoped `POST /channels` with lead-only check
+- [ ] Team channel list in team page
+
+**US-15.2 — Chat in team channels**
+- [ ] Reuse WS messaging for team-scoped channels
+- [ ] Access-control check on team membership
+
+**US-15.3 — File list + inline PDF viewing**
+- [ ] `GET /channels/{id}/files` endpoint
+- [ ] Inline PDF viewer component (react-pdf)
+
+---
+
 ## Related Diagrams
 
 ### C4 — Messaging domain (component view)
