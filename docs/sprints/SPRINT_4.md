@@ -22,29 +22,29 @@ By the end of Sprint 4, any signed-in user — with or without an organization �
 
 ### User — Direct Messages
 
-| ID     | Priority | Story                                                                                         | Subtasks                                                                                                            |
-| ------ | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| US-3.1 | High     | As a **user**, I want to send a direct message, so that we can talk privately.                | 1. `POST /direct-messages` endpoint<br>2. WS `/ws/direct-messages` broadcast<br>3. DM thread UI                     |
-| US-3.2 | Medium   | As a **user**, I want to edit, delete and attach files in my DMs, so that I control my chats. | 1. `PATCH` / `DELETE /direct-messages/{id}` with owner check<br>2. File attach via Cloudinary                       |
-| US-3.3 | Medium   | As a **user**, I want to search a DM thread, so that I can find a past message.               | 1. Thread-scoped search endpoint<br>2. Search input + result highlighting                                           |
-| US-3.4 | Medium   | As a **user**, I want typing indicators in DMs, so that I know when someone's typing.         | 1. WS `typing` event (start / stop)<br>2. Typing-dots indicator component                                           |
-| US-3.5 | Medium   | As a **user**, I want a list of my DM conversations, so that I can resume them.               | 1. `GET /direct-messages/conversations` with last-message preview<br>2. DM inbox UI with unread badges              |
+| ID     | Epic             | Priority | Story                                                                                         | Subtasks                                                                                                            |
+| ------ | ---------------- | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| US-3.1 | Direct Messages  | High     | As a **user**, I want to send a direct message, so that we can talk privately.                | 1. `POST /direct-messages` endpoint<br>2. WS `/ws/direct-messages` broadcast<br>3. DM thread UI                     |
+| US-3.2 | Direct Messages  | Medium   | As a **user**, I want to edit, delete and attach files in my DMs, so that I control my chats. | 1. `PATCH` / `DELETE /direct-messages/{id}` with owner check<br>2. File attach via Cloudinary                       |
+| US-3.3 | Search           | Medium   | As a **user**, I want to search a DM thread, so that I can find a past message.               | 1. Thread-scoped search endpoint<br>2. Search input + result highlighting                                           |
+| US-3.4 | Presence         | Medium   | As a **user**, I want typing indicators in DMs, so that I know when someone's typing.         | 1. WS `typing` event (start / stop)<br>2. Typing-dots indicator component                                           |
+| US-3.5 | Inbox            | Medium   | As a **user**, I want a list of my DM conversations, so that I can resume them.               | 1. `GET /direct-messages/conversations` with last-message preview<br>2. DM inbox UI with unread badges              |
 
 ### User — Friends
 
-| ID     | Priority | Story                                                                                    | Subtasks                                                                                              |
-| ------ | -------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| US-4.1 | Medium   | As a **user**, I want to send a friend request, so that I can connect with someone.      | 1. `POST /friend-requests` endpoint<br>2. Friend search + request UI                                  |
-| US-4.2 | Medium   | As a **user**, I want to accept, reject or remove friends, so that I curate my contacts. | 1. Accept / reject / remove endpoints<br>2. Friends list UI with status filters                       |
-| US-4.3 | Low      | As a **user**, I want to block or unblock users, so that I can stop unwanted contact.    | 1. `POST /blocks` and `DELETE /blocks/{id}`<br>2. Block check enforced on DM send                     |
+| ID     | Epic           | Priority | Story                                                                                    | Subtasks                                                                                              |
+| ------ | -------------- | -------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| US-4.1 | Social Graph   | Medium   | As a **user**, I want to send a friend request, so that I can connect with someone.      | 1. `POST /friend-requests` endpoint<br>2. Friend search + request UI                                  |
+| US-4.2 | Social Graph   | Medium   | As a **user**, I want to accept, reject or remove friends, so that I curate my contacts. | 1. Accept / reject / remove endpoints<br>2. Friends list UI with status filters                       |
+| US-4.3 | Social Graph   | Low      | As a **user**, I want to block or unblock users, so that I can stop unwanted contact.    | 1. `POST /blocks` and `DELETE /blocks/{id}`<br>2. Block check enforced on DM send                     |
 
 ### User — Group Chats
 
-| ID     | Priority | Story                                                                                                  | Subtasks                                                                                                  |
-| ------ | -------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| US-5.1 | High     | As a **user**, I want to create a group chat, so that small groups can talk.                           | 1. `POST /group-chats` with member list<br>2. Group-creation modal with member picker                     |
-| US-5.2 | Medium   | As a **user**, I want to add, edit or delete a group chat, so that I can manage it.                    | 1. `PATCH` / `DELETE /group-chats/{id}` + member endpoints<br>2. Group settings UI                        |
-| US-5.3 | High     | As a **user**, I want to send, edit and delete group messages in real time, so that we can collaborate. | 1. WS `/ws/group-chats` broadcast<br>2. Edit / delete endpoints with owner check<br>3. Reuse message renderer |
+| ID     | Epic         | Priority | Story                                                                                                  | Subtasks                                                                                                  |
+| ------ | ------------ | -------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| US-5.1 | Group Chats  | High     | As a **user**, I want to create a group chat, so that small groups can talk.                           | 1. `POST /group-chats` with member list<br>2. Group-creation modal with member picker                     |
+| US-5.2 | Group Chats  | Medium   | As a **user**, I want to add, edit or delete a group chat, so that I can manage it.                    | 1. `PATCH` / `DELETE /group-chats/{id}` + member endpoints<br>2. Group settings UI                        |
+| US-5.3 | Group Chats  | High     | As a **user**, I want to send, edit and delete group messages in real time, so that we can collaborate. | 1. WS `/ws/group-chats` broadcast<br>2. Edit / delete endpoints with owner check<br>3. Reuse message renderer |
 
 ---
 

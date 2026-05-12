@@ -22,30 +22,30 @@ By the end of Sprint 3, members can create channels (general or announcement) in
 
 ### Member
 
-| ID     | Priority | Story                                                                                                    | Subtasks                                                                                                                       |
-| ------ | -------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| US-7.1 | High     | As a **member**, I want to create org channels (general or announcement), so that topics stay organized. | 1. `POST /channels` with channel-type enum<br>2. Channel-creation modal in UI                                                  |
-| US-7.2 | High     | As a **member**, I want to chat in channels in real time, so that conversations feel instant.            | 1. WebSocket `/ws/messages` connection lifecycle<br>2. Broadcast send → channel subscribers<br>3. Persist messages on send     |
-| US-7.3 | High     | As a **member**, I want to edit or delete my own messages, so that I can fix mistakes.                   | 1. `PATCH` / `DELETE /messages/{id}` with owner check<br>2. Inline edit + delete-confirm UI                                    |
-| US-7.4 | High     | As a **member**, I want to load older messages on scroll, so that history loads smoothly.                | 1. Cursor-paginated history endpoint<br>2. Infinite-scroll handler in chat view                                                |
-| US-7.5 | Medium   | As a **member**, I want to reply to a message, so that threads stay readable.                            | 1. `parent_message_id` field on messages<br>2. Reply / thread UI rendering                                                     |
-| US-7.6 | Medium   | As a **member**, I want to pin and unpin messages, so that important info is easy to find.               | 1. `POST /messages/{id}/pin` and unpin endpoint<br>2. Pinned-messages panel in channel UI                                      |
-| US-7.7 | Medium   | As a **member**, I want to search messages in a channel, so that I can find past discussions.            | 1. Full-text search endpoint (Postgres FTS)<br>2. Channel search bar with result list                                          |
-| US-7.8 | Medium   | As a **member**, I want to share files in channels, so that documents stay with the conversation.        | 1. Upload pipeline via Cloudinary<br>2. Attachment chip rendering in messages<br>3. Index file contents in Pinecone            |
-| US-7.9 | Medium   | As a **member**, I want to mention teammates with `@tag`, so that they get notified.                     | 1. Mention parser on message send<br>2. Notification fan-out to mentioned users                                                |
+| ID     | Epic                 | Priority | Story                                                                                                    | Subtasks                                                                                                                       |
+| ------ | -------------------- | -------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| US-7.1 | Channel Management   | High     | As a **member**, I want to create org channels (general or announcement), so that topics stay organized. | 1. `POST /channels` with channel-type enum<br>2. Channel-creation modal in UI                                                  |
+| US-7.2 | Real-time Messaging  | High     | As a **member**, I want to chat in channels in real time, so that conversations feel instant.            | 1. WebSocket `/ws/messages` connection lifecycle<br>2. Broadcast send → channel subscribers<br>3. Persist messages on send     |
+| US-7.3 | Real-time Messaging  | High     | As a **member**, I want to edit or delete my own messages, so that I can fix mistakes.                   | 1. `PATCH` / `DELETE /messages/{id}` with owner check<br>2. Inline edit + delete-confirm UI                                    |
+| US-7.4 | Real-time Messaging  | High     | As a **member**, I want to load older messages on scroll, so that history loads smoothly.                | 1. Cursor-paginated history endpoint<br>2. Infinite-scroll handler in chat view                                                |
+| US-7.5 | Threads              | Medium   | As a **member**, I want to reply to a message, so that threads stay readable.                            | 1. `parent_message_id` field on messages<br>2. Reply / thread UI rendering                                                     |
+| US-7.6 | Message Pinning      | Medium   | As a **member**, I want to pin and unpin messages, so that important info is easy to find.               | 1. `POST /messages/{id}/pin` and unpin endpoint<br>2. Pinned-messages panel in channel UI                                      |
+| US-7.7 | Search               | Medium   | As a **member**, I want to search messages in a channel, so that I can find past discussions.            | 1. Full-text search endpoint (Postgres FTS)<br>2. Channel search bar with result list                                          |
+| US-7.8 | File Sharing         | Medium   | As a **member**, I want to share files in channels, so that documents stay with the conversation.        | 1. Upload pipeline via Cloudinary<br>2. Attachment chip rendering in messages<br>3. Index file contents in Pinecone            |
+| US-7.9 | Mentions             | Medium   | As a **member**, I want to mention teammates with `@tag`, so that they get notified.                     | 1. Mention parser on message send<br>2. Notification fan-out to mentioned users                                                |
 
 ### Team Lead
 
-| ID      | Priority | Story                                                                                          | Subtasks                                                                                          |
-| ------- | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| US-13.5 | Medium   | As a **team lead**, I want to create channels in my team, so that the team has its own spaces. | 1. Team-scoped `POST /channels` with lead-only check<br>2. Team channel list in team page         |
+| ID      | Epic                 | Priority | Story                                                                                          | Subtasks                                                                                          |
+| ------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| US-13.5 | Channel Management   | Medium   | As a **team lead**, I want to create channels in my team, so that the team has its own spaces. | 1. Team-scoped `POST /channels` with lead-only check<br>2. Team channel list in team page         |
 
 ### Team Member
 
-| ID      | Priority | Story                                                                                                                              | Subtasks                                                                                          |
-| ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| US-15.2 | High     | As a **team member**, I want to chat in my team's channels, so that I can collaborate with my team.                                | 1. Reuse WS messaging for team-scoped channels<br>2. Access-control check on team membership      |
-| US-15.3 | Low      | As a **team member**, I want a file list per team channel with inline PDF viewing, so that I can find and read attachments easily. | 1. `GET /channels/{id}/files` endpoint<br>2. Inline PDF viewer component (react-pdf)              |
+| ID      | Epic                 | Priority | Story                                                                                                                              | Subtasks                                                                                          |
+| ------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| US-15.2 | Real-time Messaging  | High     | As a **team member**, I want to chat in my team's channels, so that I can collaborate with my team.                                | 1. Reuse WS messaging for team-scoped channels<br>2. Access-control check on team membership      |
+| US-15.3 | File Sharing         | Low      | As a **team member**, I want a file list per team channel with inline PDF viewing, so that I can find and read attachments easily. | 1. `GET /channels/{id}/files` endpoint<br>2. Inline PDF viewer component (react-pdf)              |
 
 ---
 

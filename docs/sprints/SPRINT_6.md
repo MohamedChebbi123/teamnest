@@ -22,21 +22,21 @@ By the end of Sprint 6, a member can ask the AI assistant about their organizati
 
 ### Member — AI & Search
 
-| ID      | Priority | Story                                                                                                                | Subtasks                                                                                                                  |
-| ------- | -------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| US-9.1  | Medium   | As a **member**, I want to ask the AI about my org, so that I get quick answers.                                     | 1. `POST /assistant/ask` endpoint<br>2. Retrieve context from Pinecone<br>3. Build prompt + call Groq LLM (llama-3.3-70b) |
-| US-9.2  | Low      | As a **member**, I want the AI to use our uploaded documents, so that answers come from our files.                   | 1. Document chunking via LlamaIndex<br>2. Embed chunks + store in Pinecone with org namespace                             |
-| US-9.3  | Low      | As a **member**, I want to open a PDF inline and ask the AI about it, so that I can extract answers from long files. | 1. Inline PDF viewer with selectable page range<br>2. Pass active document scope into RAG context                         |
-| US-10.1 | High     | As a **member**, I want to search across org messages, so that I find info fast.                                     | 1. Vector similarity search endpoint over Pinecone<br>2. Global search bar UI in header<br>3. Hydrate results from DB     |
+| ID      | Epic              | Priority | Story                                                                                                                | Subtasks                                                                                                                  |
+| ------- | ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| US-9.1  | AI Assistant (RAG) | Medium  | As a **member**, I want to ask the AI about my org, so that I get quick answers.                                     | 1. `POST /assistant/ask` endpoint<br>2. Retrieve context from Pinecone<br>3. Build prompt + call Groq LLM (llama-3.3-70b) |
+| US-9.2  | AI Assistant (RAG) | Low     | As a **member**, I want the AI to use our uploaded documents, so that answers come from our files.                   | 1. Document chunking via LlamaIndex<br>2. Embed chunks + store in Pinecone with org namespace                             |
+| US-9.3  | AI Assistant (RAG) | Low     | As a **member**, I want to open a PDF inline and ask the AI about it, so that I can extract answers from long files. | 1. Inline PDF viewer with selectable page range<br>2. Pass active document scope into RAG context                         |
+| US-10.1 | Global Search      | High    | As a **member**, I want to search across org messages, so that I find info fast.                                     | 1. Vector similarity search endpoint over Pinecone<br>2. Global search bar UI in header<br>3. Hydrate results from DB     |
 
 ### Org Owner — Billing, Logs & Undo
 
-| ID      | Priority | Story                                                                                                  | Subtasks                                                                                                                  |
-| ------- | -------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| US-12.2 | High     | As an **org owner**, I want to subscribe to the Pro plan, so that I can unlock plan limits.            | 1. Stripe Checkout session endpoint<br>2. Stripe webhook updates org subscription<br>3. Plan-selection UI on billing page |
-| US-12.3 | High     | As an **org owner**, I want to cancel the Pro subscription, so that I can downgrade.                   | 1. Call Stripe `subscriptions.cancel`<br>2. Webhook downgrade flow resets plan limits                                     |
-| US-12.4 | Medium   | As an **owner or admin**, I want to view the activity log, so that I have an audit trail.              | 1. `activity_log` table + `GET /activity-log` endpoint<br>2. Filterable log UI (actor, action, date range)                |
-| US-12.5 | Low      | As an **org owner**, I want to undo a reversible logged action, so that I can recover from a mistake.  | 1. Per-action reversal handlers (with safety guard)<br>2. Undo button on eligible log entries                             |
+| ID      | Epic           | Priority | Story                                                                                                  | Subtasks                                                                                                                  |
+| ------- | -------------- | -------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| US-12.2 | Billing        | High     | As an **org owner**, I want to subscribe to the Pro plan, so that I can unlock plan limits.            | 1. Stripe Checkout session endpoint<br>2. Stripe webhook updates org subscription<br>3. Plan-selection UI on billing page |
+| US-12.3 | Billing        | High     | As an **org owner**, I want to cancel the Pro subscription, so that I can downgrade.                   | 1. Call Stripe `subscriptions.cancel`<br>2. Webhook downgrade flow resets plan limits                                     |
+| US-12.4 | Activity Log   | Medium   | As an **owner or admin**, I want to view the activity log, so that I have an audit trail.              | 1. `activity_log` table + `GET /activity-log` endpoint<br>2. Filterable log UI (actor, action, date range)                |
+| US-12.5 | Activity Log   | Low      | As an **org owner**, I want to undo a reversible logged action, so that I can recover from a mistake.  | 1. Per-action reversal handlers (with safety guard)<br>2. Undo button on eligible log entries                             |
 
 ---
 
