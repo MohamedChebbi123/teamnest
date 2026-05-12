@@ -297,3 +297,9 @@ sequenceDiagram
     deactivate API
     FE-->>-User: Display file
 ```
+
+---
+
+## Conclusion
+
+Sprint 3 turns the workspace into a live collaboration tool. Members exchange messages instantly inside org or team channels, edit and pin them, scroll back through history, search past discussions, attach files, and mention each other with `@tag`. The big infrastructural wins are the WebSocket manager, the Cloudinary upload pipeline, and the Pinecone indexing of channel content — all three are reused by every later real-time or AI-driven feature (DMs in Sprint 4, notifications in Sprint 5, the assistant and global search in Sprint 6). After this sprint TeamNest is no longer a static workspace but a real-time platform.

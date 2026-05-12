@@ -402,3 +402,9 @@ sequenceDiagram
     deactivate API
     FE-->>-Lead: Result
 ```
+
+---
+
+## Conclusion
+
+Sprint 2 turns isolated users into a structured workspace. Admins can stand up an organisation, onboard people through invitations or join requests, and carve the org into teams led by appointed leads with fine-grained role permissions. Owners hold the kill-switch with delete, and every member now has a directory view of who they work with. The `Organization`, `Team`, `OrganizationMember`, and `TeamRole` entities introduced here become the scoping unit for every feature that follows — channels, tasks, billing, and the activity log all attach to an organisation, so this sprint is what makes the rest of TeamNest multi-tenant.

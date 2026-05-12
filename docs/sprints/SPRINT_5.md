@@ -275,3 +275,9 @@ sequenceDiagram
     deactivate API
     FE-->>-Manager: Result
 ```
+
+---
+
+## Conclusion
+
+Sprint 5 adds the second half of "ship work": teams now have a real task tracker on top of their chat. Leads create tasks with assignees and due dates, split them into subtasks, attach files, and approve or reject submissions; assignees own their queue and report progress through a state machine. The notifications surface — mentions, DMs, friend events, and now task events — converges into a single real-time inbox over the existing WebSocket manager. With `Task`, `TaskAssignee`, `TaskAttachment`, and `Notification` in place, every meaningful action a member takes is now both trackable and broadcastable, which sets up the activity log and AI grounding work in Sprint 6.

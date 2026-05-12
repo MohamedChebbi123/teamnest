@@ -325,3 +325,9 @@ sequenceDiagram
     end
     deactivate API
 ```
+
+---
+
+## Conclusion
+
+Sprint 4 rounds out the conversational side of TeamNest by covering everything that lives outside a channel: 1:1 direct messages with edit/delete/search/typing/attachments, multi-user group chats with full lifecycle management, and a friends graph backed by requests, acceptance, removal and blocking. Every piece reuses the WebSocket manager and Cloudinary pipeline built in Sprint 3 — no new transport, just new domain. The `DirectMessage`, `GroupChat`, `Friendship`, and `BlockedUser` entities also give later sprints the hooks they need: notifications in Sprint 5 fan out over the same channels, and the assistant in Sprint 6 can mine DMs for context. Users can now communicate both inside and outside an organisation.

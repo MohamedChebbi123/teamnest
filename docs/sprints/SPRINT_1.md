@@ -304,3 +304,9 @@ sequenceDiagram
     deactivate API
     FE-->>-User: Result
 ```
+
+---
+
+## Conclusion
+
+Sprint 1 closes with a complete, self-contained identity foundation. Any visitor can sign up, prove ownership of their email, log in across devices with rotating refresh tokens, recover access, and personalise their profile — all backed by JWT auth, Cloudinary avatars, and transactional emails via Resend. The `User` and `RefreshToken` domain objects established here are referenced by every subsequent sprint, so the rest of the platform can now safely assume "an authenticated, verified user" as its starting point. Sprint 2 builds directly on top by introducing the organisation as the unit those users will collaborate inside.
