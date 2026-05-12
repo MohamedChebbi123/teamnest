@@ -1,6 +1,6 @@
-# TeamNest — Functional Requirements
+# TeamNest — Functional Requirements (Actor-Based)
 
-This document lists the **functional requirements (FR)** of the TeamNest platform. Each requirement is linked to the **user stories** it implements (see [USER_STORIES.md](USER_STORIES.md)) and tagged with its **sprint** and **priority**.
+This document lists the **functional requirements (FR)** of the TeamNest platform, grouped by **actor (role)**. Each row pairs the requirement with the **user story** it implements, along with its **sprint** and **priority** tags.
 
 ## Legend
 
@@ -9,178 +9,138 @@ This document lists the **functional requirements (FR)** of the TeamNest platfor
 
 ---
 
-## FR-1 — Authentication & Account Lifecycle
+## FR-1 — Visitor
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-1.1 | The system shall allow a visitor to browse the public landing page without authentication. | [US-1.1](USER_STORIES.md#visitor) | S1 | High |
-| FR-1.2 | The system shall allow a visitor to register a new account using email and password. | [US-1.2](USER_STORIES.md#visitor) | S1 | High |
-| FR-1.3 | The system shall send an email verification code and activate the account upon successful confirmation. | [US-2.1](USER_STORIES.md#user) | S1 | High |
-| FR-1.4 | The system shall allow a user to resend the verification code if the previous one expired or was lost. | [US-2.2](USER_STORIES.md#user) | S1 | High |
-| FR-1.5 | The system shall maintain a persistent session via refresh tokens so the user stays signed in across visits. | [US-2.3](USER_STORIES.md#user) | S1 | High |
-| FR-1.6 | The system shall allow a user to log out from the current device or from all active sessions. | [US-2.4](USER_STORIES.md#user) | S1 | High |
-| FR-1.7 | The system shall allow a user to reset a forgotten password through an email-based recovery flow. | [US-2.5](USER_STORIES.md#user) | S1 | High |
-| FR-1.8 | The system shall allow an authenticated user to change their password from the account settings. | [US-2.6](USER_STORIES.md#user) | S1 | Medium |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-1.1 | The system shall allow a visitor to browse the public landing page without authentication. | **US-1.1** — As a visitor, I want to browse the landing page, so that I can learn what TeamNest offers. | S1 | High |
+| FR-1.2 | The system shall allow a visitor to register a new account using email and password. | **US-1.2** — As a visitor, I want to register, so that I can create an account. | S1 | High |
 
 ---
 
-## FR-2 — User Profile & Preferences
+## FR-2 — User
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-2.1 | The system shall allow a user to edit their profile (avatar, display name, country, phone). | [US-2.7](USER_STORIES.md#user) | S1 | Medium |
-| FR-2.2 | The system shall allow a user to set their presence status (online, away, busy, offline). | [US-2.8](USER_STORIES.md#user) | S1 | Low |
-| FR-2.3 | The system shall allow a user to switch between light and dark UI themes. | [US-2.9](USER_STORIES.md#user) | S1 | Low |
-| FR-2.4 | The system shall provide a first-time guided tour introducing the main features. | [US-2.10](USER_STORIES.md#user) | S1 | Low |
-| FR-2.5 | The system shall allow a member to view a teammate's profile within the organization. | [US-15.1](USER_STORIES.md#team-member) | S2 | Low |
-
----
-
-## FR-3 — Organizations
-
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-3.1 | The system shall allow a signed-in user to create an organization and become its owner. | [US-6.1](USER_STORIES.md#member) | S2 | High |
-| FR-3.2 | The system shall allow a user to join an organization through an email invitation. | [US-6.2](USER_STORIES.md#member) | S2 | High |
-| FR-3.3 | The system shall display the list of all members of an organization. | [US-6.3](USER_STORIES.md#member) | S2 | High |
-| FR-3.4 | The system shall display the list of all teams within an organization. | [US-6.4](USER_STORIES.md#member) | S2 | High |
-| FR-3.5 | The system shall allow an org admin to invite members by email. | [US-11.1](USER_STORIES.md#org-admin) | S2 | High |
-| FR-3.6 | The system shall allow an org admin to accept or reject pending join requests. | [US-11.2](USER_STORIES.md#org-admin) | S2 | High |
-| FR-3.7 | The system shall allow an org admin to update organization metadata (name, logo, description). | [US-11.3](USER_STORIES.md#org-admin) | S2 | Medium |
-| FR-3.8 | The system shall allow the org owner to delete the organization. | [US-12.1](USER_STORIES.md#org-owner) | S2 | Medium |
-
----
-
-## FR-4 — Teams & Permissions
-
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-4.1 | The system shall allow an org admin to create teams inside the organization. | [US-11.4](USER_STORIES.md#org-admin) | S2 | High |
-| FR-4.2 | The system shall allow a team lead to update or delete their team. | [US-13.1](USER_STORIES.md#team-lead) | S2 | Medium |
-| FR-4.3 | The system shall allow a team lead to add members to their team from the org pool. | [US-13.2](USER_STORIES.md#team-lead) | S2 | High |
-| FR-4.4 | The system shall allow a team lead to grant or revoke a member's team-scoped permissions. | [US-13.3](USER_STORIES.md#team-lead) | S2 | Medium |
-| FR-4.5 | The system shall allow a team lead to remove (kick) a member from their team. | [US-13.4](USER_STORIES.md#team-lead) | S2 | Medium |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-2.1 | The system shall send an email verification code and activate the account upon successful confirmation. | **US-2.1** — As a user, I want to verify my email, so that my account is activated. | S1 | High |
+| FR-2.2 | The system shall allow a user to resend the verification code if the previous one expired or was lost. | **US-2.2** — As a user, I want to resend the verification code, so that I'm not blocked. | S1 | High |
+| FR-2.3 | The system shall maintain a persistent session via refresh tokens so the user stays signed in across visits. | **US-2.3** — As a user, I want to stay signed in, so that I don't log in every visit. | S1 | High |
+| FR-2.4 | The system shall allow a user to log out from the current device or from all active sessions. | **US-2.4** — As a user, I want to log out from one or all devices, so that I can secure my account. | S1 | High |
+| FR-2.5 | The system shall allow a user to reset a forgotten password through an email-based recovery flow. | **US-2.5** — As a user, I want to reset my password by email, so that I can recover access. | S1 | High |
+| FR-2.6 | The system shall allow an authenticated user to change their password from the account settings. | **US-2.6** — As a user, I want to change my password, so that I can rotate it. | S1 | Medium |
+| FR-2.7 | The system shall allow a user to edit their profile (avatar, display name, country, phone). | **US-2.7** — As a user, I want to edit my profile (avatar, name, country, phone), so that it stays current. | S1 | Medium |
+| FR-2.8 | The system shall allow a user to set their presence status (online, away, busy, offline). | **US-2.8** — As a user, I want to set my presence, so that others know my availability. | S1 | Low |
+| FR-2.9 | The system shall allow a user to switch between light and dark UI themes. | **US-2.9** — As a user, I want light/dark theme, so that the look matches my preference. | S1 | Low |
+| FR-2.10 | The system shall provide a first-time guided tour introducing the main features. | **US-2.10** — As a user, I want a guided tour, so that I learn the basics quickly. | S1 | Low |
+| FR-2.11 | The system shall allow a user to send a direct message to another user. | **US-3.1** — As a user, I want to send a direct message, so that we can talk privately. | S4 | High |
+| FR-2.12 | The system shall allow a user to edit, delete, and attach files in their DMs. | **US-3.2** — As a user, I want to edit, delete and attach files in my DMs, so that I control my chats. | S4 | Medium |
+| FR-2.13 | The system shall allow a user to search through a DM thread. | **US-3.3** — As a user, I want to search a DM thread, so that I can find a past message. | S4 | Medium |
+| FR-2.14 | The system shall display typing indicators in DM conversations. | **US-3.4** — As a user, I want typing indicators in DMs, so that I know when someone's typing. | S4 | Medium |
+| FR-2.15 | The system shall display a list of the user's DM conversations. | **US-3.5** — As a user, I want a list of my DM conversations, so that I can resume them. | S4 | Medium |
+| FR-2.16 | The system shall allow a user to send a friend request to another user. | **US-4.1** — As a user, I want to send a friend request, so that I can connect with someone. | S4 | Medium |
+| FR-2.17 | The system shall allow a user to accept, reject, or remove a friend. | **US-4.2** — As a user, I want to accept, reject or remove friends, so that I curate my contacts. | S4 | Medium |
+| FR-2.18 | The system shall allow a user to block or unblock other users. | **US-4.3** — As a user, I want to block or unblock users, so that I can stop unwanted contact. | S4 | Low |
+| FR-2.19 | The system shall allow a user to create a group chat with multiple participants. | **US-5.1** — As a user, I want to create a group chat, so that small groups can talk. | S4 | High |
+| FR-2.20 | The system shall allow a user to add, edit, or delete a group chat. | **US-5.2** — As a user, I want to add, edit or delete a group chat, so that I can manage it. | S4 | Medium |
+| FR-2.21 | The system shall allow real-time send/edit/delete of group-chat messages. | **US-5.3** — As a user, I want to send, edit and delete group messages in real time, so that we can collaborate. | S4 | High |
 
 ---
 
-## FR-5 — Channels & Real-time Messaging
+## FR-3 — Member
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-5.1 | The system shall allow a member to create org channels (general or announcement). | [US-7.1](USER_STORIES.md#member) | S3 | High |
-| FR-5.2 | The system shall deliver channel messages in real time over WebSockets. | [US-7.2](USER_STORIES.md#member) | S3 | High |
-| FR-5.3 | The system shall allow a member to edit or delete their own messages. | [US-7.3](USER_STORIES.md#member) | S3 | High |
-| FR-5.4 | The system shall paginate channel history and load older messages on scroll. | [US-7.4](USER_STORIES.md#member) | S3 | High |
-| FR-5.5 | The system shall allow a member to reply to a specific message, creating a thread. | [US-7.5](USER_STORIES.md#member) | S3 | Medium |
-| FR-5.6 | The system shall allow a member to pin and unpin important messages in a channel. | [US-7.6](USER_STORIES.md#member) | S3 | Medium |
-| FR-5.7 | The system shall allow a member to search messages within a channel. | [US-7.7](USER_STORIES.md#member) | S3 | Medium |
-| FR-5.8 | The system shall allow a member to share files in channels with persistent storage. | [US-7.8](USER_STORIES.md#member) | S3 | Medium |
-| FR-5.9 | The system shall support `@mention` tagging to notify specific teammates. | [US-7.9](USER_STORIES.md#member) | S3 | Medium |
-| FR-5.10 | The system shall allow a team lead to create channels scoped to their team. | [US-13.5](USER_STORIES.md#team-lead) | S3 | Medium |
-| FR-5.11 | The system shall allow team members to chat in their team's channels. | [US-15.2](USER_STORIES.md#team-member) | S3 | High |
-| FR-5.12 | The system shall display a file list per team channel with inline PDF viewing. | [US-15.3](USER_STORIES.md#team-member) | S3 | Low |
-
----
-
-## FR-6 — Direct Messages & Group Chats
-
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-6.1 | The system shall allow a user to send a direct message to another user. | [US-3.1](USER_STORIES.md#user) | S4 | High |
-| FR-6.2 | The system shall allow a user to edit, delete, and attach files in their DMs. | [US-3.2](USER_STORIES.md#user) | S4 | Medium |
-| FR-6.3 | The system shall allow a user to search through a DM thread. | [US-3.3](USER_STORIES.md#user) | S4 | Medium |
-| FR-6.4 | The system shall display typing indicators in DM conversations. | [US-3.4](USER_STORIES.md#user) | S4 | Medium |
-| FR-6.5 | The system shall display a list of the user's DM conversations. | [US-3.5](USER_STORIES.md#user) | S4 | Medium |
-| FR-6.6 | The system shall allow a user to create a group chat with multiple participants. | [US-5.1](USER_STORIES.md#user) | S4 | High |
-| FR-6.7 | The system shall allow a user to add, edit, or delete a group chat. | [US-5.2](USER_STORIES.md#user) | S4 | Medium |
-| FR-6.8 | The system shall allow real-time send/edit/delete of group-chat messages. | [US-5.3](USER_STORIES.md#user) | S4 | High |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-3.1 | The system shall allow a signed-in user to create an organization and become its owner. | **US-6.1** — As a member, I want to create an organization, so that I can host my workspace. | S2 | High |
+| FR-3.2 | The system shall allow a user to join an organization through an email invitation. | **US-6.2** — As a member, I want to join an org with an invite, so that I can collaborate. | S2 | High |
+| FR-3.3 | The system shall display the list of all members of an organization. | **US-6.3** — As a member, I want to see all org members, so that I have an overview. | S2 | High |
+| FR-3.4 | The system shall display the list of all teams within an organization. | **US-6.4** — As a member, I want to see the teams in my org, so that I can navigate to one. | S2 | High |
+| FR-3.5 | The system shall allow a member to create org channels (general or announcement). | **US-7.1** — As a member, I want to create org channels (general or announcement), so that topics stay organized. | S3 | High |
+| FR-3.6 | The system shall deliver channel messages in real time over WebSockets. | **US-7.2** — As a member, I want to chat in channels in real time, so that conversations feel instant. | S3 | High |
+| FR-3.7 | The system shall allow a member to edit or delete their own messages. | **US-7.3** — As a member, I want to edit or delete my own messages, so that I can fix mistakes. | S3 | High |
+| FR-3.8 | The system shall paginate channel history and load older messages on scroll. | **US-7.4** — As a member, I want to load older messages on scroll, so that history loads smoothly. | S3 | High |
+| FR-3.9 | The system shall allow a member to reply to a specific message, creating a thread. | **US-7.5** — As a member, I want to reply to a message, so that threads stay readable. | S3 | Medium |
+| FR-3.10 | The system shall allow a member to pin and unpin important messages in a channel. | **US-7.6** — As a member, I want to pin and unpin messages, so that important info is easy to find. | S3 | Medium |
+| FR-3.11 | The system shall allow a member to search messages within a channel. | **US-7.7** — As a member, I want to search messages in a channel, so that I can find past discussions. | S3 | Medium |
+| FR-3.12 | The system shall allow a member to share files in channels with persistent storage. | **US-7.8** — As a member, I want to share files in channels, so that documents stay with the conversation. | S3 | Medium |
+| FR-3.13 | The system shall support `@mention` tagging to notify specific teammates. | **US-7.9** — As a member, I want to mention teammates with `@tag`, so that they get notified. | S3 | Medium |
+| FR-3.14 | The system shall deliver real-time notifications for mentions, DMs, friend requests, and task updates. | **US-8.1** — As a member, I want real-time notifications for mentions, DMs, friends and tasks, so that I don't miss anything. | S5 | High |
+| FR-3.15 | The system shall allow a member to view their notification feed and mark items as seen. | **US-8.2** — As a member, I want to view notifications and mark them as seen, so that I stay organized. | S5 | Medium |
+| FR-3.16 | The system shall allow a member to ask the AI assistant questions grounded in their organization's context. | **US-9.1** — As a member, I want to ask the AI about my org, so that I get quick answers. | S6 | Medium |
+| FR-3.17 | The system shall use uploaded organization documents as a retrieval source for AI answers. | **US-9.2** — As a member, I want the AI to use our uploaded documents, so that answers come from our files. | S6 | Low |
+| FR-3.18 | The system shall allow a member to open a PDF inline and ask the AI questions about its contents. | **US-9.3** — As a member, I want to open a PDF inline and ask the AI about it, so that I can extract answers from long files. | S6 | Low |
+| FR-3.19 | The system shall allow a member to search across all org messages from a single search bar. | **US-10.1** — As a member, I want to search across org messages, so that I find info fast. | S6 | High |
 
 ---
 
-## FR-7 — Friends & Contacts
+## FR-4 — Org Admin
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-7.1 | The system shall allow a user to send a friend request to another user. | [US-4.1](USER_STORIES.md#user) | S4 | Medium |
-| FR-7.2 | The system shall allow a user to accept, reject, or remove a friend. | [US-4.2](USER_STORIES.md#user) | S4 | Medium |
-| FR-7.3 | The system shall allow a user to block or unblock other users. | [US-4.3](USER_STORIES.md#user) | S4 | Low |
-
----
-
-## FR-8 — Tasks & Workflow
-
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-8.1 | The system shall allow a team lead to create tasks with assignees and a due date. | [US-14.1](USER_STORIES.md#team-lead) | S5 | High |
-| FR-8.2 | The system shall allow a team lead to edit or delete a task. | [US-14.2](USER_STORIES.md#team-lead) | S5 | High |
-| FR-8.3 | The system shall allow a team lead to break a task into subtasks. | [US-14.3](USER_STORIES.md#team-lead) | S5 | Medium |
-| FR-8.4 | The system shall allow a team lead to approve or reject a task submitted for review. | [US-14.4](USER_STORIES.md#team-lead) | S5 | Medium |
-| FR-8.5 | The system shall allow a team member to add or remove task attachments. | [US-15.4](USER_STORIES.md#team-member) | S5 | Medium |
-| FR-8.6 | The system shall allow an assignee to view all tasks assigned to them. | [US-16.1](USER_STORIES.md#assignee) | S5 | High |
-| FR-8.7 | The system shall allow an assignee to update task status and submit for review. | [US-16.2](USER_STORIES.md#assignee) | S5 | High |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-4.1 | The system shall allow an org admin to invite members by email. | **US-11.1** — As an org admin, I want to invite members by email, so that they can join. | S2 | High |
+| FR-4.2 | The system shall allow an org admin to accept or reject pending join requests. | **US-11.2** — As an org admin, I want to accept or reject join requests, so that I control who gets in. | S2 | High |
+| FR-4.3 | The system shall allow an org admin to update organization metadata (name, logo, description). | **US-11.3** — As an org admin, I want to update the organization, so that I can keep it accurate. | S2 | Medium |
+| FR-4.4 | The system shall allow an org admin to create teams inside the organization. | **US-11.4** — As an org admin, I want to create teams, so that I can group members by project. | S2 | High |
 
 ---
 
-## FR-9 — Notifications
+## FR-5 — Org Owner
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-9.1 | The system shall deliver real-time notifications for mentions, DMs, friend requests, and task updates. | [US-8.1](USER_STORIES.md#member) | S5 | High |
-| FR-9.2 | The system shall allow a member to view their notification feed and mark items as seen. | [US-8.2](USER_STORIES.md#member) | S5 | Medium |
-
----
-
-## FR-10 — AI Assistant
-
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-10.1 | The system shall allow a member to ask the AI assistant questions grounded in their organization's context. | [US-9.1](USER_STORIES.md#member) | S6 | Medium |
-| FR-10.2 | The system shall use uploaded organization documents as a retrieval source for AI answers. | [US-9.2](USER_STORIES.md#member) | S6 | Low |
-| FR-10.3 | The system shall allow a member to open a PDF inline and ask the AI questions about its contents. | [US-9.3](USER_STORIES.md#member) | S6 | Low |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-5.1 | The system shall allow the org owner to delete the organization. | **US-12.1** — As an org owner, I want to delete my organization, so that I can decommission it. | S2 | Medium |
+| FR-5.2 | The system shall allow an org owner to subscribe to the Pro plan via Stripe Checkout. | **US-12.2** — As an org owner, I want to subscribe to the Pro plan, so that I can unlock plan limits. | S6 | High |
+| FR-5.3 | The system shall allow an org owner to cancel the Pro subscription and downgrade. | **US-12.3** — As an org owner, I want to cancel the Pro subscription, so that I can downgrade. | S6 | High |
+| FR-5.4 | The system shall record sensitive actions in an audit log viewable by org owners and admins. | **US-12.4** — As an owner or admin, I want to view the activity log, so that I have an audit trail. | S6 | Medium |
+| FR-5.5 | The system shall allow an org owner to undo a reversible logged action. | **US-12.5** — As an org owner, I want to undo a reversible logged action, so that I can recover from a mistake. | S6 | Low |
 
 ---
 
-## FR-11 — Global Search
+## FR-6 — Team Lead
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-11.1 | The system shall allow a member to search across all org messages from a single search bar. | [US-10.1](USER_STORIES.md#member) | S6 | High |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-6.1 | The system shall allow a team lead to update or delete their team. | **US-13.1** — As a team lead, I want to update or delete my team, so that I can keep it accurate or wind it down. | S2 | Medium |
+| FR-6.2 | The system shall allow a team lead to add members to their team from the org pool. | **US-13.2** — As a team lead, I want to add members to my team, so that they get access. | S2 | High |
+| FR-6.3 | The system shall allow a team lead to grant or revoke a member's team-scoped permissions. | **US-13.3** — As a team lead, I want to grant or revoke a member's permissions, so that responsibilities are clear. | S2 | Medium |
+| FR-6.4 | The system shall allow a team lead to remove (kick) a member from their team. | **US-13.4** — As a team lead, I want to kick a member, so that I can remove unwanted people. | S2 | Medium |
+| FR-6.5 | The system shall allow a team lead to create channels scoped to their team. | **US-13.5** — As a team lead, I want to create channels in my team, so that the team has its own spaces. | S3 | Medium |
+| FR-6.6 | The system shall allow a team lead to create tasks with assignees and a due date. | **US-14.1** — As a team lead, I want to create tasks with assignees and a due date, so that work is tracked. | S5 | High |
+| FR-6.7 | The system shall allow a team lead to edit or delete a task. | **US-14.2** — As a team lead, I want to edit or delete a task, so that I can adjust scope. | S5 | High |
+| FR-6.8 | The system shall allow a team lead to break a task into subtasks. | **US-14.3** — As a team lead, I want to break a task into subtasks, so that I can split large work. | S5 | Medium |
+| FR-6.9 | The system shall allow a team lead to approve or reject a task submitted for review. | **US-14.4** — As a team lead, I want to approve or reject a submitted task, so that quality is checked. | S5 | Medium |
 
 ---
 
-## FR-12 — Billing & Subscriptions
+## FR-7 — Team Member
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-12.1 | The system shall allow an org owner to subscribe to the Pro plan via Stripe Checkout. | [US-12.2](USER_STORIES.md#org-owner) | S6 | High |
-| FR-12.2 | The system shall allow an org owner to cancel the Pro subscription and downgrade. | [US-12.3](USER_STORIES.md#org-owner) | S6 | High |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-7.1 | The system shall allow a member to view a teammate's profile within the organization. | **US-15.1** — As a team member, I want to view a teammate's profile, so that I know their role. | S2 | Low |
+| FR-7.2 | The system shall allow team members to chat in their team's channels. | **US-15.2** — As a team member, I want to chat in my team's channels, so that I can collaborate with my team. | S3 | High |
+| FR-7.3 | The system shall display a file list per team channel with inline PDF viewing. | **US-15.3** — As a team member, I want a file list per team channel with inline PDF viewing, so that I can find and read attachments easily. | S3 | Low |
+| FR-7.4 | The system shall allow a team member to add or remove task attachments. | **US-15.4** — As a team member, I want to add or remove task attachments, so that files travel with the work. | S5 | Medium |
 
 ---
 
-## FR-13 — Audit Log & Governance
+## FR-8 — Assignee
 
-| ID | Functional Requirement | Related User Stories | Sprint | Priority |
-|----|------------------------|----------------------|--------|----------|
-| FR-13.1 | The system shall record sensitive actions in an audit log viewable by org owners and admins. | [US-12.4](USER_STORIES.md#org-owner) | S6 | Medium |
-| FR-13.2 | The system shall allow an org owner to undo a reversible logged action. | [US-12.5](USER_STORIES.md#org-owner) | S6 | Low |
+| ID | Functional Requirement | Related User Story | Sprint | Priority |
+|----|------------------------|--------------------|--------|----------|
+| FR-8.1 | The system shall allow an assignee to view all tasks assigned to them. | **US-16.1** — As an assignee, I want to see my tasks, so that I know what's on my plate. | S5 | High |
+| FR-8.2 | The system shall allow an assignee to update task status and submit for review. | **US-16.2** — As an assignee, I want to update my task status (and submit for review), so that the team sees progress. | S5 | High |
 
 ---
 
 ## Coverage summary
 
-| Module | # of FRs | Sprint(s) |
-|--------|----------|-----------|
-| FR-1 Authentication & Account Lifecycle | 8 | S1 |
-| FR-2 User Profile & Preferences | 5 | S1, S2 |
-| FR-3 Organizations | 8 | S2 |
-| FR-4 Teams & Permissions | 5 | S2 |
-| FR-5 Channels & Real-time Messaging | 12 | S3 |
-| FR-6 Direct Messages & Group Chats | 8 | S4 |
-| FR-7 Friends & Contacts | 3 | S4 |
-| FR-8 Tasks & Workflow | 7 | S5 |
-| FR-9 Notifications | 2 | S5 |
-| FR-10 AI Assistant | 3 | S6 |
-| FR-11 Global Search | 1 | S6 |
-| FR-12 Billing & Subscriptions | 2 | S6 |
-| FR-13 Audit Log & Governance | 2 | S6 |
+| Actor | # of FRs | Sprint(s) |
+|-------|----------|-----------|
+| FR-1 Visitor | 2 | S1 |
+| FR-2 User | 21 | S1, S4 |
+| FR-3 Member | 19 | S2, S3, S5, S6 |
+| FR-4 Org Admin | 4 | S2 |
+| FR-5 Org Owner | 5 | S2, S6 |
+| FR-6 Team Lead | 9 | S2, S3, S5 |
+| FR-7 Team Member | 4 | S2, S3, S5 |
+| FR-8 Assignee | 2 | S5 |
 | **Total** | **66** | **S1–S6** |
