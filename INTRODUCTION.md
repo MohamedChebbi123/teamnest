@@ -29,6 +29,21 @@ Despite the abundance of collaboration tools on the market, most organizations e
 7. Enable subscription billing through Stripe Checkout with webhook-driven state synchronization.
 8. Maintain an audit log of sensitive actions for organization administrators.
 
+## Actors
+
+TeamNest is built around a **stacking role model**: a single person can hold several of the roles below at the same time, scoped per organization, per team, or per task. Permission checks resolve roles **in context** ("is this user an admin *of this org*?", "is this member a lead *of this team*?"), not as global flags.
+
+- **Visitor** — an unauthenticated user. Surface is limited to public pages and the registration/login flows; no protected data is reachable. Their conversion path is registration → email verification, after which they become a User.
+- **User** — the base signed-in identity, independent of any organization. Owns a profile (avatar, display name, country, phone, presence, theme), manages friendships, and initiates direct messages and group chats. Holds session state across devices and can rotate or recover credentials. Every in-org role below inherits from this one.
+- **Member** — a User who belongs to a given organization. Reads the org directory and team list, posts in org channels with edits/pins/replies/mentions/attachments, receives org-scoped real-time notifications, and queries the AI assistant against org-scoped context and documents. Has no administrative powers by default.
+- **Org Admin** — a Member who holds the `ADMIN` role in a specific organization. Inherits all Member capabilities and adds governance: invites members by email, accepts or rejects join requests, creates teams, updates org metadata, and reads the audit log. Cannot delete the organization or manage billing.
+- **Org Owner** — the User who created the organization (exactly one per org). Inherits Org Admin powers and adds lifecycle and commercial control: subscribes to or cancels the Stripe Pro plan, deletes the organization, and may undo reversible logged actions. Plan limits gate features the Owner pays for.
+- **Team Lead** — a Member with elevated rights inside a specific team (not org-wide). Manages team membership within the org's pool, drives team-scoped tasks (assign, reassign, status, review), and administers team-private channels where applicable. Independent of Org Admin — being a Team Lead in one team does not confer admin rights elsewhere.
+- **Team Member** — a Member who belongs to a team within the org. Sees team channels and team tasks, can be assigned work, and may participate in several teams simultaneously, each with its own lead.
+- **Assignee** — a transient, per-task role rather than a persistent membership. Any Team Member (or Member, depending on the task's scope) becomes an Assignee the moment a task is assigned to them, and loses the role on reassignment or closure. Assignees receive task notifications, update statuses, attach files, and request review.
+
+The full set of stories per actor — tagged by sprint and priority — is maintained in [USER_STORIES.md](USER_STORIES.md).
+
 ## Methodology
 
 The project follows an **Agile / Scrum-inspired methodology** organized into **six two-week sprints (~12 weeks total)**. Each sprint delivers a vertical slice the user can actually try, with a clear goal and a Definition of Done that includes automated tests. This approach is justified by three considerations: (i) the scope is broad and benefits from incremental validation; (ii) several features (real-time messaging, billing, AI) carry technical risk that is better surfaced early on a working slice than late on paper; and (iii) the sprint-by-sprint backlog naturally maps to the dissertation chapters, making the engineering work and the academic narrative reinforce each other.
