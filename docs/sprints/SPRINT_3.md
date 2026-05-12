@@ -161,6 +161,58 @@ flowchart TB
     class cloud ext
 ```
 
+### Class Diagram — Channels & Messaging
+
+> Source: section 4 of [class diagram.md](../class%20diagram.md). `File` is reproduced from the cross-cutting section because attachments land in this sprint.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Channel {
+        +int channelId
+        +string name
+        +string mode
+        +datetime createdAt
+        +create(data) Channel
+        +update(data) void
+        +delete() void
+    }
+
+    class Message {
+        +int messageId
+        +string content
+        +bool isDeleted
+        +datetime sentAt
+        +edit(content) void
+        +delete() void
+    }
+
+    class PinnedMessage {
+        +int id
+        +datetime pinnedAt
+        +pin() void
+        +unpin() void
+    }
+
+    class File {
+        +int id
+        +string fileName
+        +string fileUrl
+        +int fileSize
+        +upload(file) File
+        +delete() void
+    }
+
+    Team "1" *-- "0..*" Channel : contains
+    Channel "1" *-- "0..*" Message : holds
+    User "1" --> "0..*" Message : sends
+    Channel "1" *-- "0..*" PinnedMessage : pins
+    Message "1" --> "0..*" PinnedMessage : pinned
+    Channel "1" *-- "0..*" File : in
+    User "1" --> "0..*" File : uploads
+```
+
 ### Sequence — Channel Messaging over WebSocket (US-7.2, US-7.3, US-7.4, US-7.9, US-15.2)
 
 ```mermaid

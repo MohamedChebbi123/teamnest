@@ -139,6 +139,38 @@ flowchart TB
     class emailSvc,cloud ext
 ```
 
+### Class Diagram — Identity & Access
+
+> Source: section 1 of [class diagram.md](../class%20diagram.md).
+
+```mermaid
+classDiagram
+    direction LR
+
+    class User {
+        +int userId
+        +string email
+        +string userTag
+        +string status
+        +bool isVerified
+        +register(data) User
+        +login(credentials) Session
+        +verifyEmail(code) bool
+        +resetPassword(code, newPassword) void
+        +setStatus(status) void
+    }
+
+    class RefreshToken {
+        +string jti
+        +datetime expiresAt
+        +datetime revokedAt
+        +rotate() RefreshToken
+        +revoke() void
+    }
+
+    User "1" *-- "0..*" RefreshToken : owns
+```
+
 ### Sequence — Signup & Email Verification (US-1.2, US-2.1, US-2.2)
 
 ```mermaid

@@ -156,6 +156,35 @@ flowchart TB
     class stripe ext
 ```
 
+### Class Diagram — Billing & Audit Log
+
+> Source: `OrganizationPayment` from section 2 and `AuditLog` from section 8 of [class diagram.md](../class%20diagram.md). The AI assistant and global search operate on existing `Message`, `File`, and `DirectMessage` classes already defined in earlier sprints — they introduce no new persisted domain entities.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class OrganizationPayment {
+        +int subscriptionId
+        +string stripeSubscriptionId
+        +string status
+        +createSubscription() Checkout
+        +cancelSubscription() void
+    }
+
+    class AuditLog {
+        +int id
+        +string action
+        +string targetType
+        +datetime createdAt
+        +record(action, actor) AuditLog
+    }
+
+    Organization "1" *-- "0..*" OrganizationPayment : billed by
+    Organization "1" *-- "0..*" AuditLog : records
+    User "1" --> "0..*" AuditLog : actor
+```
+
 ### Sequence — AI Assistant (RAG) (US-9.1, US-9.2, US-9.3)
 
 ```mermaid

@@ -165,6 +165,81 @@ flowchart TB
 
 > Stripe-related arrows belong to Sprint 6 (Billing). They appear here only because they live in the same domain component; the create-org part of the next sequence is what's in scope for Sprint 2.
 
+### Class Diagram — Organizations, Membership & Teams
+
+> Source: sections 2 and 3 of [class diagram.md](../class%20diagram.md). `OrganizationPayment` is shown here for completeness; the billing flow itself is exercised in Sprint 6.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Organization {
+        +int organizationId
+        +string name
+        +string plan
+        +int ownerId
+        +create(data, owner) Organization
+        +update(data) void
+        +delete() void
+    }
+
+    class OrganizationMember {
+        +int id
+        +string role
+        +assignRole(role) void
+    }
+
+    class PendingMember {
+        +int id
+        +accept() void
+        +reject() void
+    }
+
+    class OrganizationPayment {
+        +int subscriptionId
+        +string stripeSubscriptionId
+        +string status
+        +createSubscription() Checkout
+        +cancelSubscription() void
+    }
+
+    class Team {
+        +int teamId
+        +string name
+        +int teamSize
+        +datetime createdAt
+        +addMembers(userIds) void
+        +kickMember(userId) void
+        +delete() void
+    }
+
+    class TeamMembership {
+        +int teamId
+        +int userId
+    }
+
+    class TeamRole {
+        +int teamRoleId
+        +string role
+        +bool canManageRoles
+        +bool canManageTasks
+        +updatePermissions(data) void
+        +revoke(permission) void
+    }
+
+    User "1" --> "0..*" Organization : owns
+    Organization "1" *-- "0..*" OrganizationMember : has
+    User "1" --> "0..*" OrganizationMember : is
+    Organization "1" *-- "0..*" PendingMember : has
+    User "1" --> "0..*" PendingMember : requests
+    Organization "1" *-- "0..*" OrganizationPayment : billed by
+    Organization "1" *-- "0..*" Team : contains
+    Team "1" *-- "0..*" TeamMembership : has
+    User  "1" --> "0..*" TeamMembership : member of
+    Team "1" *-- "0..*" TeamRole : grants
+    User "1" --> "0..*" TeamRole : assigned
+```
+
 ### Sequence — Create Organization (US-6.1, US-11.3)
 
 ```mermaid

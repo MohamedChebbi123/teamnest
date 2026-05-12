@@ -156,6 +156,86 @@ flowchart TB
     class cloud ext
 ```
 
+### Class Diagram — Direct Messages, Group Chat & Social Graph
+
+> Source: sections 5 and 7 of [class diagram.md](../class%20diagram.md).
+
+```mermaid
+classDiagram
+    direction LR
+
+    class DirectMessage {
+        +int id
+        +string content
+        +datetime sentAt
+        +bool isDeleted
+        +send(receiver, content) DirectMessage
+        +edit(content) void
+        +delete() void
+    }
+
+    class GroupChat {
+        +int id
+        +string groupName
+        +string groupImage
+        +int ownedBy
+        +create(data, owner) GroupChat
+        +addMembers(userIds) void
+        +delete() void
+    }
+
+    class GroupChatMember {
+        +int id
+        +datetime joinedAt
+    }
+
+    class GroupChatMessage {
+        +int id
+        +string content
+        +datetime sentAt
+        +bool isDeleted
+        +send(sender, content) GroupChatMessage
+        +edit(content) void
+        +delete() void
+    }
+
+    class Friendship {
+        +int id
+        +datetime addedAt
+        +remove() void
+    }
+
+    class FriendRequest {
+        +int id
+        +string status
+        +datetime sentAt
+        +accept() Friendship
+        +reject() void
+    }
+
+    class BlockedUser {
+        +int id
+        +datetime blockedAt
+        +unblock() void
+    }
+
+    User "1" --> "0..*" DirectMessage : sends
+    User "1" --> "0..*" DirectMessage : receives
+
+    User "1" --> "0..*" GroupChat : owns
+    GroupChat "1" *-- "1..*" GroupChatMember : has
+    User "1" --> "0..*" GroupChatMember : in
+    GroupChat "1" *-- "0..*" GroupChatMessage : holds
+    User "1" --> "0..*" GroupChatMessage : sends
+
+    User "1" --> "0..*" Friendship : owns
+    User "1" --> "0..*" Friendship : with
+    User "1" --> "0..*" FriendRequest : sent
+    User "1" --> "0..*" FriendRequest : received
+    User "1" --> "0..*" BlockedUser : blocker
+    User "1" --> "0..*" BlockedUser : blocked
+```
+
 ### Sequence — Direct Messages (US-3.1 → US-3.5, US-4.3, US-5.3)
 
 ```mermaid

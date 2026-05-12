@@ -126,6 +126,57 @@ flowchart TB
     class cloud ext
 ```
 
+### Class Diagram — Tasks & Notifications
+
+> Source: section 6 of [class diagram.md](../class%20diagram.md), plus `Notification` from the cross-cutting section.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Task {
+        +int id
+        +string title
+        +string priority
+        +string status
+        +datetime dueDate
+        +updateStatus(status) void
+        +review(action) void
+        +delete() void
+    }
+
+    class TaskAssignee {
+        +int id
+        +datetime assignedAt
+    }
+
+    class TaskAttachment {
+        +int id
+        +string fileName
+        +string fileUrl
+        +upload(file) TaskAttachment
+        +delete() void
+    }
+
+    class Notification {
+        +int id
+        +string type
+        +bool isSeen
+        +datetime createdAt
+        +markSeen() void
+    }
+
+    Team "1" *-- "0..*" Task : owns
+    User "1" --> "0..*" Task : creates
+    Task "1" *-- "0..*" TaskAssignee : has
+    User "1" --> "0..*" TaskAssignee : assigned
+    Task "1" *-- "0..*" TaskAttachment : has
+
+    User "1" *-- "0..*" Notification : receives
+    Message "1" *-- "0..*" Notification : about
+    DirectMessage "1" *-- "0..*" Notification : about
+```
+
 ### Sequence — Task Lifecycle (US-14.x, US-15.4, US-16.x, US-8.1, US-8.2)
 
 **9a. Manager creates a task → assignee is notified (US-14.1, US-8.1)**
