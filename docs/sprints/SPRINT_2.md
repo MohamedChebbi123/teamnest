@@ -22,42 +22,42 @@ By the end of Sprint 2, an authenticated user can spin up a workspace, invite pe
 
 ### Member
 
-| ID     | Epic                  | Priority | Story                                                                              | Subtasks                                                                                                       |
-| ------ | --------------------- | -------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| US-6.1 | Organization Setup    | High     | As a **member**, I want to create an organization, so that I can host my workspace. | **T-6.1.1** Org creation form UI<br>**T-6.1.2** `POST /organizations` endpoint<br>**T-6.1.3** Optional logo upload via Cloudinary  |
-| US-6.2 | Membership            | High     | As a **member**, I want to join an org with an invite, so that I can collaborate.   | **T-6.2.1** Invite-acceptance endpoint (token → membership)<br>**T-6.2.2** Join-via-invite-link landing UI                         |
-| US-6.3 | Directory             | High     | As a **member**, I want to see all org members, so that I have an overview.         | **T-6.3.1** `GET /organizations/{id}/members` with pagination<br>**T-6.3.2** Members list UI with search filter                    |
-| US-6.4 |                       | High     | As a **member**, I want to see the teams in my org, so that I can navigate to one.  | **T-6.4.1** `GET /organizations/{id}/teams` endpoint<br>**T-6.4.2** Teams grid/list UI with navigation                             |
+| Epic                  | ID     | Priority | Story                                                                              | Subtasks                                                                                                       |
+| --------------------- | ------ | -------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Organization Setup    | US-6.1 | High     | As a **member**, I want to create an organization, so that I can host my workspace. | **T-6.1.1** Org creation form UI<br>**T-6.1.2** `POST /organizations` endpoint<br>**T-6.1.3** Optional logo upload via Cloudinary  |
+| Membership            | US-6.2 | High     | As a **member**, I want to join an org with an invite, so that I can collaborate.   | **T-6.2.1** Invite-acceptance endpoint (token → membership)<br>**T-6.2.2** Join-via-invite-link landing UI                         |
+| Directory             | US-6.3 | High     | As a **member**, I want to see all org members, so that I have an overview.         | **T-6.3.1** `GET /organizations/{id}/members` with pagination<br>**T-6.3.2** Members list UI with search filter                    |
+|                       | US-6.4 | High     | As a **member**, I want to see the teams in my org, so that I can navigate to one.  | **T-6.4.1** `GET /organizations/{id}/teams` endpoint<br>**T-6.4.2** Teams grid/list UI with navigation                             |
 
 ### Org Admin
 
-| ID      | Epic                  | Priority | Story                                                                                          | Subtasks                                                                                                                |
-| ------- | --------------------- | -------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| US-11.1 | Membership            | High     | As an **org admin**, I want to invite members by email, so that they can join.                 | **T-11.1.1** `POST /invitations` generates invite token<br>**T-11.1.2** Send invite email via Resend<br>**T-11.1.3** Invite form UI (single + bulk)   |
-| US-11.2 |                       | High     | As an **org admin**, I want to accept or reject join requests, so that I control who gets in.  | **T-11.2.1** `GET /organizations/{id}/join-requests`<br>**T-11.2.2** Accept/reject endpoints<br>**T-11.2.3** Admin review UI with bulk actions        |
-| US-11.3 | Organization Setup    | Medium   | As an **org admin**, I want to update the organization, so that I can keep it accurate.        | **T-11.3.1** `PATCH /organizations/{id}` for metadata<br>**T-11.3.2** Org-settings form UI                                                            |
-| US-11.4 | Team Management       | High     | As an **org admin**, I want to create teams, so that I can group members by project.           | **T-11.4.1** `POST /teams` scoped to organization<br>**T-11.4.2** Team-creation modal with lead selector                                              |
+| Epic                  | ID      | Priority | Story                                                                                          | Subtasks                                                                                                                |
+| --------------------- | ------- | -------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Membership            | US-11.1 | High     | As an **org admin**, I want to invite members by email, so that they can join.                 | **T-11.1.1** `POST /invitations` generates invite token<br>**T-11.1.2** Send invite email via Resend<br>**T-11.1.3** Invite form UI (single + bulk)   |
+|                       | US-11.2 | High     | As an **org admin**, I want to accept or reject join requests, so that I control who gets in.  | **T-11.2.1** `GET /organizations/{id}/join-requests`<br>**T-11.2.2** Accept/reject endpoints<br>**T-11.2.3** Admin review UI with bulk actions        |
+| Organization Setup    | US-11.3 | Medium   | As an **org admin**, I want to update the organization, so that I can keep it accurate.        | **T-11.3.1** `PATCH /organizations/{id}` for metadata<br>**T-11.3.2** Org-settings form UI                                                            |
+| Team Management       | US-11.4 | High     | As an **org admin**, I want to create teams, so that I can group members by project.           | **T-11.4.1** `POST /teams` scoped to organization<br>**T-11.4.2** Team-creation modal with lead selector                                              |
 
 ### Org Owner
 
-| ID      | Epic                    | Priority | Story                                                                                  | Subtasks                                                                                              |
-| ------- | ----------------------- | -------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| US-12.1 | Organization Lifecycle  | Medium   | As an **org owner**, I want to delete my organization, so that I can decommission it.  | **T-12.1.1** `DELETE /organizations/{id}` (owner-only)<br>**T-12.1.2** Cascade cleanup of teams, channels, memberships |
+| Epic                    | ID      | Priority | Story                                                                                  | Subtasks                                                                                              |
+| ----------------------- | ------- | -------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Organization Lifecycle  | US-12.1 | Medium   | As an **org owner**, I want to delete my organization, so that I can decommission it.  | **T-12.1.1** `DELETE /organizations/{id}` (owner-only)<br>**T-12.1.2** Cascade cleanup of teams, channels, memberships |
 
 ### Team Lead
 
-| ID      | Epic               | Priority | Story                                                                                                     | Subtasks                                                                                                  |
-| ------- | ------------------ | -------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| US-13.1 | Team Management    | Medium   | As a **team lead**, I want to update or delete my team, so that I can keep it accurate or wind it down.   | **T-13.1.1** `PATCH /teams/{id}` and `DELETE /teams/{id}`<br>**T-13.1.2** Team-settings page with destructive-action confirm |
-| US-13.2 | Team Membership    | High     | As a **team lead**, I want to add members to my team, so that they get access.                            | **T-13.2.1** `POST /teams/{id}/members` endpoint<br>**T-13.2.2** Member-picker UI sourcing org directory                     |
-| US-13.3 |                    | Medium   | As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear. | **T-13.3.1** Permission/role field on team membership<br>**T-13.3.2** Role-update endpoint with lead-only guard              |
-| US-13.4 |                    | Medium   | As a **team lead**, I want to kick a member, so that I can remove unwanted people.                        | **T-13.4.1** `DELETE /teams/{id}/members/{userId}`<br>**T-13.4.2** Confirmation dialog before removal                        |
+| Epic               | ID      | Priority | Story                                                                                                     | Subtasks                                                                                                  |
+| ------------------ | ------- | -------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Team Management    | US-13.1 | Medium   | As a **team lead**, I want to update or delete my team, so that I can keep it accurate or wind it down.   | **T-13.1.1** `PATCH /teams/{id}` and `DELETE /teams/{id}`<br>**T-13.1.2** Team-settings page with destructive-action confirm |
+| Team Membership    | US-13.2 | High     | As a **team lead**, I want to add members to my team, so that they get access.                            | **T-13.2.1** `POST /teams/{id}/members` endpoint<br>**T-13.2.2** Member-picker UI sourcing org directory                     |
+|                    | US-13.3 | Medium   | As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear. | **T-13.3.1** Permission/role field on team membership<br>**T-13.3.2** Role-update endpoint with lead-only guard              |
+|                    | US-13.4 | Medium   | As a **team lead**, I want to kick a member, so that I can remove unwanted people.                        | **T-13.4.1** `DELETE /teams/{id}/members/{userId}`<br>**T-13.4.2** Confirmation dialog before removal                        |
 
 ### Team Member
 
-| ID      | Epic       | Priority | Story                                                                                | Subtasks                                                                              |
-| ------- | ---------- | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| US-15.1 | Directory  | Low      | As a **team member**, I want to view a teammate's profile, so that I know their role. | **T-15.1.1** `GET /users/{id}` returning public profile fields<br>**T-15.1.2** Teammate profile page UI |
+| Epic       | ID      | Priority | Story                                                                                | Subtasks                                                                              |
+| ---------- | ------- | -------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Directory  | US-15.1 | Low      | As a **team member**, I want to view a teammate's profile, so that I know their role. | **T-15.1.1** `GET /users/{id}` returning public profile fields<br>**T-15.1.2** Teammate profile page UI |
 
 ---
 
