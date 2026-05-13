@@ -25,8 +25,8 @@ By the end of Sprint 5, a team lead can create a task with assignees and a due d
 | ID      | Epic              | Priority | Story                                                                                              | Subtasks                                                                                                  |
 | ------- | ----------------- | -------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | US-14.1 | Task Management   | High     | As a **team lead**, I want to create tasks with assignees and a due date, so that work is tracked. | **T-14.1.1** `POST /tasks` endpoint (team-scoped)<br>**T-14.1.2** Task-creation form with assignee picker + date |
-| US-14.2 | Task Management   | High     | As a **team lead**, I want to edit or delete a task, so that I can adjust scope.                   | **T-14.2.1** `PATCH /tasks/{id}` and `DELETE /tasks/{id}`<br>**T-14.2.2** Task-edit modal with confirm-delete    |
-| US-14.3 | Task Management   | Medium   | As a **team lead**, I want to break a task into subtasks, so that I can split large work.          | **T-14.3.1** Subtask model + `POST /tasks/{id}/subtasks`<br>**T-14.3.2** Subtask list UI under parent task       |
+| US-14.2 |                   | High     | As a **team lead**, I want to edit or delete a task, so that I can adjust scope.                   | **T-14.2.1** `PATCH /tasks/{id}` and `DELETE /tasks/{id}`<br>**T-14.2.2** Task-edit modal with confirm-delete    |
+| US-14.3 |                   | Medium   | As a **team lead**, I want to break a task into subtasks, so that I can split large work.          | **T-14.3.1** Subtask model + `POST /tasks/{id}/subtasks`<br>**T-14.3.2** Subtask list UI under parent task       |
 | US-14.4 | Task Review       | Medium   | As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.      | **T-14.4.1** `POST /tasks/{id}/approve` and `/reject`<br>**T-14.4.2** Review UI with comment field               |
 
 ### Team Member
@@ -40,14 +40,14 @@ By the end of Sprint 5, a team lead can create a task with assignees and a due d
 | ID      | Epic             | Priority | Story                                                                                                        | Subtasks                                                                                              |
 | ------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | US-16.1 | Task Execution   | High     | As an **assignee**, I want to see my tasks, so that I know what's on my plate.                               | **T-16.1.1** `GET /tasks?assignee=me` with status filters<br>**T-16.1.2** "My tasks" dashboard view                |
-| US-16.2 | Task Execution   | High     | As an **assignee**, I want to update my task status (and submit for review), so that the team sees progress. | **T-16.2.1** `PATCH /tasks/{id}/status` with state-machine validation<br>**T-16.2.2** Status selector + submit-for-review |
+| US-16.2 |                  | High     | As an **assignee**, I want to update my task status (and submit for review), so that the team sees progress. | **T-16.2.1** `PATCH /tasks/{id}/status` with state-machine validation<br>**T-16.2.2** Status selector + submit-for-review |
 
 ### Member — Notifications
 
 | ID     | Epic           | Priority | Story                                                                                                                | Subtasks                                                                                                                |
 | ------ | -------------- | -------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | US-8.1 | Notifications  | High     | As a **member**, I want real-time notifications for mentions, DMs, friends and tasks, so that I don't miss anything. | **T-8.1.1** WebSocket `/ws/notifications` channel<br>**T-8.1.2** Fan-out on mention / DM / friend / task events<br>**T-8.1.3** Notification toast |
-| US-8.2 | Notifications  | Medium   | As a **member**, I want to view notifications and mark them as seen, so that I stay organized.                       | **T-8.2.1** `GET /notifications` paginated endpoint<br>**T-8.2.2** `PATCH /notifications/{id}/seen` and mark-all-seen                              |
+| US-8.2 |                | Medium   | As a **member**, I want to view notifications and mark them as seen, so that I stay organized.                       | **T-8.2.1** `GET /notifications` paginated endpoint<br>**T-8.2.2** `PATCH /notifications/{id}/seen` and mark-all-seen                              |
 
 ---
 
