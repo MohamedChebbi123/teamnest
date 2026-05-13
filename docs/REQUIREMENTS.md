@@ -44,12 +44,12 @@ The system is responsible for:
 
 ## 2. Non-Functional Requirements
 
-- **Security** — bcrypt passwords, signed JWTs, rotating refresh tokens, RBAC on every endpoint, HTTPS only
-- **Performance** — real-time messages under 300 ms; REST responses under 500 ms (p95)
-- **Reliability** — 99.5% uptime, auto WebSocket reconnect, idempotent Stripe webhooks, Alembic migrations
-- **Scalability** — stateless API instances; per-org plan quotas enforced server-side
-- **Maintainability** — layered `router → service → model`, OpenAPI docs at `/docs`
-- **Usability** — light/dark theme, inline validation, onboarding tour, WCAG 2.1 AA contrast
-- **Compatibility** — latest two versions of Chrome, Firefox, Safari, Edge; responsive 360–1920 px
-- **Privacy** — AI answers scoped to the user's organization; immutable audit log
-- **Observability** — structured JSON logs, `/health` endpoint, error tracking
+- **Security** — bcrypt password hashing; HS256 JWT access tokens (15-min TTL); rotating refresh tokens stored in DB and delivered via HTTP-only cookies; verification and reset codes hashed with a 10-minute TTL
+- **Authorization** — `current_user` dependency on protected routes; team-scoped permissions via `Team_roles`
+- **Real-time messaging** — channels, DMs, group chats, and voice signalling over FastAPI WebSockets
+- **Plan quotas** — Free plan limited to 5 channels, 10 members, 10 MB per file; Stripe webhooks verified before plan changes
+- **Privacy** — RAG vectors namespaced per team in Pinecone; sensitive actions written to the `Logs` audit table
+- **Maintainability** — layered backend (`routers → services → models`, Pydantic schemas); auto-generated OpenAPI at `/docs`; env-configured CORS
+- **Schema evolution** — Alembic migrations
+- **Testability** — pytest suite covering auth, CRUD, friends/DM, permissions, presence/search
+- **Deployability** — Dockerfile + `docker-compose.yml` with Postgres healthcheck

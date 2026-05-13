@@ -150,12 +150,12 @@ This document lists the **functional requirements (FR)** of the TeamNest platfor
 
 | ID | Non-Functional Requirement | Priority |
 |----|----------------------------|----------|
-| NFR-1 | **Security** — bcrypt passwords, signed JWTs, rotating refresh-token cookies, RBAC on every protected endpoint, HTTPS only. | High |
-| NFR-2 | **Performance** — real-time messages under 300 ms (p95); REST responses under 500 ms (p95). | High |
-| NFR-3 | **Reliability** — 99.5% uptime, auto WebSocket reconnect, idempotent Stripe webhooks, Alembic migrations. | High |
-| NFR-4 | **Scalability** — stateless API instances; per-organization plan quotas enforced server-side. | Medium |
-| NFR-5 | **Maintainability** — layered `router → service → model` architecture; OpenAPI docs at `/docs`. | High |
-| NFR-6 | **Usability** — light/dark theme, inline validation, first-login guided tour, WCAG 2.1 AA contrast. | Medium |
-| NFR-7 | **Compatibility** — latest two versions of Chrome, Firefox, Safari, Edge; responsive 360–1920 px. | High |
-| NFR-8 | **Privacy** — AI answers scoped to the user's organization; immutable audit log for sensitive actions. | High |
-| NFR-9 | **Observability** — structured JSON logs, `/health` endpoint, error tracking in production. | Medium |
+| NFR-1 | **Security** — passwords hashed with `bcrypt` (`utils/hasher.py`); JWT access tokens signed with HS256 and a 15-minute TTL (`utils/jwt_handler.py`); refresh tokens rotated with a new `jti` and stored in the `Refresh_tokens` table; refresh token delivered in an HTTP-only cookie with configurable `Secure`/`SameSite`/`Domain` (`routers/auth_router.py`); email verification and password-reset codes hashed and expire after 10 minutes (`services/auth_service.py`). | High |
+| NFR-2 | **Authorization** — every protected route resolves the caller through the `current_user` dependency (`utils/security.py`); team-scoped permissions checked via the `Team_roles` table. | High |
+| NFR-3 | **Real-time messaging** — channels, DMs, group chats, and voice signalling delivered over FastAPI WebSockets (`utils/Websocket_manager.py`). | High |
+| NFR-4 | **Plan quotas** — Free plan capped at 5 channels, 10 members, and 10 MB per file; Pro plan unlimited (`utils/plan_limits.py`). Stripe webhooks verified with `stripe.Webhook.construct_event` before flipping plan state (`services/org_service.py`). | High |
+| NFR-5 | **Privacy / data scoping** — RAG vectors stored in Pinecone under a `team-{team_id}` namespace so retrieval cannot cross teams (`utils/vector_db_handler.py`); sensitive actions written to the `Logs` audit table via `create_log` (`utils/log_handler.py`). | High |
+| NFR-6 | **Maintainability** — layered backend: `routers/` → `services/` → `models/` with `schemas/` Pydantic DTOs; FastAPI auto-publishes OpenAPI at `/docs`; CORS origins configured by `FRONTEND_URL` env var (`main.py`). | Medium |
+| NFR-7 | **Schema evolution** — database migrations managed by Alembic (`backend/alembic/`). | Medium |
+| NFR-8 | **Testability** — backend test suite with `pytest` covering auth, CRUD, friends/DM, permissions, and presence/search (`backend/tests/`). | Medium |
+| NFR-9 | **Deployability** — backend containerized via `Dockerfile`; full stack (Postgres + backend) brought up by `docker-compose.yml` with a `pg_isready` healthcheck on the database. | Medium |
