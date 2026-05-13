@@ -22,32 +22,32 @@ By the end of Sprint 5, a team lead can create a task with assignees and a due d
 
 ### Team Lead
 
-| Epic              | ID      | Priority | Story                                                                                              | Subtasks                                                                                                  |
-| ----------------- | ------- | -------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Task Management   | US-14.1 | High     | As a **team lead**, I want to create tasks with assignees and a due date, so that work is tracked. | **T-14.1.1** `POST /tasks` endpoint (team-scoped)<br>**T-14.1.2** Task-creation form with assignee picker + date |
-|                   | US-14.2 | High     | As a **team lead**, I want to edit or delete a task, so that I can adjust scope.                   | **T-14.2.1** `PATCH /tasks/{id}` and `DELETE /tasks/{id}`<br>**T-14.2.2** Task-edit modal with confirm-delete    |
-|                   | US-14.3 | Medium   | As a **team lead**, I want to break a task into subtasks, so that I can split large work.          | **T-14.3.1** Subtask model + `POST /tasks/{id}/subtasks`<br>**T-14.3.2** Subtask list UI under parent task       |
-| Task Review       | US-14.4 | Medium   | As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.      | **T-14.4.1** `POST /tasks/{id}/approve` and `/reject`<br>**T-14.4.2** Review UI with comment field               |
+| Epic                    | ID      | Priority | Story                                                                                              | Subtasks                                                                                                         |
+| ----------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Task Creation & Editing | US-14.1 | High     | As a **team lead**, I want to create tasks with assignees and a due date, so that work is tracked. | **T-14.1.1** `POST /tasks` endpoint (team-scoped)<br>**T-14.1.2** Task-creation form with assignee picker + date |
+|                         | US-14.2 | High     | As a **team lead**, I want to edit or delete a task, so that I can adjust scope.                   | **T-14.2.1** `PATCH /tasks/{id}` and `DELETE /tasks/{id}`<br>**T-14.2.2** Task-edit modal with confirm-delete    |
+|                         | US-14.3 | Medium   | As a **team lead**, I want to break a task into subtasks, so that I can split large work.          | **T-14.3.1** Subtask model + `POST /tasks/{id}/subtasks`<br>**T-14.3.2** Subtask list UI under parent task       |
+| Task Approval           | US-14.4 | Medium   | As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.      | **T-14.4.1** `POST /tasks/{id}/approve` and `/reject`<br>**T-14.4.2** Review UI with comment field               |
 
 ### Team Member
 
-| Epic              | ID      | Priority | Story                                                                                               | Subtasks                                                                                                |
-| ----------------- | ------- | -------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Task Attachments  | US-15.4 | Medium   | As a **team member**, I want to add or remove task attachments, so that files travel with the work. | **T-15.4.1** `POST` / `DELETE /tasks/{id}/attachments` via Cloudinary<br>**T-15.4.2** Drag-drop attachment UI on task detail |
+| Epic                  | ID      | Priority | Story                                                                                               | Subtasks                                                                                                                     |
+| --------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Task File Attachments | US-15.4 | Medium   | As a **team member**, I want to add or remove task attachments, so that files travel with the work. | **T-15.4.1** `POST` / `DELETE /tasks/{id}/attachments` via Cloudinary<br>**T-15.4.2** Drag-drop attachment UI on task detail |
 
 ### Assignee
 
-| Epic             | ID      | Priority | Story                                                                                                        | Subtasks                                                                                              |
-| ---------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| Task Execution   | US-16.1 | High     | As an **assignee**, I want to see my tasks, so that I know what's on my plate.                               | **T-16.1.1** `GET /tasks?assignee=me` with status filters<br>**T-16.1.2** "My tasks" dashboard view                |
-|                  | US-16.2 | High     | As an **assignee**, I want to update my task status (and submit for review), so that the team sees progress. | **T-16.2.1** `PATCH /tasks/{id}/status` with state-machine validation<br>**T-16.2.2** Status selector + submit-for-review |
+| Epic                   | ID      | Priority | Story                                                                                                        | Subtasks                                                                                                                  |
+| ---------------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Assignee Task Tracking | US-16.1 | High     | As an **assignee**, I want to see my tasks, so that I know what's on my plate.                               | **T-16.1.1** `GET /tasks?assignee=me` with status filters<br>**T-16.1.2** "My tasks" dashboard view                       |
+|                        | US-16.2 | High     | As an **assignee**, I want to update my task status (and submit for review), so that the team sees progress. | **T-16.2.1** `PATCH /tasks/{id}/status` with state-machine validation<br>**T-16.2.2** Status selector + submit-for-review |
 
 ### Member — Notifications
 
-| Epic           | ID     | Priority | Story                                                                                                                | Subtasks                                                                                                                |
-| -------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Notifications  | US-8.1 | High     | As a **member**, I want real-time notifications for mentions, DMs, friends and tasks, so that I don't miss anything. | **T-8.1.1** WebSocket `/ws/notifications` channel<br>**T-8.1.2** Fan-out on mention / DM / friend / task events<br>**T-8.1.3** Notification toast |
-|                | US-8.2 | Medium   | As a **member**, I want to view notifications and mark them as seen, so that I stay organized.                       | **T-8.2.1** `GET /notifications` paginated endpoint<br>**T-8.2.2** `PATCH /notifications/{id}/seen` and mark-all-seen                              |
+| Epic                    | ID     | Priority | Story                                                                                                                | Subtasks                                                                                                                                          |
+| ----------------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real-time Notifications | US-8.1 | High     | As a **member**, I want real-time notifications for mentions, DMs, friends and tasks, so that I don't miss anything. | **T-8.1.1** WebSocket `/ws/notifications` channel<br>**T-8.1.2** Fan-out on mention / DM / friend / task events<br>**T-8.1.3** Notification toast |
+|                         | US-8.2 | Medium   | As a **member**, I want to view notifications and mark them as seen, so that I stay organized.                       | **T-8.2.1** `GET /notifications` paginated endpoint<br>**T-8.2.2** `PATCH /notifications/{id}/seen` and mark-all-seen                             |
 
 ---
 
