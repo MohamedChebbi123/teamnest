@@ -148,136 +148,14 @@ This document lists the **functional requirements (FR)** of the TeamNest platfor
 
 # TeamNest — Non-Functional Requirements
 
-This section lists the **non-functional requirements (NFR)** of the TeamNest platform, grouped by **quality attribute**. Each NFR specifies a **measurable target** where applicable, along with its **priority**.
-
-## Legend
-
-- **Priority:** **High** · **Medium** · **Low**.
-
----
-
-## NFR-1 — Security
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-1.1 | The system shall hash all user passwords using bcrypt with a cost factor of at least 12 before storage. | No plaintext passwords in DB; bcrypt cost ≥ 12. | High |
-| NFR-1.2 | The system shall sign all access tokens as JWTs using HS256 or stronger and shall expire access tokens within 15 minutes. | Access token TTL ≤ 15 min; signature verified server-side on every request. | High |
-| NFR-1.3 | The system shall issue refresh tokens as HTTP-only, Secure, SameSite cookies and rotate them on each refresh. | Refresh token rotation on every `/refresh` call; old token revoked. | High |
-| NFR-1.4 | The system shall enforce role-based access control (RBAC) on every protected endpoint (org, team, channel, task, billing). | 100% of protected endpoints validate role and scope. | High |
-| NFR-1.5 | The system shall serve all production traffic over HTTPS/TLS 1.2+ and reject plaintext HTTP. | TLS 1.2+ enforced; HTTP redirected to HTTPS. | High |
-| NFR-1.6 | The system shall validate and sanitize all user input on the server side to prevent SQL injection, XSS, and CSRF. | ORM-parameterized queries; output encoding; CSRF token on state-changing forms. | High |
-| NFR-1.7 | The system shall rate-limit authentication endpoints to mitigate brute-force attacks. | ≤ 10 failed login attempts per IP per 15 min. | High |
-| NFR-1.8 | The system shall expire email verification and password reset codes within 15 minutes of issuance. | Code TTL ≤ 15 min; single-use; invalidated after use. | High |
-| NFR-1.9 | The system shall verify Stripe webhook signatures before processing any billing event. | Invalid-signature webhooks rejected with HTTP 400. | High |
-| NFR-1.10 | The system shall not log secrets, passwords, tokens, or full payment details. | Secrets redacted in logs; PCI scope limited to Stripe-hosted forms. | High |
-
----
-
-## NFR-2 — Performance
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-2.1 | The system shall deliver real-time chat messages between connected clients within 300 ms (p95). | WebSocket round-trip latency p95 ≤ 300 ms. | High |
-| NFR-2.2 | The system shall respond to standard REST API requests within 500 ms (p95) under nominal load. | API p95 latency ≤ 500 ms at 100 RPS. | High |
-| NFR-2.3 | The system shall load the initial landing page within 2 seconds on a 4G connection. | First Contentful Paint ≤ 2 s on Slow 4G. | Medium |
-| NFR-2.4 | The system shall paginate channel and DM history with a page size that returns within 400 ms. | History fetch p95 ≤ 400 ms; default page size 50. | High |
-| NFR-2.5 | The system shall return AI assistant answers within 8 seconds for queries grounded in indexed documents. | RAG response p95 ≤ 8 s. | Medium |
-| NFR-2.6 | The system shall stream file uploads to Cloudinary without buffering the full payload in memory. | Memory footprint per upload ≤ 50 MB regardless of file size. | Medium |
-| NFR-2.7 | The system shall support files up to 25 MB per attachment. | Hard limit 25 MB; rejected with HTTP 413 above. | Medium |
-
----
-
-## NFR-3 — Reliability & Availability
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-3.1 | The system shall maintain 99.5% monthly uptime for the API and WebSocket gateway. | Monthly availability ≥ 99.5%. | High |
-| NFR-3.2 | The system shall automatically reconnect WebSocket clients after a transient disconnect with exponential backoff. | Reconnect attempts at 1s, 2s, 4s, 8s, … capped at 30s. | High |
-| NFR-3.3 | The system shall process Stripe webhooks idempotently using the event ID as a deduplication key. | Duplicate webhook delivery produces no duplicate side effects. | High |
-| NFR-3.4 | The system shall apply database schema changes through versioned Alembic migrations with rollback support. | Every schema change has an `upgrade()` and `downgrade()`. | High |
-| NFR-3.5 | The system shall back up the production database daily and retain backups for at least 14 days. | Daily snapshots; 14-day retention; restore drill quarterly. | Medium |
-| NFR-3.6 | The system shall return a typed error response (code + message) on failure rather than leaking stack traces. | No 5xx response includes stack traces in production. | High |
-| NFR-3.7 | The system shall queue undelivered notifications and retry delivery when the recipient reconnects. | Missed notifications surfaced on next session within 5 s. | Medium |
-
----
-
-## NFR-4 — Scalability
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-4.1 | The system shall support at least 1,000 concurrent WebSocket connections per backend instance. | Load test sustains 1,000 sockets at < 70% CPU. | Medium |
-| NFR-4.2 | The system shall scale horizontally by running multiple stateless API instances behind a load balancer. | No in-process session state; sticky sessions not required for REST. | Medium |
-| NFR-4.3 | The system shall enforce per-organization quotas (members, channels, storage) according to the active plan. | Free / Pro plan limits enforced on create endpoints. | High |
-| NFR-4.4 | The system shall index Pinecone embeddings per organization to keep retrieval scoped and parallelizable. | Each org's vectors are isolated by namespace. | Medium |
-
----
-
-## NFR-5 — Maintainability
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-5.1 | The system shall follow a layered backend architecture (`router → service → model`) with clear separation of concerns. | Routers contain no DB queries; services contain no HTTP concerns. | High |
-| NFR-5.2 | The system shall publish an OpenAPI schema at `/docs` reflecting every public endpoint. | OpenAPI coverage = 100% of routers. | High |
-| NFR-5.3 | The system shall maintain unit and integration test coverage of at least 70% on backend services. | `pytest --cov` ≥ 70%. | Medium |
-| NFR-5.4 | The system shall enforce code style and lint rules in CI for both backend (ruff/black) and frontend (eslint/prettier). | CI fails on lint or format violations. | Medium |
-| NFR-5.5 | The system shall use environment variables for all secrets and per-environment configuration. | No secret committed to the repo; `.env.example` provided. | High |
-
----
-
-## NFR-6 — Usability
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-6.1 | The system shall offer both light and dark UI themes and respect the user's OS preference on first visit. | Theme switch persists in user profile. | Low |
-| NFR-6.2 | The system shall display every form validation error inline next to the offending field. | No reliance on alert dialogs for validation. | Medium |
-| NFR-6.3 | The system shall provide a guided tour on first login covering the main features. | Tour shown once; dismissible; replayable from settings. | Low |
-| NFR-6.4 | The system shall meet WCAG 2.1 Level AA contrast ratios on all primary UI surfaces. | Contrast ratio ≥ 4.5:1 for body text. | Medium |
-| NFR-6.5 | The system shall localize date, time, and number formatting based on the user's browser locale. | `Intl` API used; no hardcoded `MM/DD/YYYY`. | Low |
-
----
-
-## NFR-7 — Compatibility & Portability
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-7.1 | The system shall function on the latest two major versions of Chrome, Firefox, Safari, and Edge. | E2E tests pass on Chrome, Firefox, Safari, Edge (latest 2). | High |
-| NFR-7.2 | The system shall provide a responsive UI usable on viewports from 360 px to 1920 px wide. | Layout breakpoints at 640 / 768 / 1024 / 1280 px. | High |
-| NFR-7.3 | The system shall ship as containerized backend and frontend images runnable on any Docker-compatible host. | `docker compose up` boots the full stack locally. | Medium |
-
----
-
-## NFR-8 — Privacy & Compliance
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-8.1 | The system shall scope AI retrieval and answers strictly to the requesting user's organization. | No cross-org document leakage in any RAG query. | High |
-| NFR-8.2 | The system shall allow a user to delete their account and remove personal data on request. | Account deletion endpoint removes profile, sessions, and PII. | Medium |
-| NFR-8.3 | The system shall record sensitive actions (member role changes, deletions, billing changes) in an immutable audit log. | Audit entries cannot be edited; viewable by org owner/admin. | High |
-| NFR-8.4 | The system shall present a privacy policy and terms of service before account creation. | Checkbox required on signup; versioned policy stored. | Medium |
-
----
-
-## NFR-9 — Observability
-
-| ID | Non-Functional Requirement | Measurable Target | Priority |
-|----|----------------------------|-------------------|----------|
-| NFR-9.1 | The system shall emit structured JSON logs for every API request including request ID, user ID, route, status, and latency. | All logs parseable as JSON; correlation via request ID. | High |
-| NFR-9.2 | The system shall expose a `/health` endpoint reporting database, cache, and external-service connectivity. | `/health` returns 200 only when all dependencies are reachable. | High |
-| NFR-9.3 | The system shall capture unhandled exceptions and forward them to an error-tracking sink. | Sentry (or equivalent) wired in production. | Medium |
-
----
-
-## NFR coverage summary
-
-| Category | # of NFRs |
-|----------|-----------|
-| NFR-1 Security | 10 |
-| NFR-2 Performance | 7 |
-| NFR-3 Reliability & Availability | 7 |
-| NFR-4 Scalability | 4 |
-| NFR-5 Maintainability | 5 |
-| NFR-6 Usability | 5 |
-| NFR-7 Compatibility & Portability | 3 |
-| NFR-8 Privacy & Compliance | 4 |
-| NFR-9 Observability | 3 |
-| **Total** | **48** |
+| ID | Non-Functional Requirement | Priority |
+|----|----------------------------|----------|
+| NFR-1 | **Security** — bcrypt passwords, signed JWTs, rotating refresh-token cookies, RBAC on every protected endpoint, HTTPS only. | High |
+| NFR-2 | **Performance** — real-time messages under 300 ms (p95); REST responses under 500 ms (p95). | High |
+| NFR-3 | **Reliability** — 99.5% uptime, auto WebSocket reconnect, idempotent Stripe webhooks, Alembic migrations. | High |
+| NFR-4 | **Scalability** — stateless API instances; per-organization plan quotas enforced server-side. | Medium |
+| NFR-5 | **Maintainability** — layered `router → service → model` architecture; OpenAPI docs at `/docs`. | High |
+| NFR-6 | **Usability** — light/dark theme, inline validation, first-login guided tour, WCAG 2.1 AA contrast. | Medium |
+| NFR-7 | **Compatibility** — latest two versions of Chrome, Firefox, Safari, Edge; responsive 360–1920 px. | High |
+| NFR-8 | **Privacy** — AI answers scoped to the user's organization; immutable audit log for sensitive actions. | High |
+| NFR-9 | **Observability** — structured JSON logs, `/health` endpoint, error tracking in production. | Medium |
