@@ -240,12 +240,12 @@ Task lifecycle from creation to approval: assignees, due dates, subtasks, status
 
 ### Per-sprint breakdown
 
-| Sprint   | Title                                  | Date       | Story points | User stories |
-| -------- | -------------------------------------- | ---------- | :----------: | :----------: |
-| Sprint 1 | Authentication & Profile               | Weeks 1–2  | 37           | 12           |
-| Sprint 2 | Organizations & Teams                  | Weeks 3–4  | 41           | 14           |
-| Sprint 3 | Channels & Real-time Messaging         | Weeks 5–6  | 45           | 12           |
-| Sprint 4 | DMs, Group Chats & Friends             | Weeks 7–8  | 35           | 11           |
-| Sprint 5 | Tasks & Notifications                  | Weeks 9–10 | 30           | 9            |
-| Sprint 6 | AI Assistant, Search, Logs & Billing   | Weeks 11–12 | 39          | 8            |
-| **Total** |                                       |            | **227**      | **66**       |
+| Sprint   | Title                                                                          | Date        | Story points | User stories |
+| -------- | ------------------------------------------------------------------------------ | ----------- | :----------: | :----------: |
+| Sprint 1 | Identity Foundation — Authentication, Sessions & Profile                       | Weeks 1–2   | 37           | 12           |
+| Sprint 2 | Workspace Setup — Organizations, Memberships & Team Structure                  | Weeks 3–4   | 41           | 14           |
+| Sprint 3 | Live Collaboration — Channels, Real-time Messaging & File Sharing              | Weeks 5–6   | 45           | 12           |
+| Sprint 4 | Personal Network — Direct Messages, Group Chats & Friends                      | Weeks 7–8   | 35           | 11           |
+| Sprint 5 | Work Tracking — Tasks, Subtasks, Approvals & Real-time Notifications           | Weeks 9–10  | 30           | 9            |
+| Sprint 6 | Platform Reach — AI Assistant, Global Search, Audit Log & Stripe Billing       | Weeks 11–12 | 39           | 8            |
+| **Total** |                                                                               |             | **227**      | **66**       |
