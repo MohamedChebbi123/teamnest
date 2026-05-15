@@ -237,3 +237,15 @@ Task lifecycle from creation to approval: assignees, due dates, subtasks, status
 | EP-11 | Team Management             | 5       | 13           |
 | EP-12 | Task Management             | 7       | 23           |
 | **Total** |                         | **66**  | **227**      |
+
+### Per-sprint breakdown
+
+| Sprint   | Title                                  | Date       | Story points | User stories |
+| -------- | -------------------------------------- | ---------- | :----------: | :----------: |
+| Sprint 1 | Authentication & Profile               | Weeks 1–2  | 37           | 12           |
+| Sprint 2 | Organizations & Teams                  | Weeks 3–4  | 41           | 14           |
+| Sprint 3 | Channels & Real-time Messaging         | Weeks 5–6  | 45           | 12           |
+| Sprint 4 | DMs, Group Chats & Friends             | Weeks 7–8  | 35           | 11           |
+| Sprint 5 | Tasks & Notifications                  | Weeks 9–10 | 30           | 9            |
+| Sprint 6 | AI Assistant, Search, Logs & Billing   | Weeks 11–12 | 39          | 8            |
+| **Total** |                                       |            | **227**      | **66**       |
