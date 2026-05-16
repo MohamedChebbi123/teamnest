@@ -249,3 +249,129 @@ Task lifecycle from creation to approval: assignees, due dates, subtasks, status
 | Sprint 5 | Work Tracking — Tasks, Subtasks, Approvals & Real-time Notifications           | Weeks 9–10  | 30           | 9            |
 | Sprint 6 | Platform Reach — AI Assistant, Global Search, Audit Log & Stripe Billing       | Weeks 11–12 | 39           | 8            |
 | **Total** |                                                                               |             | **227**      | **66**       |
+
+---
+
+## User Stories by Sprint
+
+The same 66 stories, regrouped by the sprint that delivers them. Within each sprint, stories are grouped by epic and sorted from highest to lowest priority.
+
+### Sprint 1 — Identity Foundation (Weeks 1–2)
+
+Authentication, sessions and profile.
+
+| ID      | User Story                                                                                          | Epic  | Role    | Story Points | Priority |
+| ------- | --------------------------------------------------------------------------------------------------- | ----- | ------- | :----------: | :------: |
+| US-1.1  | As a **visitor**, I want to browse the landing page, so that I can learn what TeamNest offers.      | EP-01 | Visitor | 3            | **M**    |
+| US-1.2  | As a **visitor**, I want to register, so that I can create an account.                              | EP-01 | Visitor | 3            | **M**    |
+| US-2.1  | As a **user**, I want to verify my email, so that my account is activated.                          | EP-01 | User    | 3            | **M**    |
+| US-2.2  | As a **user**, I want to resend the verification code, so that I'm not blocked.                     | EP-01 | User    | 2            | **M**    |
+| US-2.3  | As a **user**, I want to stay signed in, so that I don't log in every visit.                        | EP-01 | User    | 5            | **M**    |
+| US-2.4  | As a **user**, I want to log out from one or all devices, so that I can secure my account.          | EP-01 | User    | 3            | **M**    |
+| US-2.5  | As a **user**, I want to reset my password by email, so that I can recover access.                  | EP-01 | User    | 5            | **M**    |
+| US-2.6  | As a **user**, I want to change my password, so that I can rotate it.                               | EP-01 | User    | 2            | **S**    |
+| US-2.10 | As a **user**, I want a guided tour, so that I learn the basics quickly.                            | EP-01 | User    | 3            | **C**    |
+| US-2.7  | As a **user**, I want to edit my profile (avatar, name, country, phone), so that it stays current.  | EP-02 | User    | 3            | **S**    |
+| US-2.8  | As a **user**, I want to set my presence, so that others know my availability.                      | EP-02 | User    | 3            | **C**    |
+| US-2.9  | As a **user**, I want light/dark theme, so that the look matches my preference.                     | EP-02 | User    | 2            | **C**    |
+
+**Sprint totals:** 12 stories • 37 story points
+
+### Sprint 2 — Workspace Setup (Weeks 3–4)
+
+Organizations, memberships and team structure.
+
+| ID      | User Story                                                                                          | Epic  | Role        | Story Points | Priority |
+| ------- | --------------------------------------------------------------------------------------------------- | ----- | ----------- | :----------: | :------: |
+| US-6.1  | As a **member**, I want to create an organization, so that I can host my workspace.                 | EP-06 | Member      | 5            | **M**    |
+| US-6.2  | As a **member**, I want to join an org with an invite, so that I can collaborate.                   | EP-06 | Member      | 3            | **M**    |
+| US-6.3  | As a **member**, I want to see all org members, so that I have an overview.                         | EP-06 | Member      | 3            | **M**    |
+| US-6.4  | As a **member**, I want to see the teams in my org, so that I can navigate to one.                  | EP-06 | Member      | 2            | **M**    |
+| US-11.1 | As an **org admin**, I want to invite members by email, so that they can join.                      | EP-06 | Org Admin   | 5            | **M**    |
+| US-11.2 | As an **org admin**, I want to accept or reject join requests, so that I control who gets in.       | EP-06 | Org Admin   | 3            | **M**    |
+| US-11.3 | As an **org admin**, I want to update the organization, so that I can keep it accurate.             | EP-06 | Org Admin   | 2            | **S**    |
+| US-12.1 | As an **org owner**, I want to delete my organization, so that I can decommission it.               | EP-06 | Org Owner   | 3            | **S**    |
+| US-15.1 | As a **team member**, I want to view a teammate's profile, so that I know their role.               | EP-06 | Team Member | 2            | **C**    |
+| US-11.4 | As an **org admin**, I want to create teams, so that I can group members by project.                | EP-11 | Org Admin   | 3            | **M**    |
+| US-13.2 | As a **team lead**, I want to add members to my team, so that they get access.                      | EP-11 | Team Lead   | 2            | **M**    |
+| US-13.1 | As a **team lead**, I want to update or delete my team, so that I can keep it accurate or wind it down. | EP-11 | Team Lead | 3        | **S**    |
+| US-13.3 | As a **team lead**, I want to grant or revoke a member's permissions, so that responsibilities are clear. | EP-11 | Team Lead | 3      | **S**    |
+| US-13.4 | As a **team lead**, I want to kick a member, so that I can remove unwanted people.                  | EP-11 | Team Lead   | 2            | **S**    |
+
+**Sprint totals:** 14 stories • 41 story points
+
+### Sprint 3 — Live Collaboration (Weeks 5–6)
+
+Channels, real-time messaging and file sharing.
+
+| ID      | User Story                                                                                          | Epic  | Role        | Story Points | Priority |
+| ------- | --------------------------------------------------------------------------------------------------- | ----- | ----------- | :----------: | :------: |
+| US-7.1  | As a **member**, I want to create org channels (general or announcement), so that topics stay organized. | EP-07 | Member | 3            | **M**    |
+| US-7.2  | As a **member**, I want to chat in channels in real time, so that conversations feel instant.       | EP-07 | Member      | 8            | **M**    |
+| US-7.3  | As a **member**, I want to edit or delete my own messages, so that I can fix mistakes.              | EP-07 | Member      | 3            | **M**    |
+| US-7.4  | As a **member**, I want to load older messages on scroll, so that history loads smoothly.           | EP-07 | Member      | 3            | **M**    |
+| US-15.2 | As a **team member**, I want to chat in my team's channels, so that I can collaborate with my team. | EP-07 | Team Member | 3            | **M**    |
+| US-7.5  | As a **member**, I want to reply to a message, so that threads stay readable.                       | EP-07 | Member      | 3            | **S**    |
+| US-7.6  | As a **member**, I want to pin and unpin messages, so that important info is easy to find.          | EP-07 | Member      | 2            | **S**    |
+| US-7.7  | As a **member**, I want to search messages in a channel, so that I can find past discussions.       | EP-07 | Member      | 5            | **S**    |
+| US-7.8  | As a **member**, I want to share files in channels, so that documents stay with the conversation.   | EP-07 | Member      | 5            | **S**    |
+| US-7.9  | As a **member**, I want to mention teammates with `@tag`, so that they get notified.                | EP-07 | Member      | 3            | **S**    |
+| US-13.5 | As a **team lead**, I want to create channels in my team, so that the team has its own spaces.      | EP-07 | Team Lead   | 2            | **S**    |
+| US-15.3 | As a **team member**, I want a file list per team channel with inline PDF viewing, so that I can find and read attachments easily. | EP-07 | Team Member | 5 | **C** |
+
+**Sprint totals:** 12 stories • 45 story points
+
+### Sprint 4 — Personal Network (Weeks 7–8)
+
+Direct messages, group chats and friends.
+
+| ID     | User Story                                                                                          | Epic  | Role | Story Points | Priority |
+| ------ | --------------------------------------------------------------------------------------------------- | ----- | ---- | :----------: | :------: |
+| US-3.1 | As a **user**, I want to send a direct message, so that we can talk privately.                      | EP-03 | User | 5            | **M**    |
+| US-3.2 | As a **user**, I want to edit, delete and attach files in my DMs, so that I control my chats.       | EP-03 | User | 3            | **S**    |
+| US-3.3 | As a **user**, I want to search a DM thread, so that I can find a past message.                     | EP-03 | User | 3            | **S**    |
+| US-3.4 | As a **user**, I want typing indicators in DMs, so that I know when someone's typing.               | EP-03 | User | 2            | **S**    |
+| US-3.5 | As a **user**, I want a list of my DM conversations, so that I can resume them.                     | EP-03 | User | 3            | **S**    |
+| US-5.1 | As a **user**, I want to create a group chat, so that small groups can talk.                        | EP-05 | User | 3            | **M**    |
+| US-5.3 | As a **user**, I want to send, edit and delete group messages in real time, so that we can collaborate. | EP-05 | User | 5        | **M**    |
+| US-5.2 | As a **user**, I want to add, edit or delete a group chat, so that I can manage it.                 | EP-05 | User | 3            | **S**    |
+| US-4.1 | As a **user**, I want to send a friend request, so that I can connect with someone.                 | EP-04 | User | 3            | **S**    |
+| US-4.2 | As a **user**, I want to accept, reject or remove friends, so that I curate my contacts.            | EP-04 | User | 3            | **S**    |
+| US-4.3 | As a **user**, I want to block or unblock users, so that I can stop unwanted contact.               | EP-04 | User | 2            | **C**    |
+
+**Sprint totals:** 11 stories • 35 story points
+
+### Sprint 5 — Work Tracking (Weeks 9–10)
+
+Tasks, subtasks, approvals and real-time notifications.
+
+| ID      | User Story                                                                                          | Epic  | Role        | Story Points | Priority |
+| ------- | --------------------------------------------------------------------------------------------------- | ----- | ----------- | :----------: | :------: |
+| US-14.1 | As a **team lead**, I want to create tasks with assignees and a due date, so that work is tracked.  | EP-12 | Team Lead   | 5            | **M**    |
+| US-14.2 | As a **team lead**, I want to edit or delete a task, so that I can adjust scope.                    | EP-12 | Team Lead   | 3            | **M**    |
+| US-16.1 | As an **assignee**, I want to see my tasks, so that I know what's on my plate.                      | EP-12 | Assignee    | 3            | **M**    |
+| US-16.2 | As an **assignee**, I want to update my task status (and submit for review), so that the team sees progress. | EP-12 | Assignee | 3       | **M**    |
+| US-8.1  | As a **member**, I want real-time notifications for mentions, DMs, friends and tasks, so that I don't miss anything. | EP-08 | Member | 5 | **M** |
+| US-14.3 | As a **team lead**, I want to break a task into subtasks, so that I can split large work.           | EP-12 | Team Lead   | 3            | **S**    |
+| US-14.4 | As a **team lead**, I want to approve or reject a submitted task, so that quality is checked.       | EP-12 | Team Lead   | 3            | **S**    |
+| US-15.4 | As a **team member**, I want to add or remove task attachments, so that files travel with the work. | EP-12 | Team Member | 3            | **S**    |
+| US-8.2  | As a **member**, I want to view notifications and mark them as seen, so that I stay organized.      | EP-08 | Member      | 2            | **S**    |
+
+**Sprint totals:** 9 stories • 30 story points
+
+### Sprint 6 — Platform Reach (Weeks 11–12)
+
+AI assistant, global search, audit log and Stripe billing.
+
+| ID      | User Story                                                                                          | Epic  | Role      | Story Points | Priority |
+| ------- | --------------------------------------------------------------------------------------------------- | ----- | --------- | :----------: | :------: |
+| US-10.1 | As a **member**, I want to search across org messages, so that I find info fast.                    | EP-10 | Member    | 5            | **M**    |
+| US-12.2 | As an **org owner**, I want to subscribe to the Pro plan, so that I can unlock plan limits.         | EP-06 | Org Owner | 5            | **M**    |
+| US-12.3 | As an **org owner**, I want to cancel the Pro subscription, so that I can downgrade.                | EP-06 | Org Owner | 3            | **M**    |
+| US-9.1  | As a **member**, I want to ask the AI about my org, so that I get quick answers.                    | EP-09 | Member    | 8            | **S**    |
+| US-12.4 | As an **owner or admin**, I want to view the activity log, so that I have an audit trail.           | EP-06 | Owner / Admin | 3        | **S**    |
+| US-9.2  | As a **member**, I want the AI to use our uploaded documents, so that answers come from our files.  | EP-09 | Member    | 5            | **C**    |
+| US-9.3  | As a **member**, I want to open a PDF inline and ask the AI about it, so that I can extract answers from long files. | EP-09 | Member | 5 | **C** |
+| US-12.5 | As an **org owner**, I want to undo a reversible logged action, so that I can recover from a mistake. | EP-06 | Org Owner | 5         | **C**    |
+
+**Sprint totals:** 8 stories • 39 story points
