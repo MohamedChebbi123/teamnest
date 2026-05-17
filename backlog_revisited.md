@@ -260,6 +260,16 @@ The same 66 stories, regrouped by the sprint that delivers them. Within each spr
 
 Authentication, sessions and profile.
 
+**Sprint goal:** _Anyone can create a verified account and manage their profile._
+
+**Related diagrams** — see [docs/sprints/SPRINT_1.md](docs/sprints/SPRINT_1.md):
+
+- C4 — Auth domain (component view)
+- Class diagram — Identity & Access
+- Sequence — Signup & Email Verification
+- Sequence — Login & Refresh Token Rotation
+- Sequence — Password Reset
+
 | ID      | User Story                                                                                          | Epic  | Role    | Story Points | Priority |
 | ------- | --------------------------------------------------------------------------------------------------- | ----- | ------- | :----------: | :------: |
 | US-1.1  | As a **visitor**, I want to browse the landing page, so that I can learn what TeamNest offers.      | EP-01 | Visitor | 3            | **M**    |
@@ -277,9 +287,70 @@ Authentication, sessions and profile.
 
 **Sprint totals:** 12 stories • 37 story points
 
+**Subtask breakdown** — up to 3 implementation subtasks per story.
+
+- **US-1.1** — Browse the landing page
+  - [ ] Build the responsive landing layout (hero, features, footer)
+  - [ ] Add navigation with CTAs routing to register/login
+  - [ ] Add SEO metadata and Open Graph tags
+- **US-1.2** — Register
+  - [ ] Build the registration form with client-side validation
+  - [ ] Implement `POST /auth/register` with bcrypt password hashing
+  - [ ] Persist the user record and trigger the verification email
+- **US-2.1** — Verify email
+  - [ ] Generate and email a hashed, time-limited verification code
+  - [ ] Build the code-entry screen
+  - [ ] Implement `POST /auth/verify` to activate the account
+- **US-2.2** — Resend the verification code
+  - [ ] Add a resend endpoint with rate limiting
+  - [ ] Invalidate the previous code on resend
+  - [ ] Wire the resend button with a cooldown timer
+- **US-2.3** — Stay signed in
+  - [ ] Issue a rotating refresh token in an HTTP-only cookie
+  - [ ] Implement `POST /auth/refresh` with `jti` rotation
+  - [ ] Add silent token refresh on the frontend
+- **US-2.4** — Log out from one or all devices
+  - [ ] Implement single-device logout (revoke current `jti`)
+  - [ ] Implement logout-all (revoke every refresh token for the user)
+  - [ ] Add the logout controls to account settings
+- **US-2.5** — Reset password by email
+  - [ ] Build the request-reset and verify-code flow with a hashed code
+  - [ ] Implement `POST /auth/reset-password` with code validation
+  - [ ] Build the forgot- and reset-password screens
+- **US-2.6** — Change password
+  - [ ] Add `PUT /auth/password` requiring the current password
+  - [ ] Build the change-password form
+  - [ ] Re-hash the password and revoke other sessions
+- **US-2.10** — Guided tour
+  - [ ] Integrate a product-tour component
+  - [ ] Define the step sequence covering the main features
+  - [ ] Persist a "tour completed" flag per user
+- **US-2.7** — Edit profile
+  - [ ] Build the profile edit form (avatar, name, country, phone)
+  - [ ] Wire avatar upload to Cloudinary
+  - [ ] Implement the `PUT /users/me` endpoint
+- **US-2.8** — Set presence
+  - [ ] Add the presence field and status enum to the user model
+  - [ ] Broadcast presence changes over WebSocket
+  - [ ] Add the presence picker to the UI
+- **US-2.9** — Light/dark theme
+  - [ ] Add a theme provider/context
+  - [ ] Persist the theme preference
+  - [ ] Add the light/dark toggle control
+
 ### Sprint 2 — Workspace Setup (Weeks 3–4)
 
 Organizations, memberships and team structure.
+
+**Sprint goal:** _An admin can create an organization, onboard members and structure them into teams._
+
+**Related diagrams** — see [docs/sprints/SPRINT_2.md](docs/sprints/SPRINT_2.md):
+
+- C4 — Organization domain (component view)
+- Class diagram — Organizations, Membership & Teams
+- Sequence — Create Organization
+- Sequence — Join Organization (request → review → decide)
+- Sequence — Team + Member Management
 
 | ID      | User Story                                                                                          | Epic  | Role        | Story Points | Priority |
 | ------- | --------------------------------------------------------------------------------------------------- | ----- | ----------- | :----------: | :------: |
@@ -300,9 +371,77 @@ Organizations, memberships and team structure.
 
 **Sprint totals:** 14 stories • 41 story points
 
+**Subtask breakdown** — up to 3 implementation subtasks per story.
+
+- **US-6.1** — Create an organization
+  - [ ] Build the organization creation form
+  - [ ] Implement `POST /orgs` setting the creator as owner
+  - [ ] Seed a default organization channel
+- **US-6.2** — Join an org with an invite
+  - [ ] Validate the invite token server-side
+  - [ ] Build the join flow opened from the email link
+  - [ ] Create the membership record
+- **US-6.3** — See all org members
+  - [ ] Implement `GET /orgs/{id}/members`
+  - [ ] Build the member directory UI
+  - [ ] Add member search and filtering
+- **US-6.4** — See the teams in my org
+  - [ ] Implement `GET /orgs/{id}/teams`
+  - [ ] Build the team list UI
+  - [ ] Add navigation into a team view
+- **US-11.1** — Invite members by email
+  - [ ] Generate a signed invite token
+  - [ ] Send the invitation email
+  - [ ] Build the admin invite UI
+- **US-11.2** — Accept or reject join requests
+  - [ ] Implement the pending-requests list endpoint
+  - [ ] Implement the accept and reject endpoints
+  - [ ] Build the admin requests panel
+- **US-11.3** — Update the organization
+  - [ ] Implement `PUT /orgs/{id}` (name, logo, description)
+  - [ ] Wire logo upload to Cloudinary
+  - [ ] Build the org settings form
+- **US-12.1** — Delete my organization
+  - [ ] Implement owner-only `DELETE /orgs/{id}` with cascade
+  - [ ] Add a confirmation modal
+  - [ ] Write the deletion to the audit log
+- **US-15.1** — View a teammate's profile
+  - [ ] Implement `GET /users/{id}` scoped to the org
+  - [ ] Build the profile modal/page
+  - [ ] Show the teammate's role badges
+- **US-11.4** — Create teams
+  - [ ] Implement `POST /orgs/{id}/teams`
+  - [ ] Build the team creation form
+  - [ ] Assign the initial team lead
+- **US-13.2** — Add members to my team
+  - [ ] Implement `POST /teams/{id}/members` from the org pool
+  - [ ] Build the member picker UI
+  - [ ] Notify the added member
+- **US-13.1** — Update or delete my team
+  - [ ] Implement `PUT` and `DELETE /teams/{id}`
+  - [ ] Build the team settings form
+  - [ ] Add a confirmation modal and audit log entry
+- **US-13.3** — Grant or revoke a member's permissions
+  - [ ] Add the `Team_roles` management endpoints
+  - [ ] Build the permission toggle UI
+  - [ ] Enforce the permissions in route guards
+- **US-13.4** — Kick a member
+  - [ ] Implement `DELETE /teams/{id}/members/{uid}`
+  - [ ] Remove the member from team channels
+  - [ ] Add a confirmation modal
+
 ### Sprint 3 — Live Collaboration (Weeks 5–6)
 
 Channels, real-time messaging and file sharing.
+
+**Sprint goal:** _Members hold live conversations in channels with pinning, search and file sharing._
+
+**Related diagrams** — see [docs/sprints/SPRINT_3.md](docs/sprints/SPRINT_3.md):
+
+- C4 — Messaging domain (component view)
+- Class diagram — Channels & Messaging
+- Sequence — Channel Messaging over WebSocket
+- Sequence — File Upload & Indexing
 
 | ID      | User Story                                                                                          | Epic  | Role        | Story Points | Priority |
 | ------- | --------------------------------------------------------------------------------------------------- | ----- | ----------- | :----------: | :------: |
@@ -321,9 +460,69 @@ Channels, real-time messaging and file sharing.
 
 **Sprint totals:** 12 stories • 45 story points
 
+**Subtask breakdown** — up to 3 implementation subtasks per story.
+
+- **US-7.1** — Create org channels
+  - [ ] Implement `POST /channels` for general/announcement types
+  - [ ] Build the channel creation form
+  - [ ] Enforce a permission check on the channel type
+- **US-7.2** — Chat in channels in real time
+  - [ ] Broadcast messages via the WebSocket manager
+  - [ ] Persist every message to the database
+  - [ ] Build the channel chat UI with live updates
+- **US-7.3** — Edit or delete my own messages
+  - [ ] Add edit/delete endpoints with an ownership check
+  - [ ] Broadcast the updates over WebSocket
+  - [ ] Add inline edit/delete controls
+- **US-7.4** — Load older messages on scroll
+  - [ ] Implement a cursor-paginated history endpoint
+  - [ ] Add the infinite-scroll handler
+  - [ ] Preserve scroll position when prepending messages
+- **US-15.2** — Chat in my team's channels
+  - [ ] Scope channels to a `team_id`
+  - [ ] Add the team-channel access guard
+  - [ ] Surface team channels in the team view
+- **US-7.5** — Reply to a message
+  - [ ] Add a `parent_message_id` to the message model
+  - [ ] Build the thread view UI
+  - [ ] Show a reply-count indicator
+- **US-7.6** — Pin and unpin messages
+  - [ ] Add pin/unpin endpoints
+  - [ ] Build the pinned-messages panel
+  - [ ] Enforce the pin permission check
+- **US-7.7** — Search messages in a channel
+  - [ ] Implement the channel message search endpoint
+  - [ ] Build the channel search bar
+  - [ ] Highlight and jump to the matched result
+- **US-7.8** — Share files in channels
+  - [ ] Upload attachments to Cloudinary on send
+  - [ ] Persist the attachment metadata
+  - [ ] Render attachment previews in the chat
+- **US-7.9** — Mention teammates with `@tag`
+  - [ ] Build the mention parser and autocomplete
+  - [ ] Resolve mentioned users server-side
+  - [ ] Trigger the mention notification
+- **US-13.5** — Create channels in my team
+  - [ ] Add the team-scoped channel creation endpoint
+  - [ ] Enforce the team-lead-only permission check
+  - [ ] Add the creation UI in the team view
+- **US-15.3** — File list per team channel with inline PDF
+  - [ ] Implement the per-channel file list endpoint
+  - [ ] Build the file list UI
+  - [ ] Add the inline PDF viewer
+
 ### Sprint 4 — Personal Network (Weeks 7–8)
 
 Direct messages, group chats and friends.
+
+**Sprint goal:** _Users have 1:1 and small-group conversations and manage their personal network._
+
+**Related diagrams** — see [docs/sprints/SPRINT_4.md](docs/sprints/SPRINT_4.md):
+
+- C4 — Messaging domain (component view)
+- Class diagram — Direct Messages, Group Chat & Social Graph
+- Sequence — Direct Messages
+- Sequence — Presence WebSocket
 
 | ID     | User Story                                                                                          | Epic  | Role | Story Points | Priority |
 | ------ | --------------------------------------------------------------------------------------------------- | ----- | ---- | :----------: | :------: |
@@ -341,9 +540,64 @@ Direct messages, group chats and friends.
 
 **Sprint totals:** 11 stories • 35 story points
 
+**Subtask breakdown** — up to 3 implementation subtasks per story.
+
+- **US-3.1** — Send a direct message
+  - [ ] Add the DM conversation and message models
+  - [ ] Deliver DMs over WebSocket
+  - [ ] Build the DM thread UI
+- **US-3.2** — Edit, delete and attach files in DMs
+  - [ ] Add the DM edit and delete endpoints
+  - [ ] Wire Cloudinary attachments into DMs
+  - [ ] Add the edit/delete/attach UI controls
+- **US-3.3** — Search a DM thread
+  - [ ] Implement the DM search endpoint
+  - [ ] Build the in-thread search UI
+  - [ ] Highlight the matched results
+- **US-3.4** — Typing indicators in DMs
+  - [ ] Emit a typing event over WebSocket
+  - [ ] Debounce the typing emit on the client
+  - [ ] Render the typing indicator
+- **US-3.5** — List of my DM conversations
+  - [ ] Implement the user DM conversations endpoint
+  - [ ] Build the DM inbox list UI
+  - [ ] Show the last message and unread badge
+- **US-5.1** — Create a group chat
+  - [ ] Add the group chat model with participants
+  - [ ] Implement the create-group endpoint
+  - [ ] Build the group creation UI
+- **US-5.3** — Send, edit and delete group messages in real time
+  - [ ] Broadcast group messages over WebSocket
+  - [ ] Add the group message edit/delete endpoints
+  - [ ] Build the group chat UI
+- **US-5.2** — Add, edit or delete a group chat
+  - [ ] Add endpoints to add/remove participants and rename
+  - [ ] Implement the delete-group endpoint
+  - [ ] Build the group settings UI
+- **US-4.1** — Send a friend request
+  - [ ] Add the friend request model and endpoint
+  - [ ] Build the send-request UI
+  - [ ] Trigger the friend-request notification
+- **US-4.2** — Accept, reject or remove friends
+  - [ ] Add the accept/reject/remove endpoints
+  - [ ] Build the friends list and requests UI
+  - [ ] Update the friendship state on each action
+- **US-4.3** — Block or unblock users
+  - [ ] Add the block model and block/unblock endpoints
+  - [ ] Filter blocked users out of DMs and requests
+  - [ ] Add the block/unblock UI controls
+
 ### Sprint 5 — Work Tracking (Weeks 9–10)
 
 Tasks, subtasks, approvals and real-time notifications.
+
+**Sprint goal:** _Teams plan and track work and stay informed via real-time notifications._
+
+**Related diagrams** — see [docs/sprints/SPRINT_5.md](docs/sprints/SPRINT_5.md):
+
+- C4 — Task domain (component view)
+- Class diagram — Tasks & Notifications
+- Sequence — Task Lifecycle
 
 | ID      | User Story                                                                                          | Epic  | Role        | Story Points | Priority |
 | ------- | --------------------------------------------------------------------------------------------------- | ----- | ----------- | :----------: | :------: |
@@ -359,9 +613,59 @@ Tasks, subtasks, approvals and real-time notifications.
 
 **Sprint totals:** 9 stories • 30 story points
 
+**Subtask breakdown** — up to 3 implementation subtasks per story.
+
+- **US-14.1** — Create tasks with assignees and a due date
+  - [ ] Add the task model (assignee, due date, status)
+  - [ ] Implement the `POST /tasks` endpoint
+  - [ ] Build the task creation form
+- **US-14.2** — Edit or delete a task
+  - [ ] Add the edit/delete endpoints with a permission check
+  - [ ] Build the task edit form
+  - [ ] Add a delete confirmation modal
+- **US-16.1** — See my tasks
+  - [ ] Implement `GET /tasks` filtered by the current assignee
+  - [ ] Build the "My Tasks" view
+  - [ ] Add filtering and sorting by status and due date
+- **US-16.2** — Update my task status and submit for review
+  - [ ] Add the status update endpoint
+  - [ ] Implement the submit-for-review transition
+  - [ ] Build the status control UI
+- **US-8.1** — Real-time notifications for mentions, DMs, friends and tasks
+  - [ ] Add the notification model and creation hooks
+  - [ ] Push notifications over WebSocket
+  - [ ] Build the notification toast and bell UI
+- **US-14.3** — Break a task into subtasks
+  - [ ] Add a `parent_task_id` to the task model
+  - [ ] Implement the subtask creation endpoint
+  - [ ] Build the subtask list UI under the parent
+- **US-14.4** — Approve or reject a submitted task
+  - [ ] Add the approve/reject endpoints (team-lead-only)
+  - [ ] Build the review queue UI
+  - [ ] Notify the assignee of the outcome
+- **US-15.4** — Add or remove task attachments
+  - [ ] Add the add/remove attachment endpoints
+  - [ ] Wire attachment upload to Cloudinary
+  - [ ] Build the attachment list on the task view
+- **US-8.2** — View notifications and mark them as seen
+  - [ ] Implement the notification feed endpoint
+  - [ ] Add the mark-as-seen endpoint
+  - [ ] Build the notification inbox UI
+
 ### Sprint 6 — Platform Reach (Weeks 11–12)
 
 AI assistant, global search, audit log and Stripe billing.
+
+**Sprint goal:** _Add cross-cutting capabilities — AI help, global search, audit trail and paid plans._
+
+**Related diagrams** — see [docs/sprints/SPRINT_6.md](docs/sprints/SPRINT_6.md):
+
+- C4 — Assistant domain (RAG component view)
+- C4 — Organization domain (billing slice)
+- Class diagram — Billing & Audit Log
+- Sequence — AI Assistant (RAG)
+- Sequence — Stripe Upgrade
+- Sequence — Global Message Search
 
 | ID      | User Story                                                                                          | Epic  | Role      | Story Points | Priority |
 | ------- | --------------------------------------------------------------------------------------------------- | ----- | --------- | :----------: | :------: |
@@ -375,3 +679,38 @@ AI assistant, global search, audit log and Stripe billing.
 | US-12.5 | As an **org owner**, I want to undo a reversible logged action, so that I can recover from a mistake. | EP-06 | Org Owner | 5         | **C**    |
 
 **Sprint totals:** 8 stories • 39 story points
+
+**Subtask breakdown** — up to 3 implementation subtasks per story.
+
+- **US-10.1** — Search across org messages
+  - [ ] Implement the cross-channel search endpoint
+  - [ ] Build the global search bar
+  - [ ] Group the results by channel
+- **US-12.2** — Subscribe to the Pro plan
+  - [ ] Create the Stripe Checkout session endpoint
+  - [ ] Handle the webhook that flips the plan to Pro
+  - [ ] Build the upgrade UI and pricing page
+- **US-12.3** — Cancel the Pro subscription
+  - [ ] Add the cancel-subscription endpoint
+  - [ ] Handle the webhook that downgrades the plan
+  - [ ] Build the manage-subscription UI
+- **US-9.1** — Ask the AI about my org
+  - [ ] Build the RAG pipeline with LlamaIndex
+  - [ ] Implement `POST /ai/ask` grounded in org context
+  - [ ] Build the AI chat UI
+- **US-12.4** — View the activity log
+  - [ ] Implement the `GET` logs endpoint (owner/admin only)
+  - [ ] Build the activity log UI with filters
+  - [ ] Render entries from the `Logs` audit table
+- **US-9.2** — AI uses our uploaded documents
+  - [ ] Build document upload and embedding into Pinecone
+  - [ ] Scope retrieval to the `team-{team_id}` namespace
+  - [ ] Build the document management UI
+- **US-9.3** — Open a PDF inline and ask the AI about it
+  - [ ] Add the inline PDF viewer
+  - [ ] Implement the per-document AI query endpoint
+  - [ ] Build the ask-about-PDF UI panel
+- **US-12.5** — Undo a reversible logged action
+  - [ ] Mark reversible actions in the `Logs` table
+  - [ ] Implement the undo endpoint per action type
+  - [ ] Add the undo control in the activity log
