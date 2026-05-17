@@ -285,6 +285,10 @@ _Source: [docs/sprints/SPRINT_1.md](docs/sprints/SPRINT_1.md)._
 
 ##### C4 — Auth domain (component view)
 
+- Shows the **auth slice** of the backend: `auth_router.py` delegates to `auth_service.py`, which owns credentials, JWTs and email codes.
+- The web app reaches it over REST and WebSocket; persistence goes through SQLAlchemy to PostgreSQL.
+- Two external services hang off it — **Resend** for verification/reset emails and **Cloudinary** for avatar uploads.
+
 ```mermaid
 flowchart TB
     web[Web Application<br/>Next.js]
@@ -319,6 +323,10 @@ flowchart TB
 
 ##### Class diagram — Identity & Access
 
+- Models the two persisted entities behind sign-in: `User` and `RefreshToken`.
+- `User` carries verification state and the auth operations (register, login, verify, reset).
+- A user **owns many refresh tokens** — one per active session — each of which can be rotated or revoked.
+
 ```mermaid
 classDiagram
     direction LR
@@ -348,6 +356,10 @@ classDiagram
 ```
 
 ##### Sequence — Signup & Email Verification (US-1.2, US-2.1, US-2.2)
+
+- Walks the visitor → verified-user path: create account, request a code, confirm it.
+- The code is generated server-side, stored, and emailed via the email service.
+- The `alt` branch shows the verified vs. invalid-code outcomes; verification gates every later action.
 
 ```mermaid
 sequenceDiagram
@@ -393,6 +405,10 @@ sequenceDiagram
 
 ##### Sequence — Login & Refresh Token Rotation (US-2.3, US-2.4)
 
+- Top half: credentials are checked, tokens issued, and the session saved.
+- Bottom half: once the access token expires, the refresh token is exchanged for a fresh pair.
+- The `alt` branches cover invalid credentials and invalid/expired tokens (forcing a re-login).
+
 ```mermaid
 sequenceDiagram
     actor User
@@ -434,6 +450,10 @@ sequenceDiagram
 ```
 
 ##### Sequence — Password Reset (US-2.5, US-2.6)
+
+- Three steps: request a reset, verify the emailed code, then set a new password.
+- The `opt User exists` block hides whether an account exists (anti-enumeration).
+- The new password is hashed before it is persisted.
 
 ```mermaid
 sequenceDiagram
@@ -512,6 +532,10 @@ _Source: [docs/sprints/SPRINT_2.md](docs/sprints/SPRINT_2.md)._
 
 ##### C4 — Organization domain (component view)
 
+- Covers the **workspace slice**: `org_router.py` and `team_router.py` over `org_service.py` / `team_service.py`.
+- All org, member, team and payment data shares one SQLAlchemy data-access layer into PostgreSQL.
+- The **Stripe** arrows belong to Sprint 6 — shown here only because billing lives in this same domain.
+
 ```mermaid
 flowchart TB
     web[Web Application<br/>Next.js]
@@ -550,6 +574,10 @@ flowchart TB
 > Stripe-related arrows belong to Sprint 6 (Billing). They appear here only because they live in the same domain component; the create-org part is what's in scope for Sprint 2.
 
 ##### Class diagram — Organizations, Membership & Teams
+
+- Models the multi-tenant core: `Organization`, its `OrganizationMember`s and `PendingMember`s, and nested `Team`s.
+- `TeamRole` holds the fine-grained per-team permission flags (`canManageRoles`, `canManageTasks`).
+- `OrganizationPayment` is shown for completeness; the billing flow itself is exercised in Sprint 6.
 
 ```mermaid
 classDiagram
@@ -624,6 +652,10 @@ classDiagram
 
 ##### Sequence — Create Organization (US-6.1, US-11.3)
 
+- The actor must be a **verified** user — the `alt` block checks this first.
+- An optional logo is uploaded to Cloudinary before the org row is saved.
+- Ends with the creator becoming the org owner.
+
 ```mermaid
 sequenceDiagram
     actor Admin
@@ -654,6 +686,10 @@ sequenceDiagram
 ```
 
 ##### Sequence — Join Organization: request → review → decide (US-6.2, US-11.1, US-11.2)
+
+- Split into three steps: **5a** a user requests to join, **5b** an admin lists pending requests, **5c** the admin decides.
+- Every step re-checks authentication, and the admin steps also check permissions.
+- Accepting creates the membership record; rejecting simply removes the request.
 
 _5a. User sends join request_
 
@@ -746,6 +782,10 @@ sequenceDiagram
 
 ##### Sequence — Team + Member Management (US-11.4, US-13.1, US-13.2, US-13.3, US-13.4)
 
+- One flow for two actors: an **admin** creates a team, then a **team lead** manages its members.
+- Each action is gated by a permission check before any write happens.
+- The `alt Authorized / Unauthorized` branches show the denial paths.
+
 ```mermaid
 sequenceDiagram
     actor Admin
@@ -814,6 +854,10 @@ _Source: [docs/sprints/SPRINT_3.md](docs/sprints/SPRINT_3.md)._
 
 ##### C4 — Messaging domain (component view)
 
+- The full real-time domain: channel, DM and group-chat routers, all sharing one **WebSocket manager**.
+- Each router has its own service, but they reuse the same data-access layer and Cloudinary handler for attachments.
+- Messages persist to PostgreSQL; attachments live on Cloudinary.
+
 ```mermaid
 flowchart TB
     web[Web Application<br/>Next.js]
@@ -868,6 +912,10 @@ flowchart TB
 
 ##### Class diagram — Channels & Messaging
 
+- Models `Channel`, its `Message`s, `PinnedMessage`s and attached `File`s.
+- A channel belongs to a team and holds many messages; users send messages and upload files.
+- `Message` carries soft-delete (`isDeleted`) and edit support.
+
 ```mermaid
 classDiagram
     direction LR
@@ -918,6 +966,10 @@ classDiagram
 
 ##### Sequence — Channel Messaging over WebSocket (US-7.2, US-7.3, US-7.4, US-7.9, US-15.2)
 
+- Two users open the channel and hold a persistent WebSocket connection.
+- Inside the `loop`, each message is permission-checked, persisted, indexed in Pinecone, then broadcast to subscribers.
+- Closing the channel disconnects the socket.
+
 ```mermaid
 sequenceDiagram
     actor UserA
@@ -959,6 +1011,10 @@ sequenceDiagram
 ```
 
 ##### Sequence — File Upload & Indexing (US-7.8, US-15.3)
+
+- Upload path: validate → store on Cloudinary → save metadata → optionally index the content in Pinecone.
+- Download path: permission-check, load the row, then fetch the bytes back from Cloudinary.
+- Indexing is what later lets the AI assistant retrieve file content.
 
 ```mermaid
 sequenceDiagram
@@ -1029,6 +1085,10 @@ _Source: [docs/sprints/SPRINT_4.md](docs/sprints/SPRINT_4.md)._
 
 ##### C4 — Messaging domain (component view)
 
+- The full real-time domain: channel, DM and group-chat routers, all sharing one **WebSocket manager**.
+- Each router has its own service, but they reuse the same data-access layer and Cloudinary handler for attachments.
+- Messages persist to PostgreSQL; attachments live on Cloudinary.
+
 ```mermaid
 flowchart TB
     web[Web Application<br/>Next.js]
@@ -1082,6 +1142,10 @@ flowchart TB
 ```
 
 ##### Class diagram — Direct Messages, Group Chat & Social Graph
+
+- Covers everything outside channels: `DirectMessage`, `GroupChat` (with members and messages), and the social graph.
+- The social graph is three entities — `Friendship`, `FriendRequest` and `BlockedUser`.
+- All conversation entities support edit and soft-delete.
 
 ```mermaid
 classDiagram
@@ -1161,6 +1225,10 @@ classDiagram
 
 ##### Sequence — Direct Messages (US-3.1 → US-3.5, US-4.3, US-5.3)
 
+- Two users connect; inside the `loop` each message is **block-checked**, saved, and delivered only if the recipient is online.
+- A separate step loads the conversation inbox.
+- Mirrors the channel flow, but scoped to a 1:1 thread.
+
 ```mermaid
 sequenceDiagram
     actor UserA
@@ -1205,6 +1273,10 @@ sequenceDiagram
 ```
 
 ##### Sequence — Presence WebSocket (US-3.4 typing/presence, US-4.1, US-4.2)
+
+- On connect the user is marked online and friends are notified; the online-friends list is pushed back.
+- A `loop` heartbeat (ping/pong) keeps the connection alive; status changes are broadcast.
+- On disconnect, the last session marks the user offline.
 
 ```mermaid
 sequenceDiagram
@@ -1273,6 +1345,10 @@ _Source: [docs/sprints/SPRINT_5.md](docs/sprints/SPRINT_5.md)._
 
 ##### C4 — Task domain (component view)
 
+- A small slice: `tasks_router.py` over `task_service.py`, which owns the task lifecycle.
+- Attachments go through the Cloudinary handler; assignee notifications reuse the WebSocket manager.
+- Tasks persist to PostgreSQL.
+
 ```mermaid
 flowchart TB
     web[Web Application<br/>Next.js]
@@ -1304,6 +1380,10 @@ flowchart TB
 ```
 
 ##### Class diagram — Tasks & Notifications
+
+- Models `Task`, its `TaskAssignee`s and `TaskAttachment`s, plus the cross-cutting `Notification`.
+- A task belongs to a team, is created by a user, and can have several assignees.
+- `Notification` references the message or DM it is about.
 
 ```mermaid
 classDiagram
@@ -1353,6 +1433,10 @@ classDiagram
 ```
 
 ##### Sequence — Task Lifecycle (US-14.x, US-15.4, US-16.x, US-8.1, US-8.2)
+
+- Three stages: **9a** a manager creates a task and the assignee is notified, **9b** the assignee submits for review, **9c** the manager approves or rejects.
+- Each stage validates permissions or the status transition before writing.
+- Every stage fans a notification out to the other party.
 
 _9a. Manager creates a task → assignee is notified (US-14.1, US-8.1)_
 
@@ -1476,6 +1560,10 @@ _Source: [docs/sprints/SPRINT_6.md](docs/sprints/SPRINT_6.md)._
 
 ##### C4 — Assistant domain (RAG component view)
 
+- The retrieval-augmented pipeline: `assistant_router.py` orchestrates the document, message and vector handlers.
+- `vector_db_handler.py` talks to **Pinecone**; `assistant_handler.py` calls the **Groq** LLM.
+- Documents and chat history are embedded into Pinecone, then retrieved as context at query time.
+
 ```mermaid
 flowchart TB
     web[Web Application<br/>Next.js]
@@ -1511,6 +1599,10 @@ flowchart TB
 ```
 
 ##### C4 — Organization domain (billing slice)
+
+- The same org domain as Sprint 2, with the **Stripe** arrows now live.
+- `org_service.py` creates Checkout sessions and `org_router.py` receives Stripe webhooks.
+- Webhook events flip the organization's plan state (Free ↔ Pro).
 
 ```mermaid
 flowchart TB
@@ -1549,6 +1641,10 @@ flowchart TB
 
 ##### Class diagram — Billing & Audit Log
 
+- Two entities: `OrganizationPayment` (Stripe subscription state) and `AuditLog`.
+- Each org has many payment records and many audit-log entries.
+- Every audit entry records the action and the acting user.
+
 ```mermaid
 classDiagram
     direction LR
@@ -1575,6 +1671,10 @@ classDiagram
 ```
 
 ##### Sequence — AI Assistant (RAG) (US-9.1, US-9.2, US-9.3)
+
+- Flow: permission-check → similarity search in Pinecone → build a prompt → call the LLM → return the answer with sources.
+- The `alt` branch denies unauthorized requests.
+- Answers are grounded in the org's own indexed content.
 
 ```mermaid
 sequenceDiagram
@@ -1607,6 +1707,10 @@ sequenceDiagram
 
 ##### Sequence — Stripe Upgrade (US-12.2, US-12.3)
 
+- The admin starts a subscription; the backend opens a Stripe Checkout session and redirects to it.
+- Stripe later calls back with a payment notification; the **signature is verified** before the subscription is updated.
+- The same path covers both subscribe and cancel.
+
 ```mermaid
 sequenceDiagram
     actor Admin
@@ -1634,6 +1738,10 @@ sequenceDiagram
 ```
 
 ##### Sequence — Global Message Search (US-10.1)
+
+- A member's query runs a **similarity search** against the Pinecone index populated in Sprints 3–4.
+- Top matches are hydrated back into full message rows from PostgreSQL.
+- Permission-checked, so results never cross org boundaries.
 
 ```mermaid
 sequenceDiagram
