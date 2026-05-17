@@ -262,14 +262,6 @@ Authentication, sessions and profile.
 
 **Sprint goal:** _Anyone can create a verified account and manage their profile._
 
-**Related diagrams** — see [docs/sprints/SPRINT_1.md](docs/sprints/SPRINT_1.md):
-
-- C4 — Auth domain (component view)
-- Class diagram — Identity & Access
-- Sequence — Signup & Email Verification
-- Sequence — Login & Refresh Token Rotation
-- Sequence — Password Reset
-
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
 | US-1.1 | As a **visitor**, I want to browse the landing page, so that I can learn what TeamNest offers. | EP-01 | Visitor | 3 | **M** | 1. Build the responsive landing layout (hero, features, footer)<br>2. Add navigation with CTAs routing to register/login<br>3. Add SEO metadata and Open Graph tags |
@@ -287,19 +279,213 @@ Authentication, sessions and profile.
 
 **Sprint totals:** 12 stories • 37 story points
 
+#### Related diagrams
+
+_Source: [docs/sprints/SPRINT_1.md](docs/sprints/SPRINT_1.md)._
+
+##### C4 — Auth domain (component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    emailSvc[/Email Service · Resend/]
+    cloud[/Cloudinary/]
+
+    subgraph auth [Auth domain]
+        authRouter[auth_router.py<br/>register · login · verify · WS connectivity]
+        authSvc[auth_service.py<br/>Credentials · JWT · email codes · sessions]
+        authData[Data Access<br/>SQLAlchemy · Users model]
+        emailUtil[utils/email_sender.py<br/>Resend API client]
+        cloudUtil[utils/cloudinary_handler.py<br/>Avatar uploads]
+    end
+
+    web -- "REST / WS" --> authRouter
+    authRouter --> authSvc
+    authSvc --> authData
+    authSvc --> emailUtil
+    authSvc --> cloudUtil
+    authData -- "SQL" --> db
+    emailUtil -- "Sends verification codes" --> emailSvc
+    cloudUtil --> cloud
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class authRouter,authSvc,authData,emailUtil,cloudUtil component
+    class emailSvc,cloud ext
+```
+
+##### Class diagram — Identity & Access
+
+```mermaid
+classDiagram
+    direction LR
+
+    class User {
+        +int userId
+        +string email
+        +string userTag
+        +string status
+        +bool isVerified
+        +register(data) User
+        +login(credentials) Session
+        +verifyEmail(code) bool
+        +resetPassword(code, newPassword) void
+        +setStatus(status) void
+    }
+
+    class RefreshToken {
+        +string jti
+        +datetime expiresAt
+        +datetime revokedAt
+        +rotate() RefreshToken
+        +revoke() void
+    }
+
+    User "1" *-- "0..*" RefreshToken : owns
+```
+
+##### Sequence — Signup & Email Verification (US-1.2, US-2.1, US-2.2)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Mail as Email Service
+
+    User->>+FE: Submit signup
+    FE->>+API: Create account
+    API->>+DB: Save user
+    DB-->>-API: Saved
+    API-->>-FE: Account created
+    FE-->>-User: Verify your email
+
+    Note over User,Mail: Verification required before any action
+
+    User->>+FE: Request code
+    FE->>+API: Send code
+    API->>API: Generate code
+    API->>+DB: Save code
+    DB-->>-API: Saved
+    API-)Mail: Send email
+    Mail-)User: Code received
+    API-->>-FE: OK
+    FE-->>-User: Code sent
+
+    User->>+FE: Enter code
+    FE->>+API: Verify email
+    API->>+DB: Check code
+    DB-->>-API: Result
+    alt Valid code
+        API->>+DB: Mark verified
+        DB-->>-API: Saved
+        API-->>FE: Email verified
+    else Invalid code
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-User: Account verified
+```
+
+##### Sequence — Login & Refresh Token Rotation (US-2.3, US-2.4)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    User->>+FE: Enter credentials
+    FE->>+API: Login
+    API->>+DB: Check credentials
+    DB-->>-API: Result
+    alt Valid credentials
+        API->>API: Generate tokens
+        API->>+DB: Save session
+        DB-->>-API: Saved
+        API-->>FE: Access tokens
+    else Invalid credentials
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-User: Logged in / Error
+
+    Note over User,API: Later — token expired
+
+    User->>+FE: Continue using app
+    FE->>+API: Refresh token
+    API->>+DB: Check token
+    DB-->>-API: Result
+    alt Valid token
+        API->>API: Generate tokens
+        API->>+DB: Renew token
+        DB-->>-API: Saved
+        API-->>FE: New tokens
+    else Invalid token
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-User: Continue / Re-login
+```
+
+##### Sequence — Password Reset (US-2.5, US-2.6)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Mail as Email Service
+
+    User->>+FE: Forgot password
+    FE->>+API: Forgot password
+    opt User exists
+        API->>API: Generate code
+        API->>+DB: Save code
+        DB-->>-API: Saved
+        API-)Mail: Send code
+        Mail-)User: Email received
+    end
+    API-->>-FE: Confirmation
+    FE-->>-User: Check your email
+
+    User->>+FE: Enter code
+    FE->>+API: Verify code
+    API->>+DB: Check code
+    DB-->>-API: Result
+    alt Valid code
+        API-->>FE: OK
+    else Invalid code
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-User: Result
+
+    User->>+FE: Set new password
+    FE->>+API: Reset password
+    alt Valid code
+        API->>API: Hash password
+        API->>+DB: Update password
+        DB-->>-API: Saved
+        API-->>FE: Success
+    else Invalid code
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-User: Result
+```
+
 ### Sprint 2 — Workspace Setup (Weeks 3–4)
 
 Organizations, memberships and team structure.
 
 **Sprint goal:** _An admin can create an organization, onboard members and structure them into teams._
-
-**Related diagrams** — see [docs/sprints/SPRINT_2.md](docs/sprints/SPRINT_2.md):
-
-- C4 — Organization domain (component view)
-- Class diagram — Organizations, Membership & Teams
-- Sequence — Create Organization
-- Sequence — Join Organization (request → review → decide)
-- Sequence — Team + Member Management
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -320,18 +506,290 @@ Organizations, memberships and team structure.
 
 **Sprint totals:** 14 stories • 41 story points
 
+#### Related diagrams
+
+_Source: [docs/sprints/SPRINT_2.md](docs/sprints/SPRINT_2.md)._
+
+##### C4 — Organization domain (component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    stripe[/Stripe/]
+
+    subgraph org [Organization domain]
+        orgRouter[org_router.py<br/>Orgs · members · Stripe webhook]
+        teamRouter[team_router.py<br/>Teams within an org]
+        orgSvc[org_service.py<br/>Workspace · membership · billing logic]
+        teamSvc[team_service.py<br/>Team logic]
+        orgData[Data Access<br/>SQLAlchemy · Organization · Members · Teams · Payments]
+    end
+
+    web -- "REST" --> orgRouter
+    web -- "REST" --> teamRouter
+    stripe -- "Webhook events" --> orgRouter
+
+    orgRouter --> orgSvc
+    teamRouter --> teamSvc
+
+    orgSvc --> orgData
+    teamSvc --> orgData
+    orgData -- "SQL" --> db
+
+    orgSvc -- "Charges subscriptions" --> stripe
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class orgRouter,teamRouter,orgSvc,teamSvc,orgData component
+    class stripe ext
+```
+
+> Stripe-related arrows belong to Sprint 6 (Billing). They appear here only because they live in the same domain component; the create-org part is what's in scope for Sprint 2.
+
+##### Class diagram — Organizations, Membership & Teams
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Organization {
+        +int organizationId
+        +string name
+        +string plan
+        +int ownerId
+        +create(data, owner) Organization
+        +update(data) void
+        +delete() void
+    }
+
+    class OrganizationMember {
+        +int id
+        +string role
+        +assignRole(role) void
+    }
+
+    class PendingMember {
+        +int id
+        +accept() void
+        +reject() void
+    }
+
+    class OrganizationPayment {
+        +int subscriptionId
+        +string stripeSubscriptionId
+        +string status
+        +createSubscription() Checkout
+        +cancelSubscription() void
+    }
+
+    class Team {
+        +int teamId
+        +string name
+        +int teamSize
+        +datetime createdAt
+        +addMembers(userIds) void
+        +kickMember(userId) void
+        +delete() void
+    }
+
+    class TeamMembership {
+        +int teamId
+        +int userId
+    }
+
+    class TeamRole {
+        +int teamRoleId
+        +string role
+        +bool canManageRoles
+        +bool canManageTasks
+        +updatePermissions(data) void
+        +revoke(permission) void
+    }
+
+    User "1" --> "0..*" Organization : owns
+    Organization "1" *-- "0..*" OrganizationMember : has
+    User "1" --> "0..*" OrganizationMember : is
+    Organization "1" *-- "0..*" PendingMember : has
+    User "1" --> "0..*" PendingMember : requests
+    Organization "1" *-- "0..*" OrganizationPayment : billed by
+    Organization "1" *-- "0..*" Team : contains
+    Team "1" *-- "0..*" TeamMembership : has
+    User  "1" --> "0..*" TeamMembership : member of
+    Team "1" *-- "0..*" TeamRole : grants
+    User "1" --> "0..*" TeamRole : assigned
+```
+
+##### Sequence — Create Organization (US-6.1, US-11.3)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Cloud as Cloudinary
+
+    Note over Admin,DB: ref: Authenticate
+
+    alt Email verified
+        API->>+DB: Check status
+        DB-->>-API: Verified
+    else Not verified
+        API-->>Admin: Verify email
+    end
+
+    Admin->>+FE: Fill org form
+    FE->>+API: Create organization
+    opt Logo provided
+        API->>+Cloud: Upload logo
+        Cloud-->>-API: Logo URL
+    end
+    API->>+DB: Save organization
+    DB-->>-API: Saved
+    API-->>-FE: Organization created
+    FE-->>-Admin: Confirmation
+```
+
+##### Sequence — Join Organization: request → review → decide (US-6.2, US-11.1, US-11.2)
+
+_5a. User sends join request_
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over User,DB: ref: Authenticate
+
+    alt Email verified
+        API->>+DB: Check status
+        DB-->>-API: Verified
+    else Not verified
+        API-->>User: Verify email
+    end
+
+    User->>+FE: Search & request
+    FE->>+API: Request to join
+    API->>+DB: Check eligibility
+    DB-->>-API: Result
+    alt Eligible
+        API->>+DB: Save request
+        DB-->>-API: Saved
+        API-->>FE: Request submitted
+    else Not eligible
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-User: Result
+```
+
+_5b. Admin lists pending requests_
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Open requests page
+    FE->>+API: List requests
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+DB: Load requests
+        DB-->>-API: Rows
+        API-->>FE: Requests
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Admin: List displayed
+```
+
+_5c. Admin accepts or rejects_
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Decide on request
+    FE->>+API: Submit decision
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Accepted
+        API->>+DB: Add member
+        DB-->>-API: Saved
+        API-->>FE: OK
+    else Rejected
+        API->>+DB: Remove request
+        DB-->>-API: Removed
+        API-->>FE: OK
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Admin: Result
+```
+
+##### Sequence — Team + Member Management (US-11.4, US-13.1, US-13.2, US-13.3, US-13.4)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    actor Lead as Team Lead
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Create team
+    FE->>+API: Create team
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+DB: Save team
+        DB-->>-API: Saved
+        API-->>FE: Team created
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Admin: Result
+
+    Lead->>+FE: Manage members
+    FE->>+API: Update members
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+DB: Update members
+        DB-->>-API: Saved
+        API-->>FE: OK
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Lead: Result
+```
+
 ### Sprint 3 — Live Collaboration (Weeks 5–6)
 
 Channels, real-time messaging and file sharing.
 
 **Sprint goal:** _Members hold live conversations in channels with pinning, search and file sharing._
-
-**Related diagrams** — see [docs/sprints/SPRINT_3.md](docs/sprints/SPRINT_3.md):
-
-- C4 — Messaging domain (component view)
-- Class diagram — Channels & Messaging
-- Sequence — Channel Messaging over WebSocket
-- Sequence — File Upload & Indexing
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -350,18 +808,204 @@ Channels, real-time messaging and file sharing.
 
 **Sprint totals:** 12 stories • 45 story points
 
+#### Related diagrams
+
+_Source: [docs/sprints/SPRINT_3.md](docs/sprints/SPRINT_3.md)._
+
+##### C4 — Messaging domain (component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    cloud[/Cloudinary/]
+
+    subgraph msg [Messaging domain]
+        chRouter[channels_router.py<br/>REST · WS /mesages · WS /ws/notifications]
+        dmRouter[direct_messages_router.py<br/>REST · WS /ws/direct-messages]
+        gcRouter[groupe_chat_router.py<br/>Group chat REST / WS]
+
+        chSvc[channel_service.py]
+        msgSvc[message_service.py<br/>Send · edit · delete · reactions]
+        dmSvc[direct_message_service.py]
+        gcSvc[groupe_chat_service.py]
+
+        wsMgr[utils/Websocket_manager.py<br/>Connection registry · broadcast · presence]
+        cloudUtil[utils/cloudinary_handler.py<br/>Attachments]
+        msgData[Data Access<br/>SQLAlchemy · Channels · Messages · DM · GroupChat]
+    end
+
+    web -- "REST / WS" --> chRouter
+    web -- "REST / WS" --> dmRouter
+    web -- "REST / WS" --> gcRouter
+
+    chRouter --> chSvc
+    chRouter --> msgSvc
+    chRouter --> wsMgr
+    dmRouter --> dmSvc
+    dmRouter --> wsMgr
+    gcRouter --> gcSvc
+    gcRouter --> wsMgr
+
+    msgSvc --> cloudUtil
+    dmSvc --> cloudUtil
+    gcSvc --> cloudUtil
+    cloudUtil --> cloud
+
+    chSvc --> msgData
+    msgSvc --> msgData
+    dmSvc --> msgData
+    gcSvc --> msgData
+    msgData -- "SQL" --> db
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class chRouter,dmRouter,gcRouter,chSvc,msgSvc,dmSvc,gcSvc,wsMgr,cloudUtil,msgData component
+    class cloud ext
+```
+
+##### Class diagram — Channels & Messaging
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Channel {
+        +int channelId
+        +string name
+        +string mode
+        +datetime createdAt
+        +create(data) Channel
+        +update(data) void
+        +delete() void
+    }
+
+    class Message {
+        +int messageId
+        +string content
+        +bool isDeleted
+        +datetime sentAt
+        +edit(content) void
+        +delete() void
+    }
+
+    class PinnedMessage {
+        +int id
+        +datetime pinnedAt
+        +pin() void
+        +unpin() void
+    }
+
+    class File {
+        +int id
+        +string fileName
+        +string fileUrl
+        +int fileSize
+        +upload(file) File
+        +delete() void
+    }
+
+    Team "1" *-- "0..*" Channel : contains
+    Channel "1" *-- "0..*" Message : holds
+    User "1" --> "0..*" Message : sends
+    Channel "1" *-- "0..*" PinnedMessage : pins
+    Message "1" --> "0..*" PinnedMessage : pinned
+    Channel "1" *-- "0..*" File : in
+    User "1" --> "0..*" File : uploads
+```
+
+##### Sequence — Channel Messaging over WebSocket (US-7.2, US-7.3, US-7.4, US-7.9, US-15.2)
+
+```mermaid
+sequenceDiagram
+    actor UserA
+    actor UserB
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Vec as Pinecone
+
+    Note over UserA,DB: ref: Authenticate
+
+    UserA->>+FE: Open channel
+    FE->>+API: «WebSocket» Connect
+    API-->>FE: «WebSocket» Connected
+    FE-->>-UserA: Channel ready
+
+    UserB->>+FE: Open channel
+    FE->>+API: «WebSocket» Connect
+    API-->>FE: «WebSocket» Connected
+
+    loop Active session
+        UserA->>FE: Type message
+        FE->>API: «WebSocket» Send message
+        API->>+DB: Check permissions
+        DB-->>-API: OK
+        API->>+DB: Save message
+        DB-->>-API: Saved
+        API-)Vec: Index message
+        API-)FE: «WebSocket» Broadcast message
+        FE-)UserB: Display message
+    end
+
+    UserA->>FE: Close channel
+    FE->>API: «WebSocket» Disconnect
+    UserB->>FE: Close channel
+    FE->>API: «WebSocket» Disconnect
+    deactivate API
+    deactivate API
+```
+
+##### Sequence — File Upload & Indexing (US-7.8, US-15.3)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Cloud as Cloudinary
+    participant Vec as Pinecone
+
+    Note over User,DB: ref: Authenticate
+
+    User->>+FE: Select file
+    FE->>+API: «WebSocket» Upload file
+    API->>API: Validate file
+    API->>+Cloud: Store file
+    Cloud-->>-API: URL
+    API->>+DB: Save file
+    DB-->>-API: Saved
+    opt Indexable file
+        API-)Vec: Index content
+    end
+    API-->>-FE: «WebSocket» File shared
+    FE-->>-User: Upload complete
+
+    User->>+FE: Open file
+    FE->>+API: Download file
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+DB: Load file
+        DB-->>-API: Row
+        API->>+Cloud: Fetch content
+        Cloud-->>-API: File data
+        API-->>FE: File
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-User: Display file
+```
+
 ### Sprint 4 — Personal Network (Weeks 7–8)
 
 Direct messages, group chats and friends.
 
 **Sprint goal:** _Users have 1:1 and small-group conversations and manage their personal network._
-
-**Related diagrams** — see [docs/sprints/SPRINT_4.md](docs/sprints/SPRINT_4.md):
-
-- C4 — Messaging domain (component view)
-- Class diagram — Direct Messages, Group Chat & Social Graph
-- Sequence — Direct Messages
-- Sequence — Presence WebSocket
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -379,17 +1023,235 @@ Direct messages, group chats and friends.
 
 **Sprint totals:** 11 stories • 35 story points
 
+#### Related diagrams
+
+_Source: [docs/sprints/SPRINT_4.md](docs/sprints/SPRINT_4.md)._
+
+##### C4 — Messaging domain (component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    cloud[/Cloudinary/]
+
+    subgraph msg [Messaging domain]
+        chRouter[channels_router.py<br/>REST · WS /mesages · WS /ws/notifications]
+        dmRouter[direct_messages_router.py<br/>REST · WS /ws/direct-messages]
+        gcRouter[groupe_chat_router.py<br/>Group chat REST / WS]
+
+        chSvc[channel_service.py]
+        msgSvc[message_service.py<br/>Send · edit · delete · reactions]
+        dmSvc[direct_message_service.py]
+        gcSvc[groupe_chat_service.py]
+
+        wsMgr[utils/Websocket_manager.py<br/>Connection registry · broadcast · presence]
+        cloudUtil[utils/cloudinary_handler.py<br/>Attachments]
+        msgData[Data Access<br/>SQLAlchemy · Channels · Messages · DM · GroupChat]
+    end
+
+    web -- "REST / WS" --> chRouter
+    web -- "REST / WS" --> dmRouter
+    web -- "REST / WS" --> gcRouter
+
+    chRouter --> chSvc
+    chRouter --> msgSvc
+    chRouter --> wsMgr
+    dmRouter --> dmSvc
+    dmRouter --> wsMgr
+    gcRouter --> gcSvc
+    gcRouter --> wsMgr
+
+    msgSvc --> cloudUtil
+    dmSvc --> cloudUtil
+    gcSvc --> cloudUtil
+    cloudUtil --> cloud
+
+    chSvc --> msgData
+    msgSvc --> msgData
+    dmSvc --> msgData
+    gcSvc --> msgData
+    msgData -- "SQL" --> db
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class chRouter,dmRouter,gcRouter,chSvc,msgSvc,dmSvc,gcSvc,wsMgr,cloudUtil,msgData component
+    class cloud ext
+```
+
+##### Class diagram — Direct Messages, Group Chat & Social Graph
+
+```mermaid
+classDiagram
+    direction LR
+
+    class DirectMessage {
+        +int id
+        +string content
+        +datetime sentAt
+        +bool isDeleted
+        +send(receiver, content) DirectMessage
+        +edit(content) void
+        +delete() void
+    }
+
+    class GroupChat {
+        +int id
+        +string groupName
+        +string groupImage
+        +int ownedBy
+        +create(data, owner) GroupChat
+        +addMembers(userIds) void
+        +delete() void
+    }
+
+    class GroupChatMember {
+        +int id
+        +datetime joinedAt
+    }
+
+    class GroupChatMessage {
+        +int id
+        +string content
+        +datetime sentAt
+        +bool isDeleted
+        +send(sender, content) GroupChatMessage
+        +edit(content) void
+        +delete() void
+    }
+
+    class Friendship {
+        +int id
+        +datetime addedAt
+        +remove() void
+    }
+
+    class FriendRequest {
+        +int id
+        +string status
+        +datetime sentAt
+        +accept() Friendship
+        +reject() void
+    }
+
+    class BlockedUser {
+        +int id
+        +datetime blockedAt
+        +unblock() void
+    }
+
+    User "1" --> "0..*" DirectMessage : sends
+    User "1" --> "0..*" DirectMessage : receives
+
+    User "1" --> "0..*" GroupChat : owns
+    GroupChat "1" *-- "1..*" GroupChatMember : has
+    User "1" --> "0..*" GroupChatMember : in
+    GroupChat "1" *-- "0..*" GroupChatMessage : holds
+    User "1" --> "0..*" GroupChatMessage : sends
+
+    User "1" --> "0..*" Friendship : owns
+    User "1" --> "0..*" Friendship : with
+    User "1" --> "0..*" FriendRequest : sent
+    User "1" --> "0..*" FriendRequest : received
+    User "1" --> "0..*" BlockedUser : blocker
+    User "1" --> "0..*" BlockedUser : blocked
+```
+
+##### Sequence — Direct Messages (US-3.1 → US-3.5, US-4.3, US-5.3)
+
+```mermaid
+sequenceDiagram
+    actor UserA
+    actor UserB
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over UserA,DB: ref: Authenticate
+
+    UserA->>+FE: Open DM
+    FE->>+API: «WebSocket» Connect
+    UserB->>+FE: Open DM
+    FE->>+API: «WebSocket» Connect
+
+    loop Active session
+        UserA->>FE: Type message
+        FE->>API: «WebSocket» Send message
+        API->>+DB: Check block
+        DB-->>-API: OK
+        API->>+DB: Save message
+        DB-->>-API: Saved
+        opt UserB online
+            API-)FE: «WebSocket» Broadcast message
+            FE-)UserB: Display message
+        end
+    end
+
+    UserA->>+FE: Open inbox
+    FE->>+API: List conversations
+    API->>+DB: Load conversations
+    DB-->>-API: Rows
+    API-->>-FE: Conversations
+    FE-->>-UserA: List displayed
+
+    UserA->>FE: Close DM
+    FE->>API: «WebSocket» Disconnect
+    UserB->>FE: Close DM
+    FE->>API: «WebSocket» Disconnect
+    deactivate API
+    deactivate API
+```
+
+##### Sequence — Presence WebSocket (US-3.4 typing/presence, US-4.1, US-4.2)
+
+```mermaid
+sequenceDiagram
+    actor User
+    actor Friends
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over User,DB: ref: Authenticate
+
+    User->>+FE: Open app
+    FE->>+API: «WebSocket» Connect
+    API->>+DB: Mark online
+    DB-->>-API: Saved
+    API-)Friends: «WebSocket» Broadcast presence
+    API-)FE: «WebSocket» Online friends list
+    FE-->>-User: Friends shown
+
+    loop Heartbeat
+        FE->>API: «WebSocket» Ping
+        API-->>FE: «WebSocket» Pong
+    end
+
+    opt Status change
+        User->>FE: Change status
+        FE->>API: «WebSocket» Update
+        API->>+DB: Save status
+        DB-->>-API: Saved
+        API-)Friends: «WebSocket» Broadcast status
+    end
+
+    User->>FE: Close app
+    FE->>API: «WebSocket» Disconnect
+    alt Last session
+        API->>+DB: Mark offline
+        DB-->>-API: Saved
+        API-)Friends: «WebSocket» Broadcast offline
+    end
+    deactivate API
+```
+
 ### Sprint 5 — Work Tracking (Weeks 9–10)
 
 Tasks, subtasks, approvals and real-time notifications.
 
 **Sprint goal:** _Teams plan and track work and stay informed via real-time notifications._
-
-**Related diagrams** — see [docs/sprints/SPRINT_5.md](docs/sprints/SPRINT_5.md):
-
-- C4 — Task domain (component view)
-- Class diagram — Tasks & Notifications
-- Sequence — Task Lifecycle
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -405,20 +1267,195 @@ Tasks, subtasks, approvals and real-time notifications.
 
 **Sprint totals:** 9 stories • 30 story points
 
+#### Related diagrams
+
+_Source: [docs/sprints/SPRINT_5.md](docs/sprints/SPRINT_5.md)._
+
+##### C4 — Task domain (component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    cloud[/Cloudinary/]
+
+    subgraph task [Task domain]
+        taskRouter[tasks_router.py<br/>Task endpoints]
+        taskSvc[task_service.py<br/>Lifecycle · assignments · attachments]
+        cloudUtil[utils/cloudinary_handler.py<br/>Task attachments]
+        wsMgr[utils/Websocket_manager.py<br/>Notifies assignees in real time]
+        taskData[Data Access<br/>SQLAlchemy · Tasks model]
+    end
+
+    web -- "REST" --> taskRouter
+    taskRouter --> taskSvc
+    taskSvc --> taskData
+    taskSvc --> cloudUtil
+    taskSvc --> wsMgr
+    taskData -- "SQL" --> db
+    cloudUtil --> cloud
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class taskRouter,taskSvc,cloudUtil,wsMgr,taskData component
+    class cloud ext
+```
+
+##### Class diagram — Tasks & Notifications
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Task {
+        +int id
+        +string title
+        +string priority
+        +string status
+        +datetime dueDate
+        +updateStatus(status) void
+        +review(action) void
+        +delete() void
+    }
+
+    class TaskAssignee {
+        +int id
+        +datetime assignedAt
+    }
+
+    class TaskAttachment {
+        +int id
+        +string fileName
+        +string fileUrl
+        +upload(file) TaskAttachment
+        +delete() void
+    }
+
+    class Notification {
+        +int id
+        +string type
+        +bool isSeen
+        +datetime createdAt
+        +markSeen() void
+    }
+
+    Team "1" *-- "0..*" Task : owns
+    User "1" --> "0..*" Task : creates
+    Task "1" *-- "0..*" TaskAssignee : has
+    User "1" --> "0..*" TaskAssignee : assigned
+    Task "1" *-- "0..*" TaskAttachment : has
+
+    User "1" *-- "0..*" Notification : receives
+    Message "1" *-- "0..*" Notification : about
+    DirectMessage "1" *-- "0..*" Notification : about
+```
+
+##### Sequence — Task Lifecycle (US-14.x, US-15.4, US-16.x, US-8.1, US-8.2)
+
+_9a. Manager creates a task → assignee is notified (US-14.1, US-8.1)_
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor Assignee
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Notif as Notifications
+
+    Note over Manager,DB: ref: Authenticate
+
+    Manager->>+FE: Fill task form
+    FE->>+API: Create task
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+DB: Save task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-)Assignee: Task assigned
+        deactivate Notif
+        API-->>FE: Task created
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Manager: Result
+```
+
+_9b. Assignee submits for review (US-16.1, US-16.2)_
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor Assignee
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Notif as Notifications
+
+    Note over Assignee,DB: ref: Authenticate
+
+    Assignee->>+FE: Mark as done
+    FE->>+API: Submit task
+    API->>API: Validate transition
+    alt Valid transition
+        API->>+DB: Update status
+        DB-->>-API: Saved
+        API->>+Notif: Notify manager
+        Notif-)Manager: Task submitted
+        deactivate Notif
+        API-->>FE: OK
+    else Invalid transition
+        API-->>FE: Error
+    end
+    deactivate API
+    FE-->>-Assignee: Result
+```
+
+_9c. Manager approves or rejects (US-14.4)_
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor Assignee
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Notif as Notifications
+
+    Note over Manager,DB: ref: Authenticate
+
+    Manager->>+FE: Review task
+    FE->>+API: Submit decision
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Approved
+        API->>+DB: Update task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-)Assignee: Task approved
+        deactivate Notif
+        API-->>FE: OK
+    else Rejected
+        API->>+DB: Update task
+        DB-->>-API: Saved
+        API->>+Notif: Notify assignee
+        Notif-)Assignee: Task rejected
+        deactivate Notif
+        API-->>FE: OK
+    end
+    deactivate API
+    FE-->>-Manager: Result
+```
+
 ### Sprint 6 — Platform Reach (Weeks 11–12)
 
 AI assistant, global search, audit log and Stripe billing.
 
 **Sprint goal:** _Add cross-cutting capabilities — AI help, global search, audit trail and paid plans._
-
-**Related diagrams** — see [docs/sprints/SPRINT_6.md](docs/sprints/SPRINT_6.md):
-
-- C4 — Assistant domain (RAG component view)
-- C4 — Organization domain (billing slice)
-- Class diagram — Billing & Audit Log
-- Sequence — AI Assistant (RAG)
-- Sequence — Stripe Upgrade
-- Sequence — Global Message Search
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -432,3 +1469,195 @@ AI assistant, global search, audit log and Stripe billing.
 | US-12.5 | As an **org owner**, I want to undo a reversible logged action, so that I can recover from a mistake. | EP-06 | Org Owner | 5 | **C** | 1. Mark reversible actions in the `Logs` table<br>2. Implement the undo endpoint per action type<br>3. Add the undo control in the activity log |
 
 **Sprint totals:** 8 stories • 39 story points
+
+#### Related diagrams
+
+_Source: [docs/sprints/SPRINT_6.md](docs/sprints/SPRINT_6.md)._
+
+##### C4 — Assistant domain (RAG component view)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    groq[/Groq LLM/]
+    pinecone[/Pinecone/]
+
+    subgraph asst [Assistant domain]
+        asstRouter[assistant_router.py<br/>Chat endpoints]
+        asstHandler[utils/assistant_handler.py<br/>Groq client · llama-3.3-70b]
+        vectorHandler[utils/vector_db_handler.py<br/>Pinecone client]
+        docHandler[utils/document_handler.py<br/>LlamaIndex parsing · chunking]
+        msgHandler[utils/messages_handler.py<br/>Embeds chat history]
+    end
+
+    web -- "REST" --> asstRouter
+    asstRouter --> docHandler
+    asstRouter --> msgHandler
+    docHandler --> vectorHandler
+    msgHandler --> vectorHandler
+    asstRouter --> vectorHandler
+    asstRouter --> asstHandler
+    vectorHandler --> pinecone
+    asstHandler --> groq
+    asstRouter --> db
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class asstRouter,asstHandler,vectorHandler,docHandler,msgHandler component
+    class groq,pinecone ext
+```
+
+##### C4 — Organization domain (billing slice)
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js]
+    db[(PostgreSQL)]
+    stripe[/Stripe/]
+
+    subgraph org [Organization domain]
+        orgRouter[org_router.py<br/>Orgs · members · Stripe webhook]
+        teamRouter[team_router.py<br/>Teams within an org]
+        orgSvc[org_service.py<br/>Workspace · membership · billing logic]
+        teamSvc[team_service.py<br/>Team logic]
+        orgData[Data Access<br/>SQLAlchemy · Organization · Members · Teams · Payments]
+    end
+
+    web -- "REST" --> orgRouter
+    web -- "REST" --> teamRouter
+    stripe -- "Webhook events" --> orgRouter
+
+    orgRouter --> orgSvc
+    teamRouter --> teamSvc
+
+    orgSvc --> orgData
+    teamSvc --> orgData
+    orgData -- "SQL" --> db
+
+    orgSvc -- "Charges subscriptions" --> stripe
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    class web,db container
+    class orgRouter,teamRouter,orgSvc,teamSvc,orgData component
+    class stripe ext
+```
+
+##### Class diagram — Billing & Audit Log
+
+```mermaid
+classDiagram
+    direction LR
+
+    class OrganizationPayment {
+        +int subscriptionId
+        +string stripeSubscriptionId
+        +string status
+        +createSubscription() Checkout
+        +cancelSubscription() void
+    }
+
+    class AuditLog {
+        +int id
+        +string action
+        +string targetType
+        +datetime createdAt
+        +record(action, actor) AuditLog
+    }
+
+    Organization "1" *-- "0..*" OrganizationPayment : billed by
+    Organization "1" *-- "0..*" AuditLog : records
+    User "1" --> "0..*" AuditLog : actor
+```
+
+##### Sequence — AI Assistant (RAG) (US-9.1, US-9.2, US-9.3)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Vec as Pinecone
+    participant LLM
+
+    Note over User,DB: ref: Authenticate
+
+    User->>+FE: Ask question
+    FE->>+API: Ask question
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+Vec: Search context
+        Vec-->>-API: Results
+        API->>API: Build prompt
+        API->>+LLM: Ask for answer
+        LLM-->>-API: Answer
+        API-->>FE: Answer + sources
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-User: Display result
+```
+
+##### Sequence — Stripe Upgrade (US-12.2, US-12.3)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Stripe
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Choose plan
+    FE->>+API: Subscribe to plan
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    API->>+Stripe: Start payment
+    Stripe-->>-API: Session URL
+    API-->>-FE: Redirect to payment
+    FE-->>-Admin: Payment page
+
+    Stripe->>+API: Payment notification
+    API->>API: Verify signature
+    API->>+DB: Update subscription
+    DB-->>-API: Saved
+    API-->>-Stripe: OK
+```
+
+##### Sequence — Global Message Search (US-10.1)
+
+```mermaid
+sequenceDiagram
+    actor Member
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+    participant Vec as Pinecone
+
+    Note over Member,DB: ref: Authenticate
+
+    Member->>+FE: Type query
+    FE->>+API: Search org messages
+    API->>+DB: Check permissions
+    DB-->>-API: OK
+    alt Authorized
+        API->>+Vec: Similarity search
+        Vec-->>-API: Top matches
+        API->>+DB: Hydrate messages
+        DB-->>-API: Rows
+        API-->>FE: Results
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Member: Display results
+```
