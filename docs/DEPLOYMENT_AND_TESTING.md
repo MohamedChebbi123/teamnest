@@ -141,16 +141,42 @@ Design decisions:
   directory, Markdown docs and the `.git` folder, so secrets and dev artefacts
   never enter the image.
 
-> **Note on multi-stage builds.** The current Dockerfile is single-stage. A
+> **Note on the backend build.** The backend Dockerfile is single-stage. A
 > multi-stage build (compiling wheels in a builder stage and copying only the
 > installed packages into a slim runtime stage) is a viable future optimisation
-> to further shrink the final image, but it is not yet applied. The frontend is
-> **not** containerised — it is deployed directly from source by Vercel.
+> to further shrink the final image, but it is not yet applied.
+
+**Frontend image.** The frontend is also containerised, via a **three-stage**
+[frontend/Dockerfile](../frontend/Dockerfile) on `node:20-alpine`:
+
+1. **`deps`** — runs `npm ci` from `package-lock.json` for a reproducible
+   dependency install.
+2. **`builder`** — runs `npm run build`. The `NEXT_PUBLIC_API_URL` and
+   `NEXT_PUBLIC_WS_URL` values are passed as **build args**, because Next.js
+   inlines `NEXT_PUBLIC_*` variables into the bundle at build time.
+3. **`runner`** — copies only the Next.js **standalone** output
+   (`output: "standalone"` in [next.config.ts](../frontend/next.config.ts))
+   and runs it as a non-root `nextjs` user. The standalone bundle ships only
+   the files needed at runtime, keeping the final image small.
+
+**Both services are containerised.** The backend and the frontend each have a
+Dockerfile, so the entire application can be built and run as containers and
+orchestrated together with Docker Compose (§5.2.2) — giving every developer an
+identical, reproducible environment regardless of host OS.
+
+**Production frontend remains zero-config.** In production the frontend is
+deployed by **Vercel** with a *zero-configuration* workflow: Vercel detects the
+Next.js project automatically, runs `next build` and publishes to its edge
+network without any Dockerfile, build script or pipeline definition. The
+frontend Dockerfile and the Compose setup therefore serve **local development
+and portable, self-hosted runs**, while production hosting stays effortless on
+Vercel.
 
 ### 5.2.2 Docker Compose for Local Development
 
-[docker-compose.yml](../docker-compose.yml) brings up the full backend stack
-locally — PostgreSQL plus the FastAPI service — with a single command.
+[docker-compose.yml](../docker-compose.yml) brings up the full stack
+locally — PostgreSQL, the FastAPI backend and the Next.js frontend — with a
+single command.
 
 ```yaml
 services:
@@ -185,6 +211,18 @@ services:
     ports:
       - "8000:8000"
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
 volumes:
   db_data:
 ```
@@ -202,27 +240,47 @@ Notable points:
   keeping sensible defaults.
 - **Injected `DATABASE_URL`** — Compose wires the backend to the `db` service
   by its service hostname, so no host-specific configuration is needed.
-- Running `docker compose up --build` produces a local environment that mirrors
-  the production container, reducing "works on my machine" drift.
+- **Frontend service** — the `frontend` service builds the Next.js image and
+  starts only after the backend. Its `NEXT_PUBLIC_*` build args point at
+  `http://localhost:8000` / `ws://localhost:8000`, because those values are
+  consumed by the **browser**, which reaches the backend through the
+  host-published port — not the internal `backend` hostname.
+- **One command for the whole stack** — `docker compose up --build` builds and
+  starts all three services together (database, backend, frontend). The
+  developer needs only Docker installed; no local Python, Node.js or PostgreSQL
+  setup is required.
+
+The resulting local environment runs the **frontend on `:3000`** and the
+**backend on `:8000`** in containers that mirror their production runtimes,
+which removes "works on my machine" drift. Production then diverges only in one
+intentional way: instead of the frontend container, Vercel hosts the frontend
+through its zero-config deployment (§5.3.3).
 
 ### 5.2.3 Container Registry and Image Management
 
 TeamNest does not publish images to a standalone registry such as Docker Hub.
-Instead it relies on **Render's integrated build pipeline**:
+Images are built where they are run:
 
-1. A commit is pushed to the branch connected to the Render service.
-2. Render checks out the repository and builds the backend image from
-   [backend/Dockerfile](../backend/Dockerfile) using the build context rules in
-   `.dockerignore`.
-3. The resulting image is stored inside Render's own image store and used to
-   start the new container revision.
-4. Each deploy is an immutable revision, so a previous image can be rolled back
-   to from the Render dashboard if a release misbehaves.
+- **Locally**, `docker compose build` builds both the backend and frontend
+  images on the developer's machine from their respective Dockerfiles.
+- **For the production backend**, **Render's integrated build pipeline** takes
+  over:
+  1. A commit is pushed to the branch connected to the Render service.
+  2. Render checks out the repository and builds the backend image from
+     [backend/Dockerfile](../backend/Dockerfile) using the build-context rules
+     in `.dockerignore`.
+  3. The resulting image is stored inside Render's own image store and used to
+     start the new container revision.
+  4. Each deploy is an immutable revision, so a previous image can be rolled
+     back to from the Render dashboard if a release misbehaves.
+- **For the production frontend**, no image is produced at all: Vercel builds
+  the Next.js project directly from source as part of its zero-config
+  deployment. The frontend Docker image exists purely for the local Compose
+  stack and for self-hosted deployments.
 
 This keeps image management lightweight: there is no registry to authenticate
 against or to garbage-collect, at the cost of being tied to the hosting
-platform's build system. Locally, `docker compose build` produces the
-equivalent image on the developer's machine.
+platforms' build systems.
 
 ---
 
@@ -290,10 +348,14 @@ blocking merges that break tests before they ever reach Vercel or Render.
 
 Deployment is **continuous and automatic**:
 
-- **Frontend → Vercel.** When the build succeeds, Vercel promotes the new
+- **Frontend → Vercel (zero-config).** Vercel auto-detects the Next.js project
+  and deploys it with **no configuration** — no Dockerfile, build script or
+  pipeline file is needed. When the build succeeds, Vercel promotes the new
   bundle to its edge network. Pushes to non-production branches produce
-  isolated preview deployments with their own URLs, which is useful for
-  reviewing changes before they reach the production domain.
+  isolated preview deployments with their own URLs, useful for reviewing
+  changes before they reach the production domain. (The frontend Dockerfile and
+  Compose service from §5.2 are used only for local and self-hosted runs and
+  are ignored by Vercel.)
 - **Backend → Render.** When the Docker image builds successfully, Render
   starts the new container revision and switches traffic to it once it is
   healthy, then retires the old revision. Failed builds leave the previous
@@ -370,6 +432,15 @@ cd backend
 pytest                  # run all 27 tests
 pytest tests/test_auth.py -v   # run a single module, verbose
 ```
+
+Because the suite uses an in-memory SQLite database and stubs every external
+integration, it needs **no running container** — it can be executed directly on
+the host as above, against the same source that is baked into the Docker image.
+The backend `.dockerignore` deliberately excludes the `tests` directory from the
+production image to keep it small; to run the suite inside a container instead,
+the source can be mounted into the backend image (e.g.
+`docker compose run --rm -v ${PWD}/backend:/backend backend pytest`), which is
+the recommended form once the tests are wired into a CI gate (§5.3.2).
 
 ### 5.4.3 End-to-End Testing
 
@@ -473,12 +544,16 @@ production system and how that system is verified.
   Next.js frontend on Vercel, the FastAPI backend and PostgreSQL on Render, and
   five managed external services for media, vectors, inference, billing and
   email. The backend is stateless, which keeps it easy to restart and scale.
-- **Containerisation (§5.2)** — the backend is packaged as a single-stage,
-  non-root Docker image on a slim Python base, with layer ordering tuned for
-  fast rebuilds and a `.dockerignore` that keeps secrets and dev artefacts out.
-  Docker Compose reproduces the backend + database stack locally with a
-  healthcheck-gated startup. Images are built by Render's integrated pipeline
-  rather than a standalone registry.
+- **Containerisation (§5.2)** — both services are containerised: the backend as
+  a single-stage non-root image on a slim Python base, and the frontend as a
+  three-stage Next.js standalone image. Layer ordering is tuned for fast
+  rebuilds and `.dockerignore` files keep secrets and dev artefacts out of every
+  image. A single `docker compose up --build` brings the whole stack — database,
+  backend and frontend — up locally with a healthcheck-gated startup, so a
+  developer needs only Docker installed. In production the backend image is
+  built by Render's integrated pipeline, while the frontend is deployed to
+  Vercel with a **zero-configuration** workflow that requires no Dockerfile or
+  build script.
 - **CI/CD (§5.3)** — deployment is Git-driven and platform-native: Vercel and
   Render build and release automatically on push, with immutable revisions
   enabling one-click rollback and Alembic managing schema evolution. The chapter
