@@ -1,8 +1,7 @@
-# Chapter 5 — Deployment, CI/CD and Testing
+# Chapter 5 — Deployment and Testing
 
 This chapter describes how **TeamNest** is packaged, deployed and verified. It
-covers the deployment architecture, the containerisation strategy, the
-continuous-deployment pipeline provided by the hosting platforms, and the
+covers the deployment architecture, the containerisation strategy, and the
 testing approach used to validate the backend and frontend.
 
 ---
@@ -79,6 +78,10 @@ Key properties of the topology:
 - **Stateless backend** — the FastAPI container holds no durable state; all
   persistence lives in PostgreSQL, Cloudinary and Pinecone, which makes the
   container safe to restart or replace.
+- **Database provisioned first** — the Render PostgreSQL service is created
+  before the backend and exists independently of any single deploy. The backend
+  receives its connection string through the `DATABASE_URL` environment
+  variable, so it always starts against an already-existing database.
 - **Managed dependencies** — the database and every heavyweight capability
   (media, vectors, inference, billing, mail) are managed services, keeping the
   deployable surface small.
@@ -254,7 +257,7 @@ The resulting local environment runs the **frontend on `:3000`** and the
 **backend on `:8000`** in containers that mirror their production runtimes,
 which removes "works on my machine" drift. Production then diverges only in one
 intentional way: instead of the frontend container, Vercel hosts the frontend
-through its zero-config deployment (§5.3.3).
+through its zero-config deployment.
 
 ### 5.2.3 Container Registry and Image Management
 
@@ -263,16 +266,12 @@ Images are built where they are run:
 
 - **Locally**, `docker compose build` builds both the backend and frontend
   images on the developer's machine from their respective Dockerfiles.
-- **For the production backend**, **Render's integrated build pipeline** takes
-  over:
-  1. A commit is pushed to the branch connected to the Render service.
-  2. Render checks out the repository and builds the backend image from
-     [backend/Dockerfile](../backend/Dockerfile) using the build-context rules
-     in `.dockerignore`.
-  3. The resulting image is stored inside Render's own image store and used to
-     start the new container revision.
-  4. Each deploy is an immutable revision, so a previous image can be rolled
-     back to from the Render dashboard if a release misbehaves.
+- **For the production backend**, **Render's integrated build** takes over: it
+  checks out the repository, builds the backend image from
+  [backend/Dockerfile](../backend/Dockerfile) using the build-context rules in
+  `.dockerignore`, stores the image in its own image store, and starts the new
+  container revision. Each deploy is an immutable revision, so a previous image
+  can be rolled back to from the Render dashboard if a release misbehaves.
 - **For the production frontend**, no image is produced at all: Vercel builds
   the Next.js project directly from source as part of its zero-config
   deployment. The frontend Docker image exists purely for the local Compose
@@ -284,109 +283,9 @@ platforms' build systems.
 
 ---
 
-## 5.3 Continuous Integration and Deployment Pipeline
+## 5.3 Testing Strategy
 
-### 5.3.1 CI/CD Pipeline Architecture
-
-TeamNest uses a **Git-driven, platform-native deployment model** rather than a
-self-managed CI server. The Git repository is the single source of truth, and
-both hosting platforms watch it for changes.
-
-```mermaid
-flowchart LR
-    dev[Developer] -- "git push" --> repo[(Git Repository)]
-    repo -- "frontend changes" --> vercel[Vercel Build]
-    repo -- "backend changes" --> render[Render Build]
-
-    vercel --> vbuild["next build<br/>+ ESLint"]
-    vbuild --> vdeploy[Deploy to Edge]
-
-    render --> rbuild["docker build<br/>from Dockerfile"]
-    rbuild --> rdeploy[Deploy Container]
-    rdeploy --> migrate["Alembic migrations<br/>(schema evolution)"]
-
-    classDef plat fill:#1168bd,stroke:#0b4884,color:#fff
-    class vercel,render,vbuild,rbuild,vdeploy,rdeploy,migrate plat
-```
-
-> **Current state.** There is no dedicated CI configuration file (e.g. a
-> GitHub Actions workflow under `.github/workflows/`) in the repository at the
-> time of writing. Build and deployment are performed by Vercel and Render on
-> push. The automated test suite described in §5.4 is run locally / on demand
-> with `pytest`; wiring it into a pre-deploy CI gate is a recommended next step
-> and is discussed below.
-
-### 5.3.2 Automated Build and Linting Stages
-
-**Frontend (Vercel).** On every push, Vercel runs `next build`
-([frontend/package.json](../frontend/package.json) → `build` script). The build
-compiles and type-checks the TypeScript sources and fails the deploy if the
-build does not succeed. ESLint is configured via
-[frontend/eslint.config.mjs](../frontend/eslint.config.mjs) with
-`eslint-config-next`, and is run with the `npm run lint` script; Next.js also
-surfaces lint errors during the build.
-
-**Backend (Render).** On every push, Render performs `docker build` against the
-backend `Dockerfile`. The build fails if dependency installation
-(`pip install -r requirements.txt`) or the image build itself fails, which
-prevents a broken image from being deployed.
-
-| Stage          | Frontend                         | Backend                           |
-|----------------|----------------------------------|-----------------------------------|
-| Trigger        | Push to connected branch         | Push to connected branch          |
-| Build          | `next build`                     | `docker build` (Dockerfile)       |
-| Static checks  | TypeScript compile, ESLint       | Dependency resolution at build    |
-| Tests          | — (manual)                       | `pytest` (manual / recommended CI gate) |
-| Artefact       | Optimised Next.js bundle         | Docker image                      |
-
-**Recommended hardening.** Adding a GitHub Actions workflow that runs `pytest`
-for the backend and `npm run lint` / `next build` for the frontend on every
-pull request would turn the current build-only flow into a true CI gate,
-blocking merges that break tests before they ever reach Vercel or Render.
-
-### 5.3.3 Automated Deployment to Production
-
-Deployment is **continuous and automatic**, and follows a deliberate order.
-
-**Provisioning order — database first.** The Render **PostgreSQL** service is
-provisioned *before* the backend. It is a long-lived managed service that
-exists independently of any single deploy, so its connection string is known
-ahead of time. That string is then set as the `DATABASE_URL` environment
-variable on the Render backend service, so the very first backend revision
-already has a database to connect to. This mirrors, at the infrastructure
-level, the healthcheck-gated startup used locally in Docker Compose (§5.2.2):
-the backend never comes up before its database exists.
-
-Once the database is in place, each push triggers:
-
-- **Frontend → Vercel (zero-config).** Vercel auto-detects the Next.js project
-  and deploys it with **no configuration** — no Dockerfile, build script or
-  pipeline file is needed. When the build succeeds, Vercel promotes the new
-  bundle to its edge network. Pushes to non-production branches produce
-  isolated preview deployments with their own URLs, useful for reviewing
-  changes before they reach the production domain. (The frontend Dockerfile and
-  Compose service from §5.2 are used only for local and self-hosted runs and
-  are ignored by Vercel.)
-- **Backend → Render.** When the Docker image builds successfully, Render
-  starts the new container revision and switches traffic to it once it is
-  healthy, then retires the old revision. Failed builds leave the previous
-  revision serving traffic.
-- **Database migrations.** Schema changes are managed with **Alembic**
-  ([backend/alembic/](../backend/alembic/)). Migrations are versioned in the
-  repository so the schema can be evolved reproducibly across environments;
-  they are applied as part of the release process rather than by ad-hoc SQL.
-- **Rollback.** Because each deploy is an immutable revision on both platforms,
-  reverting to a previous known-good release is a dashboard action.
-- **Configuration & secrets.** Runtime configuration (database URL, JWT secret,
-  Stripe / Cloudinary / Groq / Pinecone keys) is supplied through environment
-  variables on each platform and is never baked into the image or committed —
-  `.env*` files are excluded by `.dockerignore` and `.gitignore`.
-
----
-
-## 5.4 Testing Strategy
-
-### 5.4.1 Testing Levels and Scope
+### 5.3.1 Testing Levels and Scope
 
 TeamNest's quality strategy is organised into four levels. The table records
 both what is **automated today** and what is currently **manual or planned**, so
@@ -395,14 +294,14 @@ the strategy is described honestly.
 | Level                  | Scope                                                        | Status in TeamNest |
 |------------------------|--------------------------------------------------------------|--------------------|
 | Unit testing           | Individual functions/helpers (hashing, JWT, validators)      | Exercised indirectly through the backend test suite |
-| Integration testing    | Routers + services + database working together over HTTP/WS | **Automated** with `pytest` (see §5.4.2) |
-| End-to-end testing      | Full user journeys through the real frontend and backend     | **Manual** today; automation planned (see §5.4.3) |
-| User acceptance (UAT)   | Stakeholder validation against the functional requirements   | **Manual**, sprint-based (see §5.4.3) |
+| Integration testing    | Routers + services + database working together over HTTP/WS | **Automated** with `pytest` (see §5.3.2) |
+| End-to-end testing      | Full user journeys through the real frontend and backend     | **Manual** today; automation planned (see §5.3.3) |
+| User acceptance (UAT)   | Stakeholder validation against the functional requirements   | **Manual**, sprint-based (see §5.3.3) |
 
 The automated suite deliberately concentrates on the **backend**, because that
 is where the business rules, authorisation logic and data integrity live.
 
-### 5.4.2 Unit and Integration Tests
+### 5.3.2 Unit and Integration Tests
 
 The backend test suite lives in [backend/tests/](../backend/tests/) and is run
 with **pytest**. It contains **27 test functions across 5 test modules**.
@@ -450,10 +349,9 @@ the host as above, against the same source that is baked into the Docker image.
 The backend `.dockerignore` deliberately excludes the `tests` directory from the
 production image to keep it small; to run the suite inside a container instead,
 the source can be mounted into the backend image (e.g.
-`docker compose run --rm -v ${PWD}/backend:/backend backend pytest`), which is
-the recommended form once the tests are wired into a CI gate (§5.3.2).
+`docker compose run --rm -v ${PWD}/backend:/backend backend pytest`).
 
-### 5.4.3 End-to-End Testing
+### 5.3.3 End-to-End Testing
 
 End-to-end testing exercises a complete user journey through the deployed
 frontend and backend together — for example: *register → verify email → create
@@ -464,14 +362,14 @@ At present this is performed **manually** during sprint reviews and as part of
 **User Acceptance Testing (UAT)**: features are validated against the
 [functional requirements](FUNCTIONAL_REQUIREMENTS.md) and the
 [user stories](../USER_STORIES.md) at the end of each sprint
-([docs/sprints/](sprints/)). The integration suite in §5.4.2 already covers the
+([docs/sprints/](sprints/)). The integration suite in §5.3.2 already covers the
 WebSocket message and presence flows end-to-end at the API level.
 
 Automating browser-level E2E tests with a tool such as **Playwright** or
 **Cypress** — driving the real Next.js UI against a disposable backend — is a
 recommended extension once the core feature set is stable.
 
-### 5.4.4 Performance and Load Testing
+### 5.3.4 Performance and Load Testing
 
 No automated performance or load tests are committed to the repository yet.
 The architecture is, however, designed with performance in mind:
@@ -488,7 +386,7 @@ WebSocket chat clients, bursts of REST requests, and AI-assistant queries — wi
 a tool such as **Locust** or **k6**, and measure latency percentiles and
 throughput against the Render instance to establish a capacity baseline.
 
-### 5.4.5 Security Testing
+### 5.3.5 Security Testing
 
 Security is addressed primarily through **design and verification**, with the
 authorisation behaviour explicitly covered by automated tests:
@@ -515,7 +413,7 @@ Recommended additions: dependency vulnerability scanning (`pip-audit`,
 `npm audit`), static analysis (e.g. `bandit` for the Python code), and a
 periodic review against the OWASP Top 10.
 
-### 5.4.6 Test Results and Coverage Report
+### 5.3.6 Test Results and Coverage Report
 
 Executing `pytest` from the `backend/` directory runs all **27 backend tests**.
 The expected result is a fully green suite, since the tests are deterministic —
@@ -546,15 +444,15 @@ container entrypoint) is intentionally out of scope.
 
 ---
 
-## 5.5 Chapter Summary
+## 5.4 Chapter Summary
 
-This chapter described how TeamNest moves from source code to a running
-production system and how that system is verified.
+This chapter described how TeamNest is packaged, deployed and verified.
 
 - **Deployment architecture (§5.1)** — a cleanly separated topology: the
   Next.js frontend on Vercel, the FastAPI backend and PostgreSQL on Render, and
   five managed external services for media, vectors, inference, billing and
-  email. The backend is stateless, which keeps it easy to restart and scale.
+  email. The backend is stateless and the database is provisioned ahead of it,
+  which keeps the system easy to restart and scale.
 - **Containerisation (§5.2)** — both services are containerised: the backend as
   a single-stage non-root image on a slim Python base, and the frontend as a
   three-stage Next.js standalone image. Layer ordering is tuned for fast
@@ -562,14 +460,9 @@ production system and how that system is verified.
   image. A single `docker compose up --build` brings the whole stack — database,
   backend and frontend — up locally with a healthcheck-gated startup, so a
   developer needs only Docker installed. In production the backend image is
-  built by Render's integrated pipeline, while the frontend is deployed to
-  Vercel with a **zero-configuration** workflow that requires no Dockerfile or
-  build script.
-- **CI/CD (§5.3)** — deployment is Git-driven and platform-native: Vercel and
-  Render build and release automatically on push, with immutable revisions
-  enabling one-click rollback and Alembic managing schema evolution. The chapter
-  also flags the absence of a dedicated CI test gate and recommends adding one.
-- **Testing strategy (§5.4)** — a deterministic `pytest` suite of **27
+  built by Render, while the frontend is deployed to Vercel with a
+  **zero-configuration** workflow that requires no Dockerfile or build script.
+- **Testing strategy (§5.3)** — a deterministic `pytest` suite of **27
   integration tests** across authentication, CRUD, friends/DMs, authorisation
   and presence/search exercises the backend through real HTTP and WebSocket
   calls against an in-memory database with stubbed external services. E2E,
@@ -577,7 +470,7 @@ production system and how that system is verified.
   manual verification today, with concrete tooling recommendations for future
   automation.
 
-In short, TeamNest already has a reproducible build, a continuous deployment
-path and a meaningful automated test suite for its most critical layer; the
-identified next steps — a CI test gate, browser-level E2E tests, load testing
-and coverage measurement — would round the strategy out to production maturity.
+In short, TeamNest has a reproducible, fully containerised build and a
+meaningful automated test suite for its most critical layer; the identified
+next steps — browser-level E2E tests, load testing and coverage measurement —
+would round the strategy out to production maturity.
