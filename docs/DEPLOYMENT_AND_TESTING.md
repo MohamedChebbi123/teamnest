@@ -58,6 +58,23 @@ flowchart TB
     class stripe,cloud,groq,pine,mail ext
 ```
 
+The diagram is read as follows:
+
+- **Three deployment nodes, separately hosted** — the user's **browser** runs
+  the Next.js UI; the **Next.js app** is deployed on Vercel's edge network; and
+  on **Render** sit two artefacts together — the **FastAPI container** (Uvicorn,
+  Python 3.12) and the **managed PostgreSQL** database.
+- **How they communicate** — the browser loads the frontend over HTTPS and also
+  opens its own HTTPS/WSS connections straight to the backend (REST plus
+  real-time WebSockets); the Next.js app itself also calls the backend over
+  REST/WebSocket; and the backend reaches PostgreSQL over a local TCP connection
+  via `psycopg2`.
+- **External services the backend depends on** — the FastAPI container calls
+  out to five managed providers: **Stripe** (subscriptions), **Cloudinary**
+  (media storage), **Groq** (LLM inference), **Pinecone** (vector search) and an
+  **email service** (transactional mail); Stripe also calls *back* into the
+  backend through a signed webhook for subscription events.
+
 ### 5.1.2 Infrastructure Overview
 
 | Layer            | Technology                     | Hosting        | Notes |
