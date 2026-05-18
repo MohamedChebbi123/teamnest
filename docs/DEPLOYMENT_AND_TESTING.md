@@ -346,7 +346,18 @@ blocking merges that break tests before they ever reach Vercel or Render.
 
 ### 5.3.3 Automated Deployment to Production
 
-Deployment is **continuous and automatic**:
+Deployment is **continuous and automatic**, and follows a deliberate order.
+
+**Provisioning order — database first.** The Render **PostgreSQL** service is
+provisioned *before* the backend. It is a long-lived managed service that
+exists independently of any single deploy, so its connection string is known
+ahead of time. That string is then set as the `DATABASE_URL` environment
+variable on the Render backend service, so the very first backend revision
+already has a database to connect to. This mirrors, at the infrastructure
+level, the healthcheck-gated startup used locally in Docker Compose (§5.2.2):
+the backend never comes up before its database exists.
+
+Once the database is in place, each push triggers:
 
 - **Frontend → Vercel (zero-config).** Vercel auto-detects the Next.js project
   and deploys it with **no configuration** — no Dockerfile, build script or
