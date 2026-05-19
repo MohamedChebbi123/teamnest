@@ -187,6 +187,60 @@ new feature is merged. The numbers from a single dev uvicorn worker are
 treated as *relative* — useful for comparing endpoints, not for predicting
 production capacity.
 
+### Real run — 50 users, 5/s spawn, 2 minutes, headless
+
+Run against a local `uvicorn main:app` on `127.0.0.1:8000` with the dev
+PostgreSQL behind it. **1 770 requests, 0 failures, 14.92 req/s aggregate.**
+
+```
+Type     Name                              # reqs    # fails |    Avg    Min    Max    Med |  req/s  fail/s
+GET      /friends                              266   0(0.00%) |   1064      6  14341    470 |   2.24    0.00
+GET      /friends/blocked                      121   0(0.00%) |    940      6  11258    370 |   1.02    0.00
+GET      /friends/requests                     269   0(0.00%) |   1244      6  12392    680 |   2.27    0.00
+GET      /get_org_for_admin_org                442   0(0.00%) |   1029      6  14729    520 |   3.73    0.00
+POST     /login                                 50   0(0.00%) |   8999   1613  14145   9800 |   0.42    0.00
+GET      /profile                              508   0(0.00%) |   1110      5  14341    480 |   4.28    0.00
+POST     /register                             114   0(0.00%) |   1303    387  10394   1000 |   0.96    0.00
+Aggregated                                   1770   0(0.00%) |   1327      5  14729    620 |  14.92    0.00
+
+Response time percentiles (ms, approximated)
+Type     Name                                50%    75%    90%    95%    99%    100%   # reqs
+GET      /friends                            480   1500   2700   3200  11000  14000     266
+GET      /friends/blocked                    370   1300   2400   3200   7200  11000     121
+GET      /friends/requests                   680   1700   3000   3600  11000  12000     269
+GET      /get_org_for_admin_org              530   1400   2500   3300   8000  15000     442
+POST     /login                             9800  13000  14000  14000  14000  14000      50
+GET      /profile                            480   1600   2700   3300  11000  14000     508
+POST     /register                          1000   1800   2300   2700   7200  10000     114
+Aggregated                                   620   1700   3000   3700  13000  15000    1770
+```
+
+### Reading the numbers
+
+- **`POST /login` is the bottleneck** — median 9.8 s, p99 14 s. This is the
+  cost of `bcrypt.checkpw`, which is *deliberately* slow (≈12 work-factor)
+  to defeat offline cracking. The 50 logins all happen in the first 9 s
+  ramp-up window, so they collide on the same workers and queue up.
+  In production it is amortised by the JWT — clients only `/login` once and
+  then reuse the access token for every subsequent call.
+- **Read endpoints** (`/profile`, `/friends*`, `/get_org_for_admin_org`)
+  sit at **median 370–680 ms, p95 ≈ 3 s**. Bounded by Postgres round-trip
+  on a dev laptop, not by FastAPI.
+- **`POST /register` p50 ≈ 1 s** — same bcrypt cost as login, but each
+  request gets its own worker so they do not queue.
+- **0 failures across 1 770 requests** — the auth surface (JWT validation,
+  CORS, session management) survives sustained concurrent traffic.
+
+### Harness fix discovered while running this
+
+The harness shipped with `EMAIL_DOMAIN = "loadtest.local"` in both
+[seed_users.py](backend/perf/seed_users.py) and
+[locustfile.py](backend/perf/locustfile.py), but `Logininput` uses
+pydantic's `EmailStr`, which rejects the reserved `.local` TLD with HTTP
+422. Every login failed and every read endpoint cascaded to 401. Changed
+the domain to `loadtest.com` (not a reserved TLD) and the run above is
+clean.
+
 ---
 
 ## 5.4.5 Security Testing

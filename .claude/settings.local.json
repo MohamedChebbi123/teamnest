@@ -17,7 +17,15 @@
       "Bash(pip show *)",
       "Bash(python -m pytest tests/test_unit_validate_password.py tests/test_integration_register_endpoint.py tests/test_e2e_signup_login_profile.py tests/test_uat_us_1_2_visitor_registration.py --cov=utils.validators --cov=services.auth_service --cov=routers.auth_router --cov-report=term)",
       "Bash(pip install *)",
-      "Bash(python -m pytest tests/test_unit_validate_password.py tests/test_integration_register_endpoint.py tests/test_e2e_signup_login_profile.py tests/test_uat_us_1_2_visitor_registration.py --cov=utils.validators --cov=utils.hasher --cov=utils.jwt_handler --cov=services.auth_service --cov=routers.auth_router --cov-report=term-missing)"
+      "Bash(python -m pytest tests/test_unit_validate_password.py tests/test_integration_register_endpoint.py tests/test_e2e_signup_login_profile.py tests/test_uat_us_1_2_visitor_registration.py --cov=utils.validators --cov=utils.hasher --cov=utils.jwt_handler --cov=services.auth_service --cov=routers.auth_router --cov-report=term-missing)",
+      "Bash(python -m uvicorn main:app --host 127.0.0.1 --port 8000 --log-level warning)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/docs)",
+      "Bash(curl -s http://127.0.0.1:8000/openapi.json)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('title:', d['info'].get\\('title'\\)\\); print\\('paths:', list\\(d['paths'].keys\\(\\)\\)[:5]\\)\")",
+      "Bash(python perf/seed_users.py 50)",
+      "Bash(locust -f locustfile.py --host http://127.0.0.1:8000 --users 50 --spawn-rate 5 --run-time 2m --headless --only-summary)",
+      "Bash(python -m locust -f locustfile.py --host http://127.0.0.1:8000 --users 50 --spawn-rate 5 --run-time 2m --headless --only-summary)",
+      "Bash(python perf/seed_users.py --clean)"
     ],
     "additionalDirectories": [
       "C:\\Users\\moham\\OneDrive\\Bureau\\teamnest"

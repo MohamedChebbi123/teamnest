@@ -43,7 +43,7 @@ for _modinfo in pkgutil.iter_modules(_models_pkg.__path__):
 from models.Users import Users  # noqa: E402  (after dynamic model loading)
 from utils.hasher import hash_password  # noqa: E402
 
-EMAIL_DOMAIN = "loadtest.local"
+EMAIL_DOMAIN = "loadtest.com"
 PASSWORD = "Perf1!Pass"
 DEFAULT_COUNT = 50
 

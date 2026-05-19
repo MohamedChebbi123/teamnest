@@ -23,7 +23,7 @@ from locust import HttpUser, between, task
 
 USER_COUNT = 50               # keep <= the number passed to seed_users.py
 PASSWORD = "Perf1!Pass"       # must match seed_users.py
-EMAIL_DOMAIN = "loadtest.local"
+EMAIL_DOMAIN = "loadtest.com"
 
 # Hands each simulated user a seeded account index, round-robin.
 _account_cycle = itertools.cycle(range(USER_COUNT))
