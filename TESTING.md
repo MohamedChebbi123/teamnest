@@ -334,3 +334,60 @@ python -m pytest tests/ \
        --cov=services.auth_service --cov=routers.auth_router \
        --cov-report=term-missing
 ```
+
+---
+
+## 5.5 Chapter Summary
+
+This chapter described how TeamNest is packaged, deployed and verified.
+Source material: deployment + containerisation come from
+[docs/DEPLOYMENT_AND_TESTING.md](docs/DEPLOYMENT_AND_TESTING.md) §5.1–§5.2;
+testing comes from this document, §5.4.1–§5.4.6.
+
+- **Deployment architecture (§5.1)** — a cleanly separated topology: the
+  Next.js frontend on **Vercel**, the FastAPI backend and PostgreSQL on
+  **Render**, and five managed external services (Stripe, Cloudinary, Groq,
+  Pinecone, transactional email). The backend is **stateless** and the
+  database is provisioned ahead of it, which keeps the system easy to
+  restart, replace and scale.
+
+- **Containerisation (§5.2)** — both services are containerised: the backend
+  as a **single-stage non-root** image on a slim Python 3.12 base, and the
+  frontend as a **three-stage Next.js standalone** image. Layer ordering is
+  tuned for fast rebuilds and `.dockerignore` keeps secrets and dev artefacts
+  out of every image. A single `docker compose up --build` brings the whole
+  stack — database, backend, frontend — up locally with a healthcheck-gated
+  startup. In production the backend image is built by Render, while the
+  frontend is deployed to Vercel with a **zero-configuration** workflow that
+  requires no Dockerfile or build script.
+
+- **Testing strategy (§5.4)** — quality is defended by all four classical
+  levels of automated tests plus a performance harness. One representative
+  test was authored per level — `test_unit_validate_password.py`,
+  `test_integration_register_endpoint.py`, `test_e2e_signup_login_profile.py`
+  and the UAT `test_uat_us_1_2_visitor_registration.py` (walking the four
+  acceptance criteria of user story US-1.2). The full set ran green:
+  **8 cases, 0 failures, 2.49 s** with `pytest`; coverage of the auth surface
+  reaches **88% on `jwt_handler`**, **78% on `hasher`**, **71% on
+  `validators`** and **67% on the auth router**.
+
+- **Performance (§5.4.4)** — a real **Locust** run against the dev API (50
+  users, 5/s spawn, 2 minutes, headless) produced **1 770 requests with
+  0 failures at 14.92 req/s aggregate**. Read endpoints sit at median
+  370–680 ms; `POST /login` is the deliberate bcrypt-bound bottleneck
+  (median 9.8 s during ramp-up, then amortised by JWT reuse in production).
+  Running the harness also surfaced and fixed a real bug — the seeded
+  `EMAIL_DOMAIN` was `.local`, a reserved TLD that pydantic's `EmailStr`
+  rejects with HTTP 422; switching to `loadtest.com` unblocked the suite.
+
+- **Security (§5.4.5)** — the same suite doubles as a security regression
+  fence: bcrypt-only password storage, no email enumeration on `/register`,
+  enforced password-strength policy, JWT trust boundary on every protected
+  route, and origin-restricted CORS. Dependency scanning (`pip-audit`) runs
+  out-of-band before each release.
+
+In short, TeamNest has a **reproducible, fully containerised build**, a
+**deployment topology that scales horizontally** without ceremony, and a
+**representative automated test suite at every level** — unit, integration,
+end-to-end, UAT and load — backed by real, recently captured numbers rather
+than aspirational ones.
