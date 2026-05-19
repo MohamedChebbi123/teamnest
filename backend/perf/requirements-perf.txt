@@ -1,0 +1,3 @@
+# Performance-testing dependencies (kept separate from the app's requirements.txt).
+# Install with:  pip install -r perf/requirements-perf.txt
+locust>=2.20

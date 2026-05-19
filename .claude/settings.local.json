@@ -8,7 +8,19 @@
       "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\\\\\\\\utils\")",
       "Bash(grep -r \"pinecone\\\\|groq\\\\|llama\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
       "Bash(grep -r \"cloudinary\" \"c:\\\\\\\\Users\\\\\\\\moham\\\\\\\\OneDrive\\\\\\\\Bureau\\\\\\\\teamnest\\\\\\\\backend\" --include=\"*.py\")",
-      "Bash(findstr \"routers\")"
+      "Bash(findstr \"routers\")",
+      "Bash(git show *)",
+      "Bash(git -C /c/Users/moham/OneDrive/Bureau/teamnest show HEAD:backend/tests/conftest.py)",
+      "Bash(git -C /c/Users/moham/OneDrive/Bureau/teamnest/ show HEAD:backend/tests/conftest.py)",
+      "Bash(git -C /c/Users/moham/OneDrive/Bureau/teamnest/ checkout HEAD -- backend/tests/conftest.py backend/tests/.gitkeep)",
+      "Bash(python -m pytest tests/test_unit_validate_password.py tests/test_integration_register_endpoint.py tests/test_e2e_signup_login_profile.py tests/test_uat_us_1_2_visitor_registration.py -v)",
+      "Bash(pip show *)",
+      "Bash(python -m pytest tests/test_unit_validate_password.py tests/test_integration_register_endpoint.py tests/test_e2e_signup_login_profile.py tests/test_uat_us_1_2_visitor_registration.py --cov=utils.validators --cov=services.auth_service --cov=routers.auth_router --cov-report=term)",
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/test_unit_validate_password.py tests/test_integration_register_endpoint.py tests/test_e2e_signup_login_profile.py tests/test_uat_us_1_2_visitor_registration.py --cov=utils.validators --cov=utils.hasher --cov=utils.jwt_handler --cov=services.auth_service --cov=routers.auth_router --cov-report=term-missing)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\moham\\OneDrive\\Bureau\\teamnest"
     ]
   }
 }
