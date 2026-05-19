@@ -20,8 +20,6 @@ import {
   Upload,
   MessageSquare,
   Mic,
-  ShieldCheck,
-  Headphones,
   Sparkles,
   X,
   Check,
@@ -59,9 +57,7 @@ const FREE_FEATURES: PlanFeature[] = [
   { icon: Upload, label: "10 MB file upload limit", included: true },
   { icon: MessageSquare, label: "Limited message history", included: true },
   { icon: Mic, label: "Voice channels", included: false },
-  { icon: ShieldCheck, label: "Basic roles only", included: true, detail: "Admin & Member" },
-  { icon: Headphones, label: "Priority support", included: false },
-  { icon: Sparkles, label: "AI features", included: false },
+  { icon: Sparkles, label: "AI features", included: true },
 ]
 
 const PRO_FEATURES: PlanFeature[] = [
@@ -70,8 +66,6 @@ const PRO_FEATURES: PlanFeature[] = [
   { icon: Upload, label: "100 MB file upload limit", included: true },
   { icon: MessageSquare, label: "Unlimited message history", included: true },
   { icon: Mic, label: "Voice channels", included: true },
-  { icon: ShieldCheck, label: "Advanced roles & permissions", included: true },
-  { icon: Headphones, label: "Priority support", included: true },
   { icon: Sparkles, label: "AI-powered features", included: true, comingSoon: true },
 ]
 

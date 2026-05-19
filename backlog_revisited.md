@@ -503,12 +503,11 @@ sequenceDiagram
 
 #### Sprint review & retrospective
 
-**Review** — Demoed the full signup → verify → login → profile flow; all 12 stories met their Definition of Done.
-
-**Retrospective**
-
-- 👍 _Went well:_ JWT + refresh-token rotation landed cleanly and is reused by every later sprint.
-- 👎 _To improve:_ Email-code rate limiting was added late — fold security edge cases into estimates earlier.
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed the full signup → verify → login → profile flow; all 12 stories met their Definition of Done. |
+| 👍 **Went well** | JWT + refresh-token rotation landed cleanly and is reused by every later sprint. |
+| 👎 **To improve** | Email-code rate limiting was added late — fold security edge cases into estimates earlier. |
 
 ### Sprint 2 — Workspace Setup (Weeks 3–4)
 
@@ -836,12 +835,11 @@ sequenceDiagram
 
 #### Sprint review & retrospective
 
-**Review** — Demoed creating an org, inviting/accepting members, and structuring teams with roles; 14 stories accepted.
-
-**Retrospective**
-
-- 👍 _Went well:_ The role/permission model proved flexible enough for every later team-scoped feature.
-- 👎 _To improve:_ Cascade-delete of an org touched many tables — model data ownership up front next time.
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed creating an org, inviting/accepting members, and structuring teams with roles; 14 stories accepted. |
+| 👍 **Went well** | The role/permission model proved flexible enough for every later team-scoped feature. |
+| 👎 **To improve** | Cascade-delete of an org touched many tables — model data ownership up front next time. |
 
 ### Sprint 3 — Live Collaboration (Weeks 5–6)
 
@@ -1077,12 +1075,11 @@ sequenceDiagram
 
 #### Sprint review & retrospective
 
-**Review** — Demoed real-time channel chat with edit, pin, search, threads and file sharing; 12 stories accepted.
-
-**Retrospective**
-
-- 👍 _Went well:_ The WebSocket manager and Cloudinary pipeline were built once and reused everywhere after.
-- 👎 _To improve:_ Channel search was underestimated — Postgres full-text tuning spilled past the sprint.
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed real-time channel chat with edit, pin, search, threads and file sharing; 12 stories accepted. |
+| 👍 **Went well** | The WebSocket manager and Cloudinary pipeline were built once and reused everywhere after. |
+| 👎 **To improve** | Channel search was underestimated — Postgres full-text tuning spilled past the sprint. |
 
 ### Sprint 4 — Personal Network (Weeks 7–8)
 
@@ -1348,12 +1345,11 @@ sequenceDiagram
 
 #### Sprint review & retrospective
 
-**Review** — Demoed 1:1 DMs, group chats and the friends/block graph; 11 stories accepted.
-
-**Retrospective**
-
-- 👍 _Went well:_ Reusing Sprint 3's transport meant almost no new infrastructure was needed.
-- 👎 _To improve:_ Presence/typing events were chatty — debouncing should have been planned, not patched.
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed 1:1 DMs, group chats and the friends/block graph; 11 stories accepted. |
+| 👍 **Went well** | Reusing Sprint 3's transport meant almost no new infrastructure was needed. |
+| 👎 **To improve** | Presence/typing events were chatty — debouncing should have been planned, not patched. |
 
 ### Sprint 5 — Work Tracking (Weeks 9–10)
 
@@ -1573,12 +1569,11 @@ sequenceDiagram
 
 #### Sprint review & retrospective
 
-**Review** — Demoed task creation, subtasks, the review workflow and the unified real-time notification inbox; 9 stories accepted.
-
-**Retrospective**
-
-- 👍 _Went well:_ The task state machine kept status transitions predictable and easy to test.
-- 👎 _To improve:_ Notification fan-out logic grew complex — it needs a clearer central dispatch.
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed task creation, subtasks, the review workflow and the unified real-time notification inbox; 9 stories accepted. |
+| 👍 **Went well** | The task state machine kept status transitions predictable and easy to test. |
+| 👎 **To improve** | Notification fan-out logic grew complex — it needs a clearer central dispatch. |
 
 ### Sprint 6 — Platform Reach (Weeks 11–12)
 
@@ -1817,9 +1812,8 @@ sequenceDiagram
 
 #### Sprint review & retrospective
 
-**Review** — Demoed the RAG assistant, global search, the audit log with undo, and Stripe Pro billing; 8 stories accepted — the product is feature-complete.
-
-**Retrospective**
-
-- 👍 _Went well:_ Most features composed on existing infrastructure (Pinecone, Stripe stubs, audit logs).
-- 👎 _To improve:_ Stripe webhook testing needed more lead time — integrate paid services into CI earlier.
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed the RAG assistant, global search, the audit log with undo, and Stripe Pro billing; 8 stories accepted — the product is feature-complete. |
+| 👍 **Went well** | Most features composed on existing infrastructure (Pinecone, Stripe stubs, audit logs). |
+| 👎 **To improve** | Stripe webhook testing needed more lead time — integrate paid services into CI earlier. |

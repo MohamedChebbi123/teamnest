@@ -343,6 +343,9 @@ export default function TasksPage() {
       if (res.ok) {
         toast.success("Subtask created")
         setTasks(prev => [...prev, data])
+        // The parent now has a subtask — its status becomes derived.
+        await fetchTasks()
+        if (viewMode === "my-tasks") await fetchMyTasks()
         setSubtaskOpen(false)
         setSubtaskTitle("")
         setSubtaskDescription("")
@@ -406,7 +409,10 @@ export default function TasksPage() {
       )
       if (res.ok) {
         toast.success("Task deleted")
-        setTasks(prev => prev.filter(t => t.id !== selectedTask.id))
+        setTasks(prev => {
+          const removed = collectTaskAndDescendants(selectedTask.id, prev)
+          return prev.filter(t => !removed.has(t.id))
+        })
         setDetailOpen(false)
         setSelectedTask(null)
       } else {
@@ -493,6 +499,9 @@ export default function TasksPage() {
         setTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setMyTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setSelectedTask(prev => (prev && prev.id === data.id ? data : prev))
+        // Reviewing a subtask changes its parent's derived status — resync.
+        await fetchTasks()
+        if (viewMode === "my-tasks") await fetchMyTasks()
       } else {
         toast.error("Error", { description: formatApiError(data.detail, "Failed to review task") })
       }
@@ -519,6 +528,9 @@ export default function TasksPage() {
         setTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setMyTasks(prev => prev.map(t => t.id === data.id ? data : t))
         setSelectedTask(prev => (prev && prev.id === data.id ? data : prev))
+        // A subtask status change rolls up to its parent — resync.
+        await fetchTasks()
+        if (viewMode === "my-tasks") await fetchMyTasks()
       } else {
         toast.error("Error", { description: formatApiError(data.detail, "Failed to update task") })
       }
@@ -546,6 +558,9 @@ export default function TasksPage() {
       if (res.ok) {
         toast.success("Subtask updated")
         setTasks(prev => prev.map(t => t.id === data.id ? data : t))
+        // A subtask status change rolls up to its parent — resync.
+        await fetchTasks()
+        if (viewMode === "my-tasks") await fetchMyTasks()
         setEditingSubtask(null)
       } else {
         toast.error("Error", { description: formatApiError(data.detail, "Failed to update subtask") })
@@ -571,7 +586,13 @@ export default function TasksPage() {
       )
       if (res.ok) {
         toast.success("Subtask deleted")
-        setTasks(prev => prev.filter(t => t.id !== subtaskId))
+        setTasks(prev => {
+          const removed = collectTaskAndDescendants(subtaskId, prev)
+          return prev.filter(t => !removed.has(t.id))
+        })
+        // Removing a subtask may change the parent's derived status — resync.
+        await fetchTasks()
+        if (viewMode === "my-tasks") await fetchMyTasks()
         if (expandedSubtaskId === subtaskId) setExpandedSubtaskId(null)
       } else {
         const data = await res.json()
@@ -585,6 +606,23 @@ export default function TasksPage() {
   }
 
   const subtasksOf = (id: number) => tasks.filter(t => t.parent_task_id === id)
+  // A task with subtasks has a derived status — it cannot be changed directly.
+  const hasSubtasks = (id: number) => tasks.some(t => t.parent_task_id === id)
+  // A task and every subtask beneath it (recursively) — deleting a task deletes them all.
+  const collectTaskAndDescendants = (rootId: number, list: Task[]) => {
+    const ids = new Set<number>([rootId])
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const t of list) {
+        if (t.parent_task_id !== null && ids.has(t.parent_task_id) && !ids.has(t.id)) {
+          ids.add(t.id)
+          grew = true
+        }
+      }
+    }
+    return ids
+  }
   const canCreate = userRole === "OWNER" || canManageTasks
 
   const parentTasks = tasks.filter(t => t.parent_task_id === null)
@@ -1108,6 +1146,7 @@ export default function TasksPage() {
                     const Icon = col.icon
                     const statusOrder = ["todo", "in_progress", "review", "done"]
                     const currentIdx = statusOrder.indexOf(task.status)
+                    const hasSubs = hasSubtasks(task.id)
                     return (
                       <div key={task.id} className="w-full rounded-lg border bg-background overflow-hidden hover:shadow-sm transition-all">
                         <button
@@ -1127,7 +1166,16 @@ export default function TasksPage() {
                           <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
                         </button>
 
-                        {/* Status stepper */}
+                        {/* Status stepper — hidden for parent tasks (status is derived from subtasks) */}
+                        {hasSubs ? (
+                          <div className="px-4 pb-3">
+                            <div className="flex items-center gap-1.5 rounded-md bg-muted/60 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground">
+                              <Icon className={`h-3 w-3 ${col.color}`} />
+                              {col.label}
+                              <span className="text-muted-foreground/60">· derived from subtasks</span>
+                            </div>
+                          </div>
+                        ) : (
                         <div className="px-4 pb-3 flex items-center gap-1">
                           {COLUMNS.map((step, i) => {
                             const StepIcon = step.icon
@@ -1162,9 +1210,10 @@ export default function TasksPage() {
                             )
                           })}
                         </div>
+                        )}
 
-                        {/* Review actions */}
-                        {task.status === "review" && (canManageTasks || userRole === "OWNER") && !task.assignees.some(a => a.user_id === userId) && (
+                        {/* Review actions — only for leaf tasks (parents are reviewed via their subtasks) */}
+                        {task.status === "review" && !hasSubs && (canManageTasks || userRole === "OWNER") && !task.assignees.some(a => a.user_id === userId) && (
                           <div className="flex items-center gap-2 px-4 pb-3">
                             <button
                               type="button"
@@ -1257,8 +1306,8 @@ export default function TasksPage() {
                   </p>
                 </div>
 
-                {/* Review actions (full width) */}
-                {selectedTask.status === "review" && (canManageTasks || userRole === "OWNER") && !selectedTask.assignees.some(a => a.user_id === userId) && (
+                {/* Review actions (full width) — only for leaf tasks (parents are reviewed via their subtasks) */}
+                {selectedTask.status === "review" && subs.length === 0 && (canManageTasks || userRole === "OWNER") && !selectedTask.assignees.some(a => a.user_id === userId) && (
                   <div className="px-8 pb-4">
                     <div className="flex items-center gap-2">
                       <Button
@@ -1407,6 +1456,25 @@ export default function TasksPage() {
                                   {isUploadingAttachment ? "Uploading..." : "Attach file"}
                                   <input type="file" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); const file = e.target.files?.[0]; if (file) handleUploadAttachment(sub.id, file); e.target.value = "" }} />
                                 </label>
+                                {/* Approve / reject this subtask — only when it is in review and the viewer isn't an assignee */}
+                                {sub.status === "review" && !hasSubtasks(sub.id) && (canManageTasks || userRole === "OWNER") && !sub.assignees.some(a => a.user_id === userId) && (
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleReviewTask(sub.id, "accept") }}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                                    >
+                                      <Check className="h-3 w-3" /> Accept
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleReviewTask(sub.id, "reject") }}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+                                    >
+                                      <X className="h-3 w-3" /> Reject
+                                    </button>
+                                  </div>
+                                )}
                                 {canCreate && viewMode !== "my-tasks" && (
                                   <div className="flex items-center gap-2 pt-1">
                                     <button onClick={(e) => { e.stopPropagation(); setEditingSubtask(sub); setEditSubTitle(sub.title); setEditSubDescription(sub.description); setEditSubPriority(sub.priority); setEditSubStatus(sub.status); setEditSubGroup(sub.subtask_group || ""); setEditSubAssigneeIds(sub.assignees?.map(a => a.user_id) || []); setEditSubDueDate(sub.due_date ? sub.due_date.slice(0, 10) : "") }} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">Edit</button>
@@ -1494,6 +1562,9 @@ export default function TasksPage() {
                         <Icon className={`h-3 w-3 ${col.color}`} />
                         {col.label}
                       </div>
+                      {subs.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground/60 mt-1">Derived from subtasks</p>
+                      )}
                     </div>
 
                     {/* Due date */}
@@ -1688,15 +1759,22 @@ export default function TasksPage() {
               </div>
               <div className="grid gap-2">
                 <Label>Status</Label>
-                <Select value={editStatus} onValueChange={setEditStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                  </SelectContent>
-                </Select>
+                {selectedTask && hasSubtasks(selectedTask.id) ? (
+                  <div className="flex h-9 items-center gap-1.5 rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
+                    {COLUMNS.find(c => c.key === editStatus)?.label ?? editStatus}
+                    <span className="text-[11px] text-muted-foreground/60">· derived from subtasks</span>
+                  </div>
+                ) : (
+                  <Select value={editStatus} onValueChange={setEditStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">To Do</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
             <div className="grid gap-2">
@@ -1891,15 +1969,22 @@ export default function TasksPage() {
               </div>
               <div className="grid gap-2">
                 <Label>Status</Label>
-                <Select value={editSubStatus} onValueChange={setEditSubStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                  </SelectContent>
-                </Select>
+                {editingSubtask && hasSubtasks(editingSubtask.id) ? (
+                  <div className="flex h-9 items-center gap-1.5 rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
+                    {COLUMNS.find(c => c.key === editSubStatus)?.label ?? editSubStatus}
+                    <span className="text-[11px] text-muted-foreground/60">· derived from subtasks</span>
+                  </div>
+                ) : (
+                  <Select value={editSubStatus} onValueChange={setEditSubStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">To Do</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
             <div className="grid gap-2">

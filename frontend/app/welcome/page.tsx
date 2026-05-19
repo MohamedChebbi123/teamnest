@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation"
 import Sidebar from "@/components/Sidebar/page"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Building2, Hash, Loader2, PlusCircle, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
 import { getAccessToken } from "@/lib/auth"
@@ -43,19 +46,6 @@ export default function WelcomePage() {
             return
         }
         router.push("/organization/create_organizattion")
-    }
-
-    const handleJoinOrganization = () => {
-        if (!user?.is_verified) {
-            toast.error("Email Verification Required", {
-                description: "You need to verify your email before joining an organization.",
-                action: {
-                    label: "Verify Email",
-                    onClick: () => router.push("/auth/verify-email")
-                }
-            })
-            return
-        }
     }
 
     const handleSendJoinInvite = async () => {
@@ -147,58 +137,88 @@ export default function WelcomePage() {
                             />
                         </div>
                         
-                        {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-                            <Button
-                                onClick={handleCreateOrganization}
-                                className="flex-1"
-                                size="lg"
-                                disabled={loading}
-                                data-tour="welcome-create-org"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Create Organization
-                            </Button>
-                            <Button 
-                                onClick={handleJoinOrganization}
-                                className="flex-1"
-                                variant="outline"
-                                size="lg"
-                                disabled={loading}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                Join Organization
-                            </Button>
-                        </div>
+                        {/* Action Cards */}
+                        <div className="grid w-full max-w-3xl gap-6 sm:grid-cols-2">
+                            {/* Create Organization */}
+                            <Card className="flex flex-col" data-tour="welcome-create-org">
+                                <CardHeader>
+                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <PlusCircle className="h-6 w-6" />
+                                    </div>
+                                    <CardTitle>Create an Organization</CardTitle>
+                                    <CardDescription>
+                                        Start fresh and build your own workspace for your team.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="mt-auto">
+                                    <Button
+                                        onClick={handleCreateOrganization}
+                                        className="w-full"
+                                        size="lg"
+                                        disabled={loading}
+                                    >
+                                        Create Organization
+                                    </Button>
+                                </CardContent>
+                            </Card>
 
-                        <div className="w-full max-w-md mt-6 rounded-lg border p-4">
-                            <h2 className="text-lg font-semibold mb-3">Join an Organization</h2>
-                            <div className="space-y-3">
-                                <Input
-                                    placeholder="Search organization name"
-                                    value={orgSearch}
-                                    onChange={(e) => setOrgSearch(e.target.value)}
-                                    disabled={loading || sendingInvite}
-                                />
-                                <Input
-                                    placeholder="Organization tag (example: 123456)"
-                                    type="number"
-                                    value={orgTag}
-                                    onChange={(e) => setOrgTag(e.target.value)}
-                                    disabled={loading || sendingInvite}
-                                />
-                                <Button
-                                    onClick={handleSendJoinInvite}
-                                    className="w-full"
-                                    disabled={loading || sendingInvite}
-                                >
-                                    {sendingInvite ? "Sending..." : "Send Invite"}
-                                </Button>
-                            </div>
+                            {/* Join Organization */}
+                            <Card className="flex flex-col">
+                                <CardHeader>
+                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <UserPlus className="h-6 w-6" />
+                                    </div>
+                                    <CardTitle>Join an Organization</CardTitle>
+                                    <CardDescription>
+                                        Already have an invite? Enter the details below to request access.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="mt-auto space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="org-name" className="flex items-center gap-2 text-sm font-medium">
+                                            <Building2 className="h-4 w-4 text-primary" />
+                                            Organization Name
+                                        </Label>
+                                        <Input
+                                            id="org-name"
+                                            placeholder="e.g. Acme Inc"
+                                            value={orgSearch}
+                                            onChange={(e) => setOrgSearch(e.target.value)}
+                                            disabled={loading || sendingInvite}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="org-tag" className="flex items-center gap-2 text-sm font-medium">
+                                            <Hash className="h-4 w-4 text-primary" />
+                                            Organization Tag
+                                        </Label>
+                                        <Input
+                                            id="org-tag"
+                                            placeholder="e.g. 123456"
+                                            type="number"
+                                            value={orgTag}
+                                            onChange={(e) => setOrgTag(e.target.value)}
+                                            disabled={loading || sendingInvite}
+                                        />
+                                    </div>
+                                    <Button
+                                        onClick={handleSendJoinInvite}
+                                        className="w-full"
+                                        size="lg"
+                                        variant="outline"
+                                        disabled={loading || sendingInvite}
+                                    >
+                                        {sendingInvite ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Sending Request...
+                                            </>
+                                        ) : (
+                                            "Send Join Request"
+                                        )}
+                                    </Button>
+                                </CardContent>
+                            </Card>
                         </div>
 
                     </div>

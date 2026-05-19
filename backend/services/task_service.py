@@ -28,6 +28,62 @@ def _validate_team_in_org(team_id: int, org_id: int, user_id: int, db: Session) 
     return team
 
 
+# Status progression order — used to roll a parent's status up from its subtasks.
+STATUS_ORDER = {"todo": 0, "in_progress": 1, "review": 2, "done": 3}
+
+
+def _has_subtasks(task_id: int, db: Session) -> bool:
+    """True if the task has at least one non-deleted subtask."""
+    return db.query(Tasks).filter(
+        Tasks.parent_task_id == task_id,
+        Tasks.is_deleted == False,
+    ).first() is not None
+
+
+def _rollup_status(node_id, db: Session):
+    """Recompute the status of `node_id` and every ancestor from its subtasks.
+
+    A task with subtasks takes the most-advanced status among them
+    (todo < in_progress < review < done). Tasks with no subtasks are left
+    untouched. Walks up the parent chain; guards against cycles.
+    """
+    seen = set()
+    current_id = node_id
+    while current_id is not None and current_id not in seen:
+        seen.add(current_id)
+        node = db.query(Tasks).filter(Tasks.id == current_id).first()
+        if not node:
+            break
+        subtasks = db.query(Tasks).filter(
+            Tasks.parent_task_id == node.id,
+            Tasks.is_deleted == False,
+        ).all()
+        if subtasks:
+            node.status = max(
+                subtasks, key=lambda s: STATUS_ORDER.get(s.status, 0)
+            ).status
+        current_id = node.parent_task_id
+
+
+def _collect_descendants(task_id: int, db: Session):
+    """Return every non-deleted descendant task (subtasks, recursively)."""
+    descendants = []
+    frontier = [task_id]
+    seen = {task_id}
+    while frontier:
+        children = db.query(Tasks).filter(
+            Tasks.parent_task_id.in_(frontier),
+            Tasks.is_deleted == False,
+        ).all()
+        frontier = []
+        for child in children:
+            if child.id not in seen:
+                seen.add(child.id)
+                descendants.append(child)
+                frontier.append(child.id)
+    return descendants
+
+
 def task_to_dict(task):
     return {
         "id": task.id,
@@ -116,6 +172,10 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
         for assignee_id in task_data.assignee_ids:
             db.add(Task_assignees(task_id=new_task.id, user_id=assignee_id))
 
+    # A parent task's status is derived from its subtasks.
+    if new_task.parent_task_id:
+        _rollup_status(new_task.parent_task_id, db)
+
     db.commit()
     db.refresh(new_task)
 
@@ -162,13 +222,17 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
         if not role or not role.can_manage_tasks:
             raise HTTPException(status_code=403, detail="You do not have permission to edit tasks")
 
+    old_parent_id = task.parent_task_id
+
     if task_data.title is not None:
         task.title = task_data.title
     if task_data.description is not None:
         task.description = task_data.description
     if task_data.priority is not None:
         task.priority = task_data.priority
-    if task_data.status is not None:
+    if task_data.status is not None and task_data.status != task.status:
+        if _has_subtasks(task.id, db):
+            raise HTTPException(status_code=400, detail="This task has subtasks; its status is derived from them and cannot be set manually")
         if task_data.status == "done" and task.status != "review":
             raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
         task.status = task_data.status
@@ -212,6 +276,11 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
         for assignee_id in task_data.assignee_ids:
             db.add(Task_assignees(task_id=task.id, user_id=assignee_id))
 
+    # Keep ancestors' derived status in sync with any status / parent change.
+    _rollup_status(task.parent_task_id, db)
+    if old_parent_id is not None and old_parent_id != task.parent_task_id:
+        _rollup_status(old_parent_id, db)
+
     db.commit()
     db.refresh(task)
 
@@ -240,15 +309,25 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, user: Users, db
         if not role or not role.can_manage_tasks:
             raise HTTPException(status_code=403, detail="You do not have permission to delete tasks")
 
-    task.is_deleted = True
+    # Deleting a task also deletes every subtask beneath it (recursively).
+    descendants = _collect_descendants(task.id, db)
+    deleted_tasks = [task] + descendants
+    for t in deleted_tasks:
+        t.is_deleted = True
+
+    # Removing a subtask may change the parent's derived status.
+    if task.parent_task_id:
+        _rollup_status(task.parent_task_id, db)
+
     db.commit()
 
     from utils.vector_db_handler import delete_task
-    delete_task(task_id=task.id, team_id=task.team_id)
+    for t in deleted_tasks:
+        delete_task(task_id=t.id, team_id=t.team_id)
 
-    create_log(db, org_id=org_id, actor_id=user_id, action="task_deleted", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
+    create_log(db, org_id=org_id, actor_id=user_id, action="task_deleted", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id, "subtasks_deleted": len(descendants)})
 
-    return {"message": "Task deleted successfully"}
+    return {"message": "Task deleted successfully", "subtasks_deleted": len(descendants)}
 
 
 def fetch_my_tasks_service(team_id: int, org_id: int, user: Users, db: Session):
@@ -291,10 +370,18 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
     if not is_assigned:
         raise HTTPException(status_code=403, detail="You are not assigned to this task")
 
+    if _has_subtasks(task.id, db):
+        raise HTTPException(status_code=400, detail="This task has subtasks; its status is derived from them and cannot be changed directly")
+
     if status_data.status == "done" and task.status != "review":
         raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
 
     task.status = status_data.status
+
+    # Propagate the new status up to any parent task.
+    if task.parent_task_id:
+        _rollup_status(task.parent_task_id, db)
+
     db.commit()
     db.refresh(task)
 
@@ -323,6 +410,9 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
     if task.status != "review":
         raise HTTPException(status_code=400, detail="Task is not in review status")
 
+    if _has_subtasks(task.id, db):
+        raise HTTPException(status_code=400, detail="This task has subtasks; review its subtasks instead — its status is derived from them")
+
     is_assignee = db.query(Task_assignees).filter(
         Task_assignees.task_id == task_id,
         Task_assignees.user_id == user_id
@@ -340,6 +430,11 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
             raise HTTPException(status_code=403, detail="You do not have permission to review tasks")
 
     task.status = "done" if action == "accept" else "in_progress"
+
+    # Reviewing a subtask may change its parent's derived status.
+    if task.parent_task_id:
+        _rollup_status(task.parent_task_id, db)
+
     db.commit()
     db.refresh(task)
 

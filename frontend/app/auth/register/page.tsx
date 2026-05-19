@@ -17,6 +17,7 @@ import { cn, formatApiError } from "@/lib/utils"
 import { toast } from "sonner"
 import Image from "next/image"
 import Link from "next/link"
+import ThemeToggle from "@/components/ThemeToggle"
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -141,6 +142,9 @@ export default function Register() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4">
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-0 items-stretch">
         {/* Image Side */}
         <div className="hidden lg:flex items-center justify-center">
