@@ -1,17 +1,17 @@
-# Introduction Générale
+# General Introduction
 
-À l'ère de la transformation digitale, les technologies de l'information occupent une place centrale dans la simplification et l'optimisation de nos activités quotidiennes. Les applications web et mobiles, en particulier, se sont imposées comme des outils incontournables de cette transformation digitale, proposant des solutions sur mesure qui améliorent la gestion du temps et renforcent l'efficacité dans nos sphères personnelle et professionnelle. Elles transforment notre manière de vivre et de travailler en offrant un accès rapide à une vaste gamme de services.
+In the era of digital transformation, information technologies occupy a central place in simplifying and optimizing our daily activities. Web and mobile applications, in particular, have established themselves as essential tools of this digital transformation, offering tailored solutions that improve time management and strengthen efficiency in both our personal and professional spheres. They are reshaping the way we live and work by providing fast access to a wide range of services.
 
-Dans un environnement professionnel de plus en plus marqué par le travail à distance et la dispersion géographique des équipes, les entreprises ont besoin de plateformes unifiées capables de centraliser la communication, la gestion des projets et l'exploitation intelligente des connaissances internes. La fragmentation des outils utilisés au quotidien (messagerie, gestion des tâches, partage de documents, etc.) engendre une perte de temps considérable et nuit à la productivité des équipes.
+In a professional environment increasingly shaped by remote work and the geographic dispersion of teams, companies need unified platforms capable of centralizing communication, project management, and the intelligent use of internal knowledge. The fragmentation of the tools used on a daily basis (messaging, task management, document sharing, etc.) leads to a considerable loss of time and harms team productivity.
 
-Dans le cadre de notre parcours universitaire à l'Institut Supérieur des Études Technologiques de Tozeur, nous avons eu l'opportunité d'effectuer un stage pratique au sein de l'entreprise FLESK, une agence spécialisée dans le développement de solutions digitales. Ce stage représente une étape essentielle de notre formation en licence en développement des systèmes d'information, visant à mettre en application les connaissances théoriques acquises tout au long de notre cursus.
+As part of our academic journey at the Higher Institute of Technological Studies of Tozeur, we had the opportunity to carry out a practical internship at FLESK, a company specialized in the development of digital solutions. This internship represents an essential step in our training for the bachelor's degree in Information Systems Development, aiming to put into practice the theoretical knowledge acquired throughout our studies.
 
-Ce projet de fin d'études a consisté à concevoir et développer une plateforme web collaborative dédiée à la gestion du travail en équipe « **TEAMNEST** », réunissant dans un même espace la messagerie en temps réel, la gestion des projets et des tâches, l'organisation en équipes, ainsi qu'un assistant intelligent basé sur l'intelligence artificielle capable d'exploiter les documents internes de manière simple, centralisée et sécurisée.
+This end-of-studies project consisted of designing and developing a collaborative web platform dedicated to teamwork management, **TEAMNEST**, bringing together in a single space real-time messaging, project and task management, team organization, and an intelligent assistant based on artificial intelligence capable of exploiting internal documents in a simple, centralized, and secure way.
 
-Ce rapport retrace les différentes étapes de la réalisation du projet, organisées comme suit :
+This report retraces the different stages of the project, organized as follows:
 
-- **Chapitre 1**, dans lequel nous nous concentrerons sur la présentation du cadre du projet et la méthodologie utilisée.
-- **Chapitre 2**, dans lequel nous décrivons les exigences fonctionnelles et non fonctionnelles, nous établissons le « Backlog » du produit, et nous précisons l'architecture et les technologies que nous allons utiliser.
-- **Chapitres 3, 4 et 5** où nous expliquons notre développement applicatif à travers les 6 sprints qui seront abordés tout en respectant les fondamentaux de Scrum.
+- **Chapter 1**, in which we focus on the presentation of the project framework and the methodology used.
+- **Chapter 2**, in which we describe the functional and non-functional requirements, establish the product "Backlog", and specify the architecture and technologies we are going to use.
+- **Chapters 3, 4 and 5**, in which we explain our application development through the 6 sprints that will be addressed while respecting the fundamentals of Scrum.
 
-On clôture le rapport par une conclusion générale et la description de quelques perspectives et améliorations prévues pour l'application.
+We close the report with a general conclusion and the description of some perspectives and improvements planned for the application.
