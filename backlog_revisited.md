@@ -511,9 +511,9 @@ sequenceDiagram
 
 #### Sprint summary
 
-- Delivers the full account lifecycle: registration, email verification, login with refresh-token rotation, logout, and password reset.
-- Establishes the JWT + bcrypt + refresh-token security model that every later sprint reuses.
-- Adds profile customization (avatar, contact fields), presence status, and light/dark theming.
+This sprint delivers the full account lifecycle — registration, email verification, login with refresh-token rotation, logout, and password reset.
+It establishes the JWT + bcrypt + refresh-token security model that every later sprint reuses.
+On top of that, it adds profile customization (avatar, contact fields), presence status, and light/dark theming.
 
 ### Sprint 2 — Workspace Setup (Weeks 3–4)
 
@@ -849,9 +849,9 @@ sequenceDiagram
 
 #### Sprint summary
 
-- Builds the multi-tenant core: organization creation, email invitations, join-request review, and the member directory.
-- Introduces the team substructure and the role/permission model that governs every team-scoped action later on.
-- Covers the full admin lifecycle — update, delete, and member management — including kicking and permission grants.
+This sprint builds the multi-tenant core — organization creation, email invitations, join-request review, and the member directory.
+It introduces the team substructure and the role/permission model that governs every team-scoped action later on.
+It also covers the full admin lifecycle — update, delete, and member management — including kicking and permission grants.
 
 ### Sprint 3 — Live Collaboration (Weeks 5–6)
 
@@ -1095,9 +1095,9 @@ sequenceDiagram
 
 #### Sprint summary
 
-- Brings the product alive with real-time org and team channels — sending, editing, deleting, threads, pins, and `@mentions`.
-- Stands up the WebSocket manager and the Cloudinary upload pipeline that every later real-time and file feature reuses.
-- Adds channel search, paginated history loading, and inline PDF viewing for shared documents.
+This sprint brings the product alive with real-time org and team channels — sending, editing, deleting, threads, pins, and `@mentions`.
+It stands up the WebSocket manager and the Cloudinary upload pipeline that every later real-time and file feature reuses.
+It also adds channel search, paginated history loading, and inline PDF viewing for shared documents.
 
 ### Sprint 4 — Personal Network (Weeks 7–8)
 
@@ -1371,9 +1371,9 @@ sequenceDiagram
 
 #### Sprint summary
 
-- Adds 1:1 direct messaging with edit, delete, attachments, search, and a conversations inbox, all on top of Sprint 3's transport.
-- Introduces ad-hoc group chats with real-time messaging and member/settings management.
-- Builds the social graph — friend requests, accept/reject/remove, and blocking — plus typing indicators and presence broadcasts.
+This sprint adds 1:1 direct messaging with edit, delete, attachments, search, and a conversations inbox, all on top of Sprint 3's transport.
+It introduces ad-hoc group chats with real-time messaging and full member/settings management.
+It also builds the social graph — friend requests, accept/reject/remove, and blocking — plus typing indicators and presence broadcasts.
 
 ### Sprint 5 — Work Tracking (Weeks 9–10)
 
@@ -1601,9 +1601,9 @@ sequenceDiagram
 
 #### Sprint summary
 
-- Implements the task lifecycle: creation with assignees and due dates, edit/delete, subtasks, status updates, submission, and approval/rejection.
-- Adds a unified real-time notification feed covering mentions, DMs, friends, and tasks, with a viewable inbox and mark-as-seen.
-- Wires task attachments into the existing Cloudinary pipeline for files that travel with the work.
+This sprint implements the task lifecycle — creation with assignees and due dates, edit/delete, subtasks, status updates, submission, and approval/rejection.
+It adds a unified real-time notification feed covering mentions, DMs, friends, and tasks, with a viewable inbox and mark-as-seen.
+It also wires task attachments into the existing Cloudinary pipeline so files travel with the work.
 
 ### Sprint 6 — Platform Reach (Weeks 11–12)
 
@@ -1850,6 +1850,6 @@ sequenceDiagram
 
 #### Sprint summary
 
-- Delivers the AI assistant via a LlamaIndex + Pinecone + Groq RAG pipeline, grounded in org context, uploaded documents, and inline PDFs.
-- Adds org-wide global message search backed by the same vector index built across Sprints 3–4.
-- Ships Stripe Pro plan subscription and cancellation, plus the activity audit log with a reversible-undo flow on logged actions.
+This sprint delivers the AI assistant via a LlamaIndex + Pinecone + Groq RAG pipeline, grounded in org context, uploaded documents, and inline PDFs.
+It adds org-wide global message search backed by the same vector index built across Sprints 3–4.
+It also ships Stripe Pro plan subscription and cancellation, plus the activity audit log with a reversible-undo flow on logged actions.
