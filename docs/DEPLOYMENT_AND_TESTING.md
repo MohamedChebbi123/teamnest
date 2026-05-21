@@ -491,3 +491,19 @@ In short, TeamNest has a reproducible, fully containerised build and a
 meaningful automated test suite for its most critical layer; the identified
 next steps — browser-level E2E tests, load testing and coverage measurement —
 would round the strategy out to production maturity.
+
+---
+
+## 5.5 Conclusion
+
+TeamNest's deployment topology is deliberately small — a Vercel frontend, a
+Render-hosted FastAPI backend and a managed PostgreSQL instance, with every
+heavyweight capability delegated to a managed service. The backend stays
+stateless and fully containerised, and `docker compose up --build` brings the
+whole stack up locally with a healthcheck-gated startup.
+
+The automated **27-test pytest** suite exercises authentication, CRUD,
+friends/DMs, permissions and presence/search through real HTTP and WebSocket
+calls, and doubles as a regression fence for the security boundary. Browser
+E2E, load testing and dependency scanning remain the natural next steps to
+carry the strategy from "verified" to "production-mature".

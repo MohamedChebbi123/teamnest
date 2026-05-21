@@ -391,3 +391,34 @@ In short, TeamNest has a **reproducible, fully containerised build**, a
 **representative automated test suite at every level** — unit, integration,
 end-to-end, UAT and load — backed by real, recently captured numbers rather
 than aspirational ones.
+
+---
+
+## 5.6 Conclusion
+
+Testing in TeamNest was approached as an engineering discipline, not a
+formality. Each of the four classical levels of automated tests — unit,
+integration, end-to-end and user acceptance — answers a distinct question
+about the product, and the representative test authored at each level proves
+that the layers below it actually hold. Anchoring the user-acceptance test
+in a real user story (US-1.2) gives the suite a direct line back to the
+functional requirements, so a regression in the test is also a regression in
+a documented stakeholder promise.
+
+Beyond functional correctness, the same suite doubles as a regression fence
+for the highest-risk parts of the product. Bcrypt-only password storage,
+absence of email enumeration, enforced password-strength rules, the JWT
+trust boundary and origin-restricted CORS are each pinned by a test that
+fails the build when any of those guarantees weakens. The Locust harness
+adds a second dimension — sustained concurrent traffic — and surfaced a
+real configuration bug (`EMAIL_DOMAIN = "loadtest.local"`) the very first
+time it ran, which is exactly the kind of finding a performance harness is
+supposed to produce.
+
+The resulting strategy is small enough to run locally in under three
+seconds yet broad enough to defend the auth surface, the data-integrity
+rules and the real-time pipeline. The natural next steps — browser-level
+E2E automation with Playwright, integration of `pip-audit` into CI, and a
+larger sustained load run against the Render instance — extend this same
+discipline rather than replace it, and would carry the project from "well
+tested" to "production-mature" without rethinking its foundations.
