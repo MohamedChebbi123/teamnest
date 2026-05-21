@@ -262,11 +262,6 @@ Authentication, sessions and profile.
 
 **Sprint goal:** _Anyone can create a verified account and manage their profile._
 
-**Sprint summary:**
-- Delivers the full account lifecycle: registration, email verification, login with refresh-token rotation, logout, and password reset.
-- Establishes the JWT + bcrypt + refresh-token security model that every later sprint reuses.
-- Adds profile customization (avatar, contact fields), presence status, and light/dark theming.
-
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
 | US-1.1 | As a **visitor**, I want to browse the landing page, so that I can learn what TeamNest offers. | EP-01 | Visitor | 3 | **M** | 1. Build the responsive landing layout (hero, features, footer)<br>2. Add navigation with CTAs routing to register/login<br>3. Add SEO metadata and Open Graph tags |
@@ -514,16 +509,17 @@ sequenceDiagram
 | 👍 **Went well** | JWT + refresh-token rotation landed cleanly and is reused by every later sprint. |
 | 👎 **To improve** | Email-code rate limiting was added late — fold security edge cases into estimates earlier. |
 
+#### Sprint summary
+
+- Delivers the full account lifecycle: registration, email verification, login with refresh-token rotation, logout, and password reset.
+- Establishes the JWT + bcrypt + refresh-token security model that every later sprint reuses.
+- Adds profile customization (avatar, contact fields), presence status, and light/dark theming.
+
 ### Sprint 2 — Workspace Setup (Weeks 3–4)
 
 Organizations, memberships and team structure.
 
 **Sprint goal:** _An admin can create an organization, onboard members and structure them into teams._
-
-**Sprint summary:**
-- Builds the multi-tenant core: organization creation, email invitations, join-request review, and the member directory.
-- Introduces the team substructure and the role/permission model that governs every team-scoped action later on.
-- Covers the full admin lifecycle — update, delete, and member management — including kicking and permission grants.
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -851,16 +847,17 @@ sequenceDiagram
 | 👍 **Went well** | The role/permission model proved flexible enough for every later team-scoped feature. |
 | 👎 **To improve** | Cascade-delete of an org touched many tables — model data ownership up front next time. |
 
+#### Sprint summary
+
+- Builds the multi-tenant core: organization creation, email invitations, join-request review, and the member directory.
+- Introduces the team substructure and the role/permission model that governs every team-scoped action later on.
+- Covers the full admin lifecycle — update, delete, and member management — including kicking and permission grants.
+
 ### Sprint 3 — Live Collaboration (Weeks 5–6)
 
 Channels, real-time messaging and file sharing.
 
 **Sprint goal:** _Members hold live conversations in channels with pinning, search and file sharing._
-
-**Sprint summary:**
-- Brings the product alive with real-time org and team channels — sending, editing, deleting, threads, pins, and `@mentions`.
-- Stands up the WebSocket manager and the Cloudinary upload pipeline that every later real-time and file feature reuses.
-- Adds channel search, paginated history loading, and inline PDF viewing for shared documents.
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -1096,16 +1093,17 @@ sequenceDiagram
 | 👍 **Went well** | The WebSocket manager and Cloudinary pipeline were built once and reused everywhere after. |
 | 👎 **To improve** | Channel search was underestimated — Postgres full-text tuning spilled past the sprint. |
 
+#### Sprint summary
+
+- Brings the product alive with real-time org and team channels — sending, editing, deleting, threads, pins, and `@mentions`.
+- Stands up the WebSocket manager and the Cloudinary upload pipeline that every later real-time and file feature reuses.
+- Adds channel search, paginated history loading, and inline PDF viewing for shared documents.
+
 ### Sprint 4 — Personal Network (Weeks 7–8)
 
 Direct messages, group chats and friends.
 
 **Sprint goal:** _Users have 1:1 and small-group conversations and manage their personal network._
-
-**Sprint summary:**
-- Adds 1:1 direct messaging with edit, delete, attachments, search, and a conversations inbox, all on top of Sprint 3's transport.
-- Introduces ad-hoc group chats with real-time messaging and member/settings management.
-- Builds the social graph — friend requests, accept/reject/remove, and blocking — plus typing indicators and presence broadcasts.
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -1371,16 +1369,17 @@ sequenceDiagram
 | 👍 **Went well** | Reusing Sprint 3's transport meant almost no new infrastructure was needed. |
 | 👎 **To improve** | Presence/typing events were chatty — debouncing should have been planned, not patched. |
 
+#### Sprint summary
+
+- Adds 1:1 direct messaging with edit, delete, attachments, search, and a conversations inbox, all on top of Sprint 3's transport.
+- Introduces ad-hoc group chats with real-time messaging and member/settings management.
+- Builds the social graph — friend requests, accept/reject/remove, and blocking — plus typing indicators and presence broadcasts.
+
 ### Sprint 5 — Work Tracking (Weeks 9–10)
 
 Tasks, subtasks, approvals and real-time notifications.
 
 **Sprint goal:** _Teams plan and track work and stay informed via real-time notifications._
-
-**Sprint summary:**
-- Implements the task lifecycle: creation with assignees and due dates, edit/delete, subtasks, status updates, submission, and approval/rejection.
-- Adds a unified real-time notification feed covering mentions, DMs, friends, and tasks, with a viewable inbox and mark-as-seen.
-- Wires task attachments into the existing Cloudinary pipeline for files that travel with the work.
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -1600,16 +1599,17 @@ sequenceDiagram
 | 👍 **Went well** | The task state machine kept status transitions predictable and easy to test. |
 | 👎 **To improve** | Notification fan-out logic grew complex — it needs a clearer central dispatch. |
 
+#### Sprint summary
+
+- Implements the task lifecycle: creation with assignees and due dates, edit/delete, subtasks, status updates, submission, and approval/rejection.
+- Adds a unified real-time notification feed covering mentions, DMs, friends, and tasks, with a viewable inbox and mark-as-seen.
+- Wires task attachments into the existing Cloudinary pipeline for files that travel with the work.
+
 ### Sprint 6 — Platform Reach (Weeks 11–12)
 
 AI assistant, global search, audit log and Stripe billing.
 
 **Sprint goal:** _Add cross-cutting capabilities — AI help, global search, audit trail and paid plans._
-
-**Sprint summary:**
-- Delivers the AI assistant via a LlamaIndex + Pinecone + Groq RAG pipeline, grounded in org context, uploaded documents, and inline PDFs.
-- Adds org-wide global message search backed by the same vector index built across Sprints 3–4.
-- Ships Stripe Pro plan subscription and cancellation, plus the activity audit log with a reversible-undo flow on logged actions.
 
 | ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
 | -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
@@ -1847,3 +1847,9 @@ sequenceDiagram
 | **Review** | Demoed the RAG assistant, global search, the audit log with undo, and Stripe Pro billing; 8 stories accepted — the product is feature-complete. |
 | 👍 **Went well** | Most features composed on existing infrastructure (Pinecone, Stripe stubs, audit logs). |
 | 👎 **To improve** | Stripe webhook testing needed more lead time — integrate paid services into CI earlier. |
+
+#### Sprint summary
+
+- Delivers the AI assistant via a LlamaIndex + Pinecone + Groq RAG pipeline, grounded in org context, uploaded documents, and inline PDFs.
+- Adds org-wide global message search backed by the same vector index built across Sprints 3–4.
+- Ships Stripe Pro plan subscription and cancellation, plus the activity audit log with a reversible-undo flow on logged actions.
