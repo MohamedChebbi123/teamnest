@@ -6,8 +6,8 @@ The following resources were the main references consulted during the design and
 
 2. **Next.js — Official Documentation (App Router).** Vercel. Used as the main reference for the frontend architecture, file-based routing, server/client components, and deployment patterns. Available at: https://nextjs.org/docs
 
-3. **Lewis, P. et al. (2020).** *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.* Advances in Neural Information Processing Systems (NeurIPS). Foundational paper used as the conceptual basis for the AI assistant's RAG pipeline (chunking, embedding, retrieval, prompting). Available at: https://arxiv.org/abs/2005.11401
+3. **AWS Prescriptive Guidance — What is Retrieval-Augmented Generation (RAG)?** Amazon Web Services. Used as the conceptual reference for the AI assistant's RAG pipeline (chunking, embedding, retrieval, prompting). Available at: https://docs.aws.amazon.com/prescriptive-guidance/latest/retrieval-augmented-generation-options/what-is-rag.html
 
 4. **LlamaIndex — Official Documentation.** Used to implement the RAG orchestration layer connecting Pinecone (vector store) and Groq (LLM inference). Available at: https://docs.llamaindex.ai/
 
-5. **Schwaber, K. & Sutherland, J. (2020).** *The Scrum Guide — The Definitive Guide to Scrum: The Rules of the Game.* Used as the methodological reference for organizing development into sprints with iterative, functional deliveries. Available at: https://scrumguides.org/scrum-guide.html
+5. **shadcn/ui — Official Documentation.** Used as the reference for the headless, accessible component primitives (built on Radix) styled with Tailwind CSS in the frontend. Available at: https://ui.shadcn.com/docs
