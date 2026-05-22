@@ -331,7 +331,8 @@ Site-wide admin tools: a platform overview dashboard, user moderation (ban/unban
 | Sprint 4 | Personal Network — Direct Messages, Group Chats & Friends                      | Weeks 7–8   | 35           | 11           |
 | Sprint 5 | Work Tracking — Tasks, Subtasks, Approvals & Real-time Notifications           | Weeks 9–10  | 30           | 9            |
 | Sprint 6 | Platform Reach — AI Assistant, Global Search, Audit Log & Stripe Billing       | Weeks 11–12 | 39           | 8            |
-| **Total** |                                                                               |             | **227**      | **66**       |
+| Sprint 7 | Platform Administration — Admin Dashboard, User Moderation & Org Oversight     | Weeks 13–14 | 13           | 4            |
+| **Total** |                                                                               |             | **240**      | **70**       |
 
 ---
 
@@ -1936,3 +1937,232 @@ sequenceDiagram
 This sprint delivers the AI assistant via a LlamaIndex + Pinecone + Groq RAG pipeline, grounded in org context, uploaded documents, and inline PDFs.
 It adds org-wide global message search backed by the same vector index built across Sprints 3–4.
 It also ships Stripe Pro plan subscription and cancellation, plus the activity audit log with a reversible-undo flow on logged actions.
+
+### Sprint 7 — Platform Administration (Weeks 13–14)
+
+Admin dashboard, user moderation and organization oversight.
+
+**Sprint goal:** _A site admin can monitor platform health and moderate users and organizations from a single console._
+
+| ID | User Story | Epic | Role | Story Points | Priority | Subtasks |
+| -- | ---------- | ---- | ---- | :----------: | :------: | -------- |
+| US-17.1 | As a **site admin**, I want a dashboard with user, org, channel and message counts, so that I can monitor platform health. | EP-13 | Site Admin | 3 | **M** | 1. Implement `GET /admin/overview` aggregating counts across users, orgs, channels and messages<br>2. Enforce the `role == "admin"` guard on every admin endpoint<br>3. Build the admin dashboard UI with stat cards |
+| US-17.2 | As a **site admin**, I want to list every user with their status and role, so that I can audit accounts. | EP-13 | Site Admin | 2 | **M** | 1. Implement `GET /admin/users` returning verification, role and account status<br>2. Build the users table UI with sort and filter<br>3. Show the joined-at and last-login timestamps |
+| US-17.3 | As a **site admin**, I want to ban or unban users and revoke their sessions, so that I can enforce platform rules. | EP-13 | Site Admin | 3 | **M** | 1. Implement `POST /admin/users/{id}/ban` flipping `account_status` and revoking refresh tokens<br>2. Implement `POST /admin/users/{id}/unban` restoring access<br>3. Block self-ban and admin-on-admin bans<br>4. Add ban/unban controls in the users table |
+| US-17.4 | As a **site admin**, I want to inspect and delete organizations, so that I can remove abusive workspaces. | EP-13 | Site Admin | 5 | **S** | 1. Implement `GET /admin/organizations` returning a tree of orgs → teams → channels with members and owner<br>2. Implement `DELETE /admin/organizations/{id}` with cascade<br>3. Build the org explorer UI with the nested tree view<br>4. Add a delete confirmation modal |
+
+**Sprint totals:** 4 stories • 13 story points
+
+#### Related diagrams
+
+##### C4 — Admin domain (component view)
+
+- A thin slice: `admin_router.py` is permission-gated by the `role == "admin"` check and reads across every existing model.
+- Bans reuse the `Refresh_tokens` table to revoke active sessions; deletes cascade through the org graph.
+- No new external services — admin tooling reuses the existing database.
+
+```mermaid
+flowchart TB
+    web[Web Application<br/>Next.js · /admin]
+    db[(PostgreSQL)]
+
+    subgraph admin [Admin domain]
+        adminRouter[admin_router.py<br/>Overview · users · orgs · ban/unban · delete]
+        adminGuard[_require_admin<br/>role == "admin" check]
+        adminData[Data Access<br/>SQLAlchemy · Users · Orgs · Teams · Channels · Messages · Refresh_tokens]
+    end
+
+    web -- "REST" --> adminRouter
+    adminRouter --> adminGuard
+    adminGuard --> adminData
+    adminData -- "SQL" --> db
+
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    class web,db container
+    class adminRouter,adminGuard,adminData component
+```
+
+##### Class diagram — Site Administration
+
+- Models the admin actor as a specialized `User` whose `role` is `"admin"`.
+- `User` carries the moderation field `accountStatus` (`active` / `banned`) and the methods used by the admin endpoints.
+- `Organization` exposes the cascade delete; `RefreshToken` is revoked on ban.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class User {
+        +int userId
+        +string email
+        +string role
+        +string accountStatus
+        +bool isVerified
+        +ban() void
+        +unban() void
+    }
+
+    class SiteAdmin {
+        +overview() Stats
+        +listUsers() User[]
+        +listOrganizations() OrgTree[]
+        +banUser(userId) void
+        +unbanUser(userId) void
+        +deleteOrganization(orgId) void
+    }
+
+    class Organization {
+        +int organizationId
+        +string name
+        +delete() void
+    }
+
+    class RefreshToken {
+        +string jti
+        +datetime revokedAt
+        +revoke() void
+    }
+
+    SiteAdmin --|> User : role = admin
+    SiteAdmin "1" --> "0..*" User : moderates
+    SiteAdmin "1" --> "0..*" Organization : oversees
+    User "1" *-- "0..*" RefreshToken : owns
+```
+
+##### Sequence — Admin Overview Dashboard (US-17.1, US-17.2, US-17.4)
+
+- Every admin call is gated by the role check before any read.
+- The overview endpoint aggregates counts across users, orgs, channels and messages in one round-trip.
+- The org explorer returns a nested tree (orgs → teams → channels → members).
+
+```mermaid
+sequenceDiagram
+    actor Admin as Site Admin
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Open /admin
+    FE->>+API: Get overview
+    API->>API: Check role == admin
+    alt Authorized
+        API->>+DB: Aggregate counts
+        DB-->>-API: Stats
+        API-->>FE: Overview
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Admin: Dashboard shown
+
+    Admin->>+FE: Open users tab
+    FE->>+API: List users
+    API->>API: Check role == admin
+    API->>+DB: Load users
+    DB-->>-API: Rows
+    API-->>-FE: Users
+    FE-->>-Admin: Users table
+
+    Admin->>+FE: Open orgs tab
+    FE->>+API: List organizations
+    API->>API: Check role == admin
+    API->>+DB: Load orgs · teams · channels · members
+    DB-->>-API: Tree
+    API-->>-FE: Org tree
+    FE-->>-Admin: Org explorer
+```
+
+##### Sequence — Ban User & Revoke Sessions (US-17.3)
+
+- The role check runs first; self-ban and admin-on-admin bans are rejected before any write.
+- A successful ban flips `account_status` to `banned` and bulk-revokes every active refresh token for that user.
+- The banned user's next request fails to refresh and is forced to re-login (and will be blocked).
+
+```mermaid
+sequenceDiagram
+    actor Admin as Site Admin
+    actor Target
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Click ban
+    FE->>+API: Ban user
+    API->>API: Check role == admin
+    alt Self-ban or admin target
+        API-->>FE: Error
+    else Valid target
+        API->>+DB: Set status = banned
+        DB-->>-API: Saved
+        API->>+DB: Revoke refresh tokens
+        DB-->>-API: Saved
+        API-->>FE: Banned
+    end
+    deactivate API
+    FE-->>-Admin: Result
+
+    Note over Target,API: Target's next refresh fails
+
+    Target->>+FE: Continue using app
+    FE->>+API: Refresh token
+    API->>+DB: Check token
+    DB-->>-API: Revoked
+    API-->>-FE: Denied
+    FE-->>-Target: Force re-login
+```
+
+##### Sequence — Delete Organization (US-17.4)
+
+- The admin reviews the org tree, then triggers a cascade delete.
+- The role check is enforced before the delete, and the cascade removes teams, channels, members and messages.
+- Members of the deleted org lose access on their next request.
+
+```mermaid
+sequenceDiagram
+    actor Admin as Site Admin
+    participant FE as Frontend
+    participant API as Backend
+    participant DB as Database
+
+    Note over Admin,DB: ref: Authenticate
+
+    Admin->>+FE: Open org details
+    FE->>+API: Load organization
+    API->>API: Check role == admin
+    API->>+DB: Load org · teams · channels · members
+    DB-->>-API: Tree
+    API-->>-FE: Org tree
+    FE-->>-Admin: Details shown
+
+    Admin->>+FE: Confirm delete
+    FE->>+API: Delete organization
+    API->>API: Check role == admin
+    alt Authorized
+        API->>+DB: Cascade delete org
+        DB-->>-API: Deleted
+        API-->>FE: OK
+    else Unauthorized
+        API-->>FE: Denied
+    end
+    deactivate API
+    FE-->>-Admin: Result
+```
+
+#### Sprint review & retrospective
+
+| Topic | Outcome |
+| ----- | ------- |
+| **Review** | Demoed the admin dashboard, user list with ban/unban and the org explorer with cascade delete; 4 stories accepted. |
+| 👍 **Went well** | Reusing the `Refresh_tokens` table for session revocation meant banning a user instantly logged them out everywhere. |
+| 👎 **To improve** | All admin queries hit the live tables — for a busier deployment, the overview should be cached or moved to a read replica. |
+
+#### Sprint summary
+
+This sprint introduces the platform-administration console behind the `role == "admin"` guard.
+It delivers a stats overview, a global users table with ban/unban (revoking active refresh tokens), and an organization explorer with cascade delete.
+It reuses every existing model and the Sprint 1 refresh-token rotation, adding no new external service.
