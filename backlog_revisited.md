@@ -11,6 +11,23 @@ This backlog consolidates every user story from Sprints 1–6 into **12 product 
 | **C** | Could have | Desirable; ship if time/budget allows. |
 | **W** | Won't have (this release) | Out of scope for v1; tracked for later. |
 
+**Actors**
+
+The user stories below are written from ten distinct actor perspectives. Roles are cumulative — a *Team Lead* is also a *Member* and a *User*; an *Org Owner* is also an *Org Admin*.
+
+| Actor | Definition |
+| ----- | ---------- |
+| **Visitor** | Anyone browsing TeamNest without an account. Can view the landing page and register. |
+| **User** | An authenticated person with a verified TeamNest account, not yet tied to any organization. Owns their profile, sessions, friends and direct messages. |
+| **Member** | A user who belongs to at least one organization. Can use channels, notifications, search and the AI assistant within their org. |
+| **Team Member** | A member who is assigned to a specific team. Gains access to that team's channels, files and tasks. |
+| **Team Lead** | A team member with elevated permissions over their team: manages the team itself, its channels, its permissions and its tasks. |
+| **Assignee** | A team member who has been given a task. Sees, updates and submits the work assigned to them. |
+| **Org Admin** | A member with administrative rights over the organization: invites people, reviews join requests, edits org settings and creates teams. |
+| **Org Owner** | The member who created (or inherited) the organization. Has every org-admin right plus billing, deletion and reversible-undo on logged actions. |
+| **Owner / Admin** | Shorthand used when a story applies to either an *Org Owner* or an *Org Admin* (typically read-only audit views). |
+| **Site Admin** | A platform-level operator who is not bound to any single organization. Monitors platform health, moderates users (ban/unban) and removes abusive organizations. |
+
 ---
 
 ## EP-01 — Authentication & Onboarding
