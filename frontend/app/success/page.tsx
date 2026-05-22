@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
-import { getAccessToken } from "@/lib/auth"
+import { authFetch, getAccessToken, hydrateAccessToken } from "@/lib/auth"
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -24,7 +24,7 @@ function SuccessContent() {
         return
       }
 
-      const token = getAccessToken()
+      const token = getAccessToken() ?? (await hydrateAccessToken())
       if (!token) {
         router.push("/auth/login")
         return
@@ -34,22 +34,19 @@ function SuccessContent() {
         const url = `${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/confirm-upgrade${sessionId ? `?session_id=${sessionId}` : ""}`
         console.log("[SuccessPage] calling confirm-upgrade:", url)
 
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        const response = await authFetch(url, { method: "POST" })
 
-        const data = await response.json()
+        const data = await response.json().catch(() => null)
         console.log("[SuccessPage] response:", response.status, data)
 
         if (!response.ok) {
-          toast.error("Upgrade failed", { description: formatApiError(data.detail, "Could not confirm upgrade") })
+          toast.error("Upgrade failed", { description: formatApiError(data?.detail, "Could not confirm upgrade") })
         }
       } catch (error) {
         console.error("[SuccessPage] fetch error:", error)
-        toast.error("Error", { description: "Failed to confirm upgrade" })
+        toast.error("Error", {
+          description: "Could not reach the server. Make sure the backend is running and NEXT_PUBLIC_API_URL is correct.",
+        })
       } finally {
         setConfirming(false)
       }

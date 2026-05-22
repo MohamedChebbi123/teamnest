@@ -124,6 +124,9 @@ async def login_user_service(
     if not found_user or not verify_password(validator.password, found_user.password_hashed):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if found_user.account_status == "banned":
+        raise HTTPException(status_code=403, detail="This account has been banned")
+
     access_token = create_access_token({"sub": str(found_user.user_id)})
     refresh_token, jti, expires_at = create_refresh_token({"sub": str(found_user.user_id)})
 

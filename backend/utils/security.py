@@ -18,6 +18,9 @@ def _resolve_user(token: str | None, db: Session) -> Users:
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if user.account_status == "banned":
+        raise HTTPException(status_code=403, detail="This account has been banned")
+
     return user
 
 
@@ -52,6 +55,10 @@ async def authenticate_ws(websocket: WebSocket, authorization: str | None, db: S
     user = db.query(Users).filter(Users.user_id == int(payload["sub"])).first()
     if not user:
         await websocket.close(code=1008, reason="User not found")
+        return None
+
+    if user.account_status == "banned":
+        await websocket.close(code=1008, reason="Account banned")
         return None
 
     return user

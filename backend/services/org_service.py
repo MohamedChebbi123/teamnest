@@ -129,6 +129,50 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
     if org.organization_plan == "PRO" and payment and payment.stripe_subscription_id:
         return {"status": "active", "plan": org.organization_plan}
 
+    # Fallback: if the webhook hasn't arrived yet (common in local dev), verify the
+    # checkout session directly with Stripe and activate the plan ourselves.
+    if session_id:
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+            logger.info("confirm_upgrade: retrieved session", extra={
+                "session_id": session_id,
+                "payment_status": session.get("payment_status"),
+                "mode": session.get("mode"),
+                "metadata": dict(session.get("metadata") or {}),
+            })
+
+            meta_org_id = (session.get("metadata") or {}).get("org_id") or session.get("client_reference_id")
+            try:
+                meta_org_id_int = int(meta_org_id) if meta_org_id is not None else None
+            except (TypeError, ValueError):
+                meta_org_id_int = None
+
+            if meta_org_id_int != org_id:
+                logger.warning("confirm_upgrade: session org_id mismatch", extra={"session_org_id": meta_org_id, "org_id": org_id})
+                return {"status": "pending", "plan": org.organization_plan}
+
+            if session.get("payment_status") != "paid" or session.get("mode") != "subscription":
+                return {"status": "pending", "plan": org.organization_plan}
+
+            subscription_id = session.get("subscription")
+            if not subscription_id:
+                return {"status": "pending", "plan": org.organization_plan}
+
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            items = subscription.get("items", {}).get("data", [])
+            price_id = items[0]["price"]["id"] if items else None
+            pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")
+            if pro_price_id and price_id != pro_price_id:
+                logger.warning("confirm_upgrade: non-PRO price", extra={"price_id": price_id, "expected": pro_price_id})
+                return {"status": "pending", "plan": org.organization_plan}
+
+            _activate_pro_for_org(db, org_id, subscription_id, price_id)
+            db.refresh(org)
+            return {"status": "active", "plan": org.organization_plan}
+        except Exception:
+            logger.exception("confirm_upgrade: fallback failed", extra={"session_id": session_id, "org_id": org_id})
+            return {"status": "pending", "plan": org.organization_plan}
+
     return {"status": "pending", "plan": org.organization_plan}
 
 

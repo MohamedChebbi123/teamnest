@@ -27,6 +27,7 @@ class Users(Base):
     status=Column(String(10), nullable=False, default="offline")
     last_seen_at=Column(DateTime(timezone=True), nullable=True)
     role=Column(String(20), nullable=False, default="none")
+    account_status=Column(String(20), nullable=False, default="active")
     
     owned_organizations = relationship("Organization", back_populates="owner")
     team_associations = relationship("Team_association", back_populates="user")
