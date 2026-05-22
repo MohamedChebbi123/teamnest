@@ -3,7 +3,9 @@
     "allow": [
       "Bash(curl -s -o NUL -w \"HTTP %{http_code}\" http://localhost:8000/docs)",
       "Bash(curl -s -X OPTIONS -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: authorization\" -i http://localhost:8000/organization/1/confirm-upgrade)",
-      "Bash(python -c \"import stripe; print\\('stripe version:', stripe.VERSION\\); print\\('has stripe.error.StripeError:', hasattr\\(stripe, 'error'\\) and hasattr\\(stripe.error, 'StripeError'\\)\\); print\\('has stripe.StripeError:', hasattr\\(stripe, 'StripeError'\\)\\)\")"
+      "Bash(python -c \"import stripe; print\\('stripe version:', stripe.VERSION\\); print\\('has stripe.error.StripeError:', hasattr\\(stripe, 'error'\\) and hasattr\\(stripe.error, 'StripeError'\\)\\); print\\('has stripe.StripeError:', hasattr\\(stripe, 'StripeError'\\)\\)\")",
+      "Bash(git -C c:/Users/moham/OneDrive/Bureau/teamnest status --short)",
+      "Bash(git -C c:/Users/moham/OneDrive/Bureau/teamnest log --oneline -10)"
     ]
   }
 }
