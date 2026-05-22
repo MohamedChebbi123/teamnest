@@ -26,6 +26,7 @@ class Users(Base):
     reset_code_expiry=Column(DateTime,nullable=True)
     status=Column(String(10), nullable=False, default="offline")
     last_seen_at=Column(DateTime(timezone=True), nullable=True)
+    role=Column(String(20), nullable=False, default="none")
     
     owned_organizations = relationship("Organization", back_populates="owner")
     team_associations = relationship("Team_association", back_populates="user")

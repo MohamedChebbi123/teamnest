@@ -140,6 +140,7 @@ async def login_user_service(
         "message": "user logged in successfully",
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "role": found_user.role,
     }
 
 

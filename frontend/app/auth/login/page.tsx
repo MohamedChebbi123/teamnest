@@ -92,7 +92,7 @@ export default function Login() {
       toast.success("Login successful!", {
         description: "Welcome back! Redirecting to your profile...",
       })
-      
+
       const token = data.access_token || data.token
       if (token) {
         setAccessToken(token)
@@ -100,8 +100,9 @@ export default function Login() {
         throw new Error("Login succeeded but no access token was returned")
       }
 
+      const destination = data.role === "admin" ? "/admin" : "/home"
       setTimeout(() => {
-        window.location.replace("/home")
+        window.location.replace(destination)
       }, 1000)
       
       console.log("User logged in:", data)

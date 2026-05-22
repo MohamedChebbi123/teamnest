@@ -20,6 +20,7 @@ type SignalMessage = {
   to?: string
   sdp?: RTCSessionDescriptionInit
   candidate?: RTCIceCandidateInit
+  user_id?: number
 }
 
 type VoiceParticipantsMessage = {
@@ -58,19 +59,31 @@ function createClientId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function decodeUserIdFromToken(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    const sub = payload?.sub
+    const parsed = sub != null ? Number(sub) : NaN
+    return Number.isFinite(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPanelProps) {
   const clientIdRef = useRef<string>(createClientId())
+  const currentUserIdRef = useRef<number | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map())
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const meterRafRef = useRef<number | null>(null)
+  const peerLevelIntervalRef = useRef<number | null>(null)
 
   const [isJoining, setIsJoining] = useState(false)
   const [isJoined, setIsJoined] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map())
+  const [peerUserIds, setPeerUserIds] = useState<Map<string, number>>(new Map())
+  const [peerLevels, setPeerLevels] = useState<Map<string, number>>(new Map())
   const [localVoiceLevel, setLocalVoiceLevel] = useState(0)
   const [voiceParticipants, setVoiceParticipants] = useState<VoiceParticipant[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true)
@@ -88,7 +101,12 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       return
     }
 
-    ws.send(JSON.stringify(message))
+    const payload: SignalMessage =
+      currentUserIdRef.current != null && message.user_id == null
+        ? { ...message, user_id: currentUserIdRef.current }
+        : message
+
+    ws.send(JSON.stringify(payload))
   }, [])
 
   const upsertParticipant = useCallback((participant: VoiceParticipant) => {
@@ -133,6 +151,62 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     }
   }, [channelId, orgId])
 
+  const stopLevelPolling = useCallback(() => {
+    if (peerLevelIntervalRef.current !== null) {
+      window.clearInterval(peerLevelIntervalRef.current)
+      peerLevelIntervalRef.current = null
+    }
+  }, [])
+
+  const startLevelPolling = useCallback(() => {
+    if (peerLevelIntervalRef.current !== null) {
+      return
+    }
+
+    peerLevelIntervalRef.current = window.setInterval(() => {
+      const peers = peerConnectionsRef.current
+
+      const remoteLevels = new Map<string, number>()
+      for (const [peerId, pc] of peers) {
+        let maxLevel = 0
+        for (const receiver of pc.getReceivers()) {
+          if (receiver.track?.kind !== "audio") continue
+
+          const getSources = (receiver as RTCRtpReceiver & {
+            getSynchronizationSources?: () => Array<{ audioLevel?: number }>
+          }).getSynchronizationSources
+          if (!getSources) continue
+
+          for (const src of getSources.call(receiver)) {
+            const level = src.audioLevel ?? 0
+            if (level > maxLevel) maxLevel = level
+          }
+        }
+        remoteLevels.set(peerId, Math.min(1, maxLevel))
+      }
+      setPeerLevels(remoteLevels)
+
+      const firstPc = peers.values().next().value as RTCPeerConnection | undefined
+      if (firstPc) {
+        firstPc
+          .getStats()
+          .then((stats) => {
+            let level = 0
+            stats.forEach((report) => {
+              const r = report as { type?: string; kind?: string; audioLevel?: number }
+              if (r.type === "media-source" && r.kind === "audio" && typeof r.audioLevel === "number") {
+                if (r.audioLevel > level) level = r.audioLevel
+              }
+            })
+            setLocalVoiceLevel(Math.min(1, level))
+          })
+          .catch(() => {})
+      } else {
+        setLocalVoiceLevel(0)
+      }
+    }, 150)
+  }, [])
+
   const removePeer = useCallback((peerId: string) => {
     const pc = peerConnectionsRef.current.get(peerId)
     if (!pc) {
@@ -150,7 +224,29 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       next.delete(peerId)
       return next
     })
-  }, [])
+
+    setPeerUserIds((prev) => {
+      if (!prev.has(peerId)) {
+        return prev
+      }
+      const next = new Map(prev)
+      next.delete(peerId)
+      return next
+    })
+
+    setPeerLevels((prev) => {
+      if (!prev.has(peerId)) {
+        return prev
+      }
+      const next = new Map(prev)
+      next.delete(peerId)
+      return next
+    })
+
+    if (peerConnectionsRef.current.size === 0) {
+      stopLevelPolling()
+    }
+  }, [stopLevelPolling])
 
   const getOrCreatePeerConnection = useCallback(
     (peerId: string) => {
@@ -192,6 +288,8 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
           next.set(peerId, stream)
           return next
         })
+
+        startLevelPolling()
       }
 
       pc.onconnectionstatechange = () => {
@@ -203,7 +301,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       peerConnectionsRef.current.set(peerId, pc)
       return pc
     },
-    [removePeer, rtcConfig, sendSignal]
+    [removePeer, rtcConfig, sendSignal, startLevelPolling]
   )
 
   const handleOffer = useCallback(
@@ -263,62 +361,6 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     }
   }, [])
 
-  const stopLocalMeter = useCallback(() => {
-    if (meterRafRef.current !== null) {
-      cancelAnimationFrame(meterRafRef.current)
-      meterRafRef.current = null
-    }
-
-    analyserRef.current = null
-
-    if (audioContextRef.current) {
-      void audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-
-    setLocalVoiceLevel(0)
-  }, [])
-
-  const startLocalMeter = useCallback((stream: MediaStream) => {
-    stopLocalMeter()
-
-    const audioContext = new AudioContext()
-    const source = audioContext.createMediaStreamSource(stream)
-    const analyser = audioContext.createAnalyser()
-    analyser.fftSize = 512
-    analyser.smoothingTimeConstant = 0.8
-
-    source.connect(analyser)
-
-    audioContextRef.current = audioContext
-    analyserRef.current = analyser
-
-    const buffer = new Uint8Array(analyser.frequencyBinCount)
-
-    const updateLevel = () => {
-      const currentAnalyser = analyserRef.current
-      if (!currentAnalyser) {
-        return
-      }
-
-      currentAnalyser.getByteTimeDomainData(buffer)
-
-      let sumSquares = 0
-      for (let i = 0; i < buffer.length; i += 1) {
-        const normalizedSample = (buffer[i] - 128) / 128
-        sumSquares += normalizedSample * normalizedSample
-      }
-
-      const rms = Math.sqrt(sumSquares / buffer.length)
-      const scaledLevel = Math.min(1, rms * 6)
-      setLocalVoiceLevel(scaledLevel)
-
-      meterRafRef.current = requestAnimationFrame(updateLevel)
-    }
-
-    meterRafRef.current = requestAnimationFrame(updateLevel)
-  }, [stopLocalMeter])
-
   const cleanup = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.close()
@@ -333,7 +375,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     }
     peerConnectionsRef.current.clear()
 
-    stopLocalMeter()
+    stopLevelPolling()
 
     if (localStreamRef.current) {
       for (const track of localStreamRef.current.getTracks()) {
@@ -342,11 +384,16 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       localStreamRef.current = null
     }
 
+    currentUserIdRef.current = null
+
     setRemoteStreams(new Map())
+    setPeerUserIds(new Map())
+    setPeerLevels(new Map())
+    setLocalVoiceLevel(0)
     setIsJoined(false)
     setIsJoining(false)
     setIsMuted(false)
-  }, [stopLocalMeter])
+  }, [stopLevelPolling])
 
   const toggleMute = useCallback(() => {
     const localStream = localStreamRef.current
@@ -378,9 +425,17 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
         return
       }
 
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      currentUserIdRef.current = decodeUserIdFromToken(token)
+
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       localStreamRef.current = localStream
-      startLocalMeter(localStream)
+      startLevelPolling()
 
       const ws = new WebSocket(buildVoiceWsUrl(channelId, orgId, token))
 
@@ -418,6 +473,19 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
 
         if (message.to && message.to !== clientIdRef.current) {
           return
+        }
+
+        if (typeof message.user_id === "number") {
+          const incomingUserId = message.user_id
+          const peerId = message.from
+          setPeerUserIds((prev) => {
+            if (prev.get(peerId) === incomingUserId) {
+              return prev
+            }
+            const next = new Map(prev)
+            next.set(peerId, incomingUserId)
+            return next
+          })
         }
 
         switch (message.type) {
@@ -478,7 +546,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     } finally {
       setIsJoining(false)
     }
-  }, [channelId, cleanup, getOrCreatePeerConnection, handleAnswer, handleIce, handleOffer, isJoined, isJoining, orgId, removeParticipant, sendSignal, upsertParticipant])
+  }, [channelId, cleanup, getOrCreatePeerConnection, handleAnswer, handleIce, handleOffer, isJoined, isJoining, orgId, removeParticipant, sendSignal, startLevelPolling, upsertParticipant])
 
   const leaveVoice = useCallback(() => {
     cleanup()
@@ -504,9 +572,31 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
   }, [fetchParticipants])
 
   const streamEntries = Array.from(remoteStreams.entries())
-  const localUserSpeaking = localVoiceLevel > 0.1
+  const localUserSpeaking = !isMuted && localVoiceLevel > 0.1
   const localLevelPercent = Math.round(localVoiceLevel * 100)
   const totalParticipants = voiceParticipants.length
+  const SPEAKING_THRESHOLD = 0.1
+
+  const participantsByUserId = useMemo(() => {
+    const map = new Map<number, VoiceParticipant>()
+    for (const participant of voiceParticipants) {
+      map.set(participant.user_id, participant)
+    }
+    return map
+  }, [voiceParticipants])
+
+  const speakingUserIds = useMemo(() => {
+    const set = new Set<number>()
+    for (const [peerId, level] of peerLevels) {
+      if (level <= SPEAKING_THRESHOLD) continue
+      const userId = peerUserIds.get(peerId)
+      if (userId != null) set.add(userId)
+    }
+    if (localUserSpeaking && currentUserIdRef.current != null) {
+      set.add(currentUserIdRef.current)
+    }
+    return set
+  }, [peerLevels, peerUserIds, localUserSpeaking])
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-4 p-6">
@@ -553,17 +643,37 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
 
         {!isLoadingParticipants && voiceParticipants.length > 0 && (
           <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border bg-background p-3">
-            {voiceParticipants.map((participant) => (
-              <div key={participant.user_id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium">
-                    {participant.first_name} {participant.last_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{participant.user_tag || "No tag"}</p>
+            {voiceParticipants.map((participant) => {
+              const isSpeaking = speakingUserIds.has(participant.user_id)
+              const isSelf = currentUserIdRef.current === participant.user_id
+              return (
+                <div
+                  key={participant.user_id}
+                  className={`flex items-center justify-between rounded-md border px-3 py-2 transition-all ${
+                    isSpeaking ? "border-green-500/70 shadow-[0_0_0_1px_rgba(34,197,94,0.3)]" : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block h-2.5 w-2.5 rounded-full ${
+                        isSpeaking ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"
+                      }`}
+                      aria-hidden
+                    />
+                    <div>
+                      <p className="text-sm font-medium">
+                        {participant.first_name} {participant.last_name}
+                        {isSelf ? <span className="ml-1 text-xs text-muted-foreground">(you)</span> : null}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{participant.user_tag || "No tag"}</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-medium ${isSpeaking ? "text-green-600" : "text-muted-foreground"}`}>
+                    {isSpeaking ? "Speaking" : "In voice"}
+                  </span>
                 </div>
-                <span className="text-xs text-green-600">In voice</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -597,20 +707,57 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
           <p className="text-sm text-muted-foreground">Connected to voice, waiting for remote audio streams.</p>
         )}
 
-        {streamEntries.map(([peerId, stream]) => (
-          <div key={peerId} className="rounded-md border bg-background p-3">
-            <p className="mb-2 text-xs text-muted-foreground">Peer {peerId.slice(0, 8)}</p>
-            <audio
-              autoPlay
-              controls
-              ref={(node) => {
-                if (node) {
-                  node.srcObject = stream
-                }
-              }}
-            />
-          </div>
-        ))}
+        {streamEntries.map(([peerId, stream]) => {
+          const userId = peerUserIds.get(peerId)
+          const participant = userId != null ? participantsByUserId.get(userId) : undefined
+          const level = peerLevels.get(peerId) ?? 0
+          const isSpeaking = level > SPEAKING_THRESHOLD
+          const levelPercent = Math.round(level * 100)
+          const displayName = participant
+            ? `${participant.first_name} ${participant.last_name}`.trim() || participant.user_tag || `Peer ${peerId.slice(0, 8)}`
+            : `Peer ${peerId.slice(0, 8)}`
+
+          return (
+            <div
+              key={peerId}
+              className={`rounded-md border bg-background p-3 transition-all ${
+                isSpeaking ? "border-green-500/70 shadow-[0_0_0_1px_rgba(34,197,94,0.3)]" : ""
+              }`}
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${
+                      isSpeaking ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"
+                    }`}
+                    aria-hidden
+                  />
+                  <p className="text-sm font-medium">{displayName}</p>
+                </div>
+                <span className={`text-xs font-medium ${isSpeaking ? "text-green-600" : "text-muted-foreground"}`}>
+                  {isSpeaking ? "Speaking" : "Listening"}
+                </span>
+              </div>
+
+              <div className="mb-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full transition-[width] duration-75 ${isSpeaking ? "bg-green-500" : "bg-primary/60"}`}
+                  style={{ width: `${Math.max(4, levelPercent)}%` }}
+                />
+              </div>
+
+              <audio
+                autoPlay
+                playsInline
+                ref={(node) => {
+                  if (node && node.srcObject !== stream) {
+                    node.srcObject = stream
+                  }
+                }}
+              />
+            </div>
+          )
+        })}
       </div>
     </div>
   )

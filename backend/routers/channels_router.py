@@ -17,6 +17,8 @@ from services.message_service import (
     search_messages_service,
     fetch_user_notifications_service,
     mark_notifications_seen_service,
+    fetch_voice_participants_service,
+    voice_websocket_endpoint,
 )
 from fastapi import APIRouter, Depends, Query, WebSocket
 from sqlalchemy.orm import Session
@@ -183,3 +185,23 @@ async def notifications_websocket_handler(
     token: str = Query(...),
 ):
     return await notifications_ws_endpoint(websocket, f"Bearer {token}")
+
+
+@router.get("/voice/{channel_id}/participants")
+async def get_voice_participants(
+    channel_id: int,
+    org_id: int = Query(...),
+    user: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
+):
+    return fetch_voice_participants_service(channel_id, org_id, user, db)
+
+
+@router.websocket("/voice/{channel_id}")
+async def voice_ws(
+    websocket: WebSocket,
+    channel_id: int,
+    authorization: str = Query(...),
+    org_id: int = Query(...),
+):
+    return await voice_websocket_endpoint(websocket, channel_id, authorization, org_id)
