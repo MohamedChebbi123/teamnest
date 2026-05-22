@@ -2005,8 +2005,8 @@ classDiagram
 
     class SiteAdmin {
         +overview() Stats
-        +listUsers() User[]
-        +listOrganizations() OrgTree[]
+        +listUsers() List~User~
+        +listOrganizations() List~OrgTree~
         +banUser(userId) void
         +unbanUser(userId) void
         +deleteOrganization(orgId) void
