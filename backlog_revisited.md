@@ -1968,7 +1968,7 @@ flowchart TB
 
     subgraph admin [Admin domain]
         adminRouter[admin_router.py<br/>Overview · users · orgs · ban/unban · delete]
-        adminGuard[_require_admin<br/>role == "admin" check]
+        adminGuard["_require_admin<br/>role == 'admin' check"]
         adminData[Data Access<br/>SQLAlchemy · Users · Orgs · Teams · Channels · Messages · Refresh_tokens]
     end
 
