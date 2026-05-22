@@ -15,18 +15,68 @@ This backlog consolidates every user story from Sprints 1–6 into **12 product 
 
 The user stories below are written from ten distinct actor perspectives. Roles are cumulative — a *Team Lead* is also a *Member* and a *User*; an *Org Owner* is also an *Org Admin*.
 
-| Actor | Definition |
-| ----- | ---------- |
-| **Visitor** | Anyone browsing TeamNest without an account. Can view the landing page and register. |
-| **User** | An authenticated person with a verified TeamNest account, not yet tied to any organization. Owns their profile, sessions, friends and direct messages. |
-| **Member** | A user who belongs to at least one organization. Can use channels, notifications, search and the AI assistant within their org. |
-| **Team Member** | A member who is assigned to a specific team. Gains access to that team's channels, files and tasks. |
-| **Team Lead** | A team member with elevated permissions over their team: manages the team itself, its channels, its permissions and its tasks. |
-| **Assignee** | A team member who has been given a task. Sees, updates and submits the work assigned to them. |
-| **Org Admin** | A member with administrative rights over the organization: invites people, reviews join requests, edits org settings and creates teams. |
-| **Org Owner** | The member who created (or inherited) the organization. Has every org-admin right plus billing, deletion and reversible-undo on logged actions. |
-| **Owner / Admin** | Shorthand used when a story applies to either an *Org Owner* or an *Org Admin* (typically read-only audit views). |
-| **Site Admin** | A platform-level operator who is not bound to any single organization. Monitors platform health, moderates users (ban/unban) and removes abusive organizations. |
+**Visitor** — Anyone browsing TeamNest without an account.
+- Browse the landing page
+- Register a new account
+- Initiate email verification
+
+**User** — Authenticated person with a verified account, not yet tied to any organization.
+- Manage profile (avatar, name, country, phone)
+- Sign in, sign out and reset/change password
+- Set presence and theme preferences
+- Send direct messages and create group chats
+- Manage friends and block unwanted contacts
+
+**Member** — A user who belongs to at least one organization.
+- Create or join organizations
+- View the member directory and team list
+- Chat in org channels with edits, threads, pins and `@mentions`
+- Search messages and share files
+- Receive real-time notifications
+- Ask the AI assistant about org context
+
+**Team Member** — A member assigned to a specific team.
+- Access the team's channels and files
+- View teammates' profiles
+- Read and act on team tasks
+- Add or remove task attachments
+
+**Team Lead** — A team member with elevated permissions over their team.
+- Update or delete the team
+- Add or kick team members
+- Grant or revoke team permissions
+- Create team channels
+- Create, edit and break down tasks into subtasks
+- Approve or reject submitted tasks
+
+**Assignee** — User assigned to one or multiple tasks.
+- View assigned tasks
+- Update task progress
+- Upload task attachments
+- Track deadlines and statuses
+
+**Org Admin** — A member with administrative rights over the organization.
+- Invite members by email
+- Accept or reject join requests
+- Update organization settings
+- Create teams within the org
+- View the activity log
+
+**Org Owner** — The member who created (or inherited) the organization.
+- All Org Admin capabilities
+- Subscribe to or cancel the Pro plan
+- Delete the organization
+- Undo reversible logged actions
+
+**Owner / Admin** — Shorthand used when a story applies to either an Org Owner or an Org Admin.
+- View the organization activity log
+- Audit org-wide actions
+
+**Site Admin** — Platform-level operator not bound to any single organization.
+- View platform-wide stats (users, orgs, channels, messages)
+- List and audit every user account
+- Ban or unban users and revoke their sessions
+- Inspect and delete abusive organizations
 
 ---
 
