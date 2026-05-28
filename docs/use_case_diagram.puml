@@ -1,0 +1,73 @@
+@startuml TeamNest_UseCase_Diagram
+left to right direction
+skinparam packageStyle rectangle
+title TeamNest — Use Case Diagram
+
+' ===== Actors =====
+:Guest: as Guest
+:User: as User
+:Org Owner: as Owner
+:Admin: as Admin
+:Stripe: as Stripe << external >>
+
+User <|-- Owner
+User <|-- Admin
+
+rectangle "TeamNest" {
+  usecase "Register"            as UC1
+  usecase "Verify Email"        as UC1b
+  usecase "Login"               as UC2
+  usecase "Authenticate"        as UC2b
+  usecase "Manage Profile"      as UC3
+
+  usecase "Manage Organization" as UC4
+  usecase "Subscribe Plan"      as UC5
+  usecase "Pay"                 as UC5b
+
+  usecase "Manage Teams"        as UC6
+  usecase "Manage Channels"     as UC7
+  usecase "Send Message"        as UC8
+  usecase "Attach File"         as UC8b
+
+  usecase "Direct Message"      as UC9
+  usecase "Group Chat"          as UC10
+  usecase "Manage Friends"      as UC11
+
+  usecase "Manage Tasks"        as UC12
+  usecase "Notifications"       as UC13
+  usecase "Search"              as UC14
+  usecase "AI Assistant"        as UC15
+
+  usecase "Platform Admin"      as UC16
+}
+
+' ===== Actor links =====
+Guest  --> UC1
+Guest  --> UC2
+User   --> UC3
+User   --> UC8
+User   --> UC9
+User   --> UC10
+User   --> UC11
+User   --> UC12
+User   --> UC13
+User   --> UC14
+User   --> UC15
+Owner  --> UC4
+Owner  --> UC5
+Owner  --> UC6
+Owner  --> UC7
+Admin  --> UC16
+Stripe --> UC5b
+
+' ===== Include =====
+UC1 ..> UC1b : <<include>>
+UC2 ..> UC2b : <<include>>
+UC5 ..> UC5b : <<include>>
+UC4 ..> UC5  : <<include>>
+
+' ===== Extend =====
+UC8  <.. UC8b : <<extend>>
+UC12 <.. UC13 : <<extend>>
+
+@enduml
