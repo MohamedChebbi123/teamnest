@@ -31,3 +31,19 @@ def test_register_persists_user_and_hashes_password(client, db_session):
     assert persisted.is_verified is False
     assert persisted.password_hashed != "Strong1Pass"
     assert persisted.password_hashed.startswith("$2")
+
+
+def test_register_rejects_duplicate_email(client):
+    payload = {
+        "first_name": "Alice",
+        "last_name": "Example",
+        "email": "alice.duplicate@integration.test",
+        "password": "Strong1Pass",
+    }
+
+    first_response = client.post("/register", data=payload)
+    assert first_response.status_code == 200
+
+    second_response = client.post("/register", data=payload)
+    assert second_response.status_code == 409
+    assert second_response.json()["detail"] == "Email already registered"

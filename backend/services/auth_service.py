@@ -1,6 +1,7 @@
 from models.Users import Users
 from models.Refresh_tokens import Refresh_tokens
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from utils.hasher import hash_password, hash_code, verify_code
 from utils.cloudinary_handler import upload_user_profile_image
@@ -33,10 +34,8 @@ async def register_user_service(
     validate_email(email)
     validate_password(password)
 
-    generic_response = {"message": "If the email is available, your account has been created. You can now log in."}
-
     if db.query(Users).filter(Users.email == email).first():
-        return generic_response
+        raise HTTPException(status_code=409, detail="Email already registered")
 
     new_user = Users(
         first_name=first_name,
@@ -47,10 +46,14 @@ async def register_user_service(
     )
 
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        db.commit()
+        db.refresh(new_user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Email already registered")
 
-    return generic_response
+    return {"message": "Your account has been created. You can now log in."}
 
 
 async def verify_email_service(
