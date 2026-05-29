@@ -1,3 +1,5 @@
+import type { SampleRate } from "libopus-wasm"
+
 type InitMessage = {
   type: "init"
   sampleRate: number
@@ -36,12 +38,12 @@ self.onmessage = async (event: MessageEvent<VoiceWorkerMessage>) => {
       const { createEncoder, createDecoder } = await import("libopus-wasm")
 
       encoder = await createEncoder({
-        sampleRate: message.sampleRate,
+        sampleRate: message.sampleRate as SampleRate,
         channels: message.channels,
         frameSize: message.frameSize,
       })
       decoder = await createDecoder({
-        sampleRate: message.sampleRate,
+        sampleRate: message.sampleRate as SampleRate,
         channels: message.channels,
       })
       initialized = true
