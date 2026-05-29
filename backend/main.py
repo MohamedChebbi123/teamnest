@@ -1,4 +1,4 @@
-from database.connection import connect_databse
+from database.connection import connect_databse, Base, engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, org_router, channels_router, team_router, direct_messages_router, tasks_router, friends_router, groupe_chat_router, assistant_router, logs_router, search_router
@@ -10,6 +10,7 @@ import asyncio
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
     asyncio.create_task(cleanup_task(connect_databse))
     yield
 
