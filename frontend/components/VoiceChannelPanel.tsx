@@ -1,10 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2, Mic, MicOff } from "lucide-react"
 import { toast } from "sonner"
 import { getAccessToken } from "@/lib/auth"
+import { buildVoicePacket, parseVoicePacket } from "@/lib/voice/voicePacket"
+import { JitterBuffer } from "@/lib/voice/jitterBuffer"
 
 type VoiceParticipant = {
   user_id: number
@@ -12,14 +14,6 @@ type VoiceParticipant = {
   last_name: string
   avatar_url?: string | null
   user_tag?: string
-}
-
-type SignalMessage = {
-  type: "join" | "offer" | "answer" | "ice"
-  from: string
-  to?: string
-  sdp?: RTCSessionDescriptionInit
-  candidate?: RTCIceCandidateInit
 }
 
 type VoiceParticipantsMessage = {
@@ -37,7 +31,7 @@ type VoiceLeftMessage = {
   participant: VoiceParticipant
 }
 
-type VoiceSocketMessage = SignalMessage | VoiceParticipantsMessage | VoiceJoinedMessage | VoiceLeftMessage
+type VoiceSocketMessage = VoiceParticipantsMessage | VoiceJoinedMessage | VoiceLeftMessage
 
 type VoiceChannelPanelProps = {
   channelId: number
@@ -50,56 +44,29 @@ function buildVoiceWsUrl(channelId: number, orgId: number, token: string): strin
   return `${wsBaseUrl}/voice/${channelId}?authorization=${authValue}&org_id=${orgId}`
 }
 
-function createClientId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID()
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
 export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPanelProps) {
-  const clientIdRef = useRef<string>(createClientId())
   const wsRef = useRef<WebSocket | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
-  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map())
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const meterRafRef = useRef<number | null>(null)
+  const captureNodeRef = useRef<AudioWorkletNode | null>(null)
+  const playbackNodeRef = useRef<AudioWorkletNode | null>(null)
+  const workerRef = useRef<Worker | null>(null)
+  const jitterBufferRef = useRef(new JitterBuffer<Uint8Array>(4))
+  const decodeIntervalRef = useRef<number | null>(null)
+  const mutedRef = useRef(false)
 
   const [isJoining, setIsJoining] = useState(false)
   const [isJoined, setIsJoined] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map())
   const [localVoiceLevel, setLocalVoiceLevel] = useState(0)
   const [voiceParticipants, setVoiceParticipants] = useState<VoiceParticipant[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true)
 
-  const rtcConfig = useMemo<RTCConfiguration>(
-    () => ({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    }),
-    []
-  )
-
-  const sendSignal = useCallback((message: SignalMessage) => {
-    const ws = wsRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      return
-    }
-
-    ws.send(JSON.stringify(message))
-  }, [])
-
-  const configureAudioSender = useCallback((sender: RTCRtpSender) => {
-    const params = sender.getParameters()
-    if (!params.encodings || params.encodings.length === 0) {
-      params.encodings = [{}]
-    }
-
-    params.encodings[0].maxBitrate = 32000
-    void sender.setParameters(params)
-  }, [])
+  const SAMPLE_RATE = 48000
+  const FRAME_MS = 20
+  const FRAME_SAMPLES = (SAMPLE_RATE * FRAME_MS) / 1000
 
   const upsertParticipant = useCallback((participant: VoiceParticipant) => {
     setVoiceParticipants((prev) => {
@@ -142,139 +109,6 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       setIsLoadingParticipants(false)
     }
   }, [channelId, orgId])
-
-  const removePeer = useCallback((peerId: string) => {
-    const pc = peerConnectionsRef.current.get(peerId)
-    if (!pc) {
-      return
-    }
-
-    pc.onicecandidate = null
-    pc.ontrack = null
-    pc.onconnectionstatechange = null
-    pc.close()
-    peerConnectionsRef.current.delete(peerId)
-
-    setRemoteStreams((prev) => {
-      const next = new Map(prev)
-      next.delete(peerId)
-      return next
-    })
-  }, [])
-
-  const getOrCreatePeerConnection = useCallback(
-    (peerId: string) => {
-      const existing = peerConnectionsRef.current.get(peerId)
-      if (existing) {
-        return existing
-      }
-
-      const pc = new RTCPeerConnection(rtcConfig)
-      const localStream = localStreamRef.current
-
-      if (localStream) {
-        for (const track of localStream.getTracks()) {
-          const sender = pc.addTrack(track, localStream)
-          if (track.kind === "audio") {
-            configureAudioSender(sender)
-          }
-        }
-      }
-
-      pc.onicecandidate = (event) => {
-        if (!event.candidate) {
-          return
-        }
-
-        sendSignal({
-          type: "ice",
-          from: clientIdRef.current,
-          to: peerId,
-          candidate: event.candidate.toJSON(),
-        })
-      }
-
-      pc.ontrack = (event) => {
-        const [stream] = event.streams
-        if (!stream) {
-          return
-        }
-
-        setRemoteStreams((prev) => {
-          const next = new Map(prev)
-          next.set(peerId, stream)
-          return next
-        })
-      }
-
-      pc.onconnectionstatechange = () => {
-        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
-          removePeer(peerId)
-        }
-      }
-
-      peerConnectionsRef.current.set(peerId, pc)
-      return pc
-    },
-    [configureAudioSender, removePeer, rtcConfig, sendSignal]
-  )
-
-  const handleOffer = useCallback(
-    async (message: SignalMessage) => {
-      if (!message.sdp) {
-        return
-      }
-
-      const peerId = message.from
-      const pc = getOrCreatePeerConnection(peerId)
-
-      await pc.setRemoteDescription(new RTCSessionDescription(message.sdp))
-
-      const answer = await pc.createAnswer()
-      await pc.setLocalDescription(answer)
-
-      sendSignal({
-        type: "answer",
-        from: clientIdRef.current,
-        to: peerId,
-        sdp: pc.localDescription || undefined,
-      })
-    },
-    [getOrCreatePeerConnection, sendSignal]
-  )
-
-  const handleAnswer = useCallback(
-    async (message: SignalMessage) => {
-      if (!message.sdp) {
-        return
-      }
-
-      const pc = peerConnectionsRef.current.get(message.from)
-      if (!pc) {
-        return
-      }
-
-      await pc.setRemoteDescription(new RTCSessionDescription(message.sdp))
-    },
-    []
-  )
-
-  const handleIce = useCallback(async (message: SignalMessage) => {
-    if (!message.candidate) {
-      return
-    }
-
-    const pc = peerConnectionsRef.current.get(message.from)
-    if (!pc) {
-      return
-    }
-
-    try {
-      await pc.addIceCandidate(new RTCIceCandidate(message.candidate))
-    } catch (error) {
-      console.error("Failed to add ICE candidate", error)
-    }
-  }, [])
 
   const stopLocalMeter = useCallback(() => {
     if (meterRafRef.current !== null) {
@@ -333,18 +167,35 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
   }, [stopLocalMeter])
 
   const cleanup = useCallback(() => {
+    if (decodeIntervalRef.current !== null) {
+      window.clearInterval(decodeIntervalRef.current)
+      decodeIntervalRef.current = null
+    }
+
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
 
-    for (const [, pc] of peerConnectionsRef.current) {
-      pc.onicecandidate = null
-      pc.ontrack = null
-      pc.onconnectionstatechange = null
-      pc.close()
+    if (workerRef.current) {
+      workerRef.current.terminate()
+      workerRef.current = null
     }
-    peerConnectionsRef.current.clear()
+
+    if (captureNodeRef.current) {
+      captureNodeRef.current.disconnect()
+      captureNodeRef.current = null
+    }
+
+    if (playbackNodeRef.current) {
+      playbackNodeRef.current.disconnect()
+      playbackNodeRef.current = null
+    }
+
+    if (audioContextRef.current) {
+      void audioContextRef.current.close()
+      audioContextRef.current = null
+    }
 
     stopLocalMeter()
 
@@ -355,23 +206,23 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       localStreamRef.current = null
     }
 
-    setRemoteStreams(new Map())
+    jitterBufferRef.current.clear()
     setIsJoined(false)
     setIsJoining(false)
     setIsMuted(false)
   }, [stopLocalMeter])
 
   const toggleMute = useCallback(() => {
-    const localStream = localStreamRef.current
-    if (!localStream) {
-      return
-    }
-
     const nextMuted = !isMuted
-    for (const track of localStream.getAudioTracks()) {
-      track.enabled = !nextMuted
-    }
+    mutedRef.current = nextMuted
     setIsMuted(nextMuted)
+
+    if (captureNodeRef.current) {
+      captureNodeRef.current.port.postMessage({
+        type: "configure",
+        enabled: !nextMuted,
+      })
+    }
   }, [isMuted])
 
   const joinVoice = useCallback(async () => {
@@ -402,70 +253,92 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       localStreamRef.current = localStream
       startLocalMeter(localStream)
 
+      const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: "interactive" })
+      audioContextRef.current = audioContext
+      await audioContext.resume()
+
+      await audioContext.audioWorklet.addModule("/voice/voice-capture-worklet.js")
+      await audioContext.audioWorklet.addModule("/voice/voice-playback-worklet.js")
+
+      const source = audioContext.createMediaStreamSource(localStream)
+      const captureNode = new AudioWorkletNode(audioContext, "voice-capture-processor")
+      captureNode.port.postMessage({ type: "configure", frameSize: FRAME_SAMPLES, enabled: true })
+      captureNodeRef.current = captureNode
+      source.connect(captureNode)
+
+      const playbackNode = new AudioWorkletNode(audioContext, "voice-playback-processor")
+      playbackNode.connect(audioContext.destination)
+      playbackNodeRef.current = playbackNode
+
+      const worker = new Worker(new URL("../workers/voice-opus-worker.ts", import.meta.url), {
+        type: "module",
+      })
+      workerRef.current = worker
+
+      worker.postMessage({ type: "init", sampleRate: SAMPLE_RATE, channels: 1 })
+
+      worker.onmessage = (event) => {
+        const data = event.data
+        if (data.type === "error") {
+          toast.error("Voice encoder error", { description: data.message })
+          return
+        }
+
+        if (data.type === "opus") {
+          const packet = buildVoicePacket(data.seq, Date.now(), data.packet)
+          const ws = wsRef.current
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(packet)
+          }
+          return
+        }
+
+        if (data.type === "pcm") {
+          playbackNode.port.postMessage({ type: "pcm", pcm: data.pcm }, [data.pcm.buffer])
+        }
+      }
+
+      captureNode.port.onmessage = (event) => {
+        const data = event.data
+        if (data?.type === "frame") {
+          if (!mutedRef.current) {
+            worker.postMessage({ type: "encode", pcm: data.pcm }, [data.pcm.buffer])
+          }
+        }
+      }
+
       const ws = new WebSocket(buildVoiceWsUrl(channelId, orgId, token))
+      ws.binaryType = "arraybuffer"
 
-      ws.onmessage = async (event) => {
-        let message: VoiceSocketMessage
+      ws.onmessage = (event) => {
+        if (typeof event.data === "string") {
+          let message: VoiceSocketMessage
+          try {
+            message = JSON.parse(event.data)
+          } catch {
+            return
+          }
 
-        try {
-          message = JSON.parse(event.data)
-        } catch {
-          return
-        }
-
-        if (message.type === "voice_participants") {
-          setVoiceParticipants(Array.isArray(message.participants) ? message.participants : [])
-          return
-        }
-
-        if (message.type === "voice_joined") {
-          if (message.participant) {
-            upsertParticipant(message.participant)
+          if (message.type === "voice_participants") {
+            setVoiceParticipants(Array.isArray(message.participants) ? message.participants : [])
+          } else if (message.type === "voice_joined") {
+            if (message.participant) {
+              upsertParticipant(message.participant)
+            }
+          } else if (message.type === "voice_left") {
+            if (message.participant) {
+              removeParticipant(message.participant)
+            }
           }
           return
         }
 
-        if (message.type === "voice_left") {
-          if (message.participant) {
-            removeParticipant(message.participant)
+        if (event.data instanceof ArrayBuffer) {
+          const packet = parseVoicePacket(event.data)
+          if (!packet) {
+            return
           }
-          return
-        }
-
-        if (!message || message.from === clientIdRef.current) {
-          return
-        }
-
-        if (message.to && message.to !== clientIdRef.current) {
-          return
-        }
-
-        switch (message.type) {
-          case "join": {
-            const peerId = message.from
-            const pc = getOrCreatePeerConnection(peerId)
-            const offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
-
-            sendSignal({
-              type: "offer",
-              from: clientIdRef.current,
-              to: peerId,
-              sdp: pc.localDescription || undefined,
-            })
-            break
-          }
-          case "offer":
-            await handleOffer(message)
-            break
-          case "answer":
-            await handleAnswer(message)
-            break
-          case "ice":
-            await handleIce(message)
-            break
-          default:
-            break
+          jitterBufferRef.current.insert(packet.seq, packet.payload)
         }
       }
 
@@ -481,10 +354,12 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       wsRef.current = ws
       setIsJoined(true)
 
-      sendSignal({
-        type: "join",
-        from: clientIdRef.current,
-      })
+      decodeIntervalRef.current = window.setInterval(() => {
+        const payload = jitterBufferRef.current.pop()
+        if (payload) {
+          worker.postMessage({ type: "decode", packet: payload }, [payload.buffer])
+        }
+      }, FRAME_MS)
 
       toast.success("Voice connected", {
         description: "Microphone is active",
@@ -498,12 +373,16 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     } finally {
       setIsJoining(false)
     }
-  }, [channelId, cleanup, getOrCreatePeerConnection, handleAnswer, handleIce, handleOffer, isJoined, isJoining, orgId, removeParticipant, sendSignal, upsertParticipant])
+  }, [channelId, cleanup, isJoined, isJoining, orgId, removeParticipant, upsertParticipant])
 
   const leaveVoice = useCallback(() => {
     cleanup()
     toast("Left voice channel")
   }, [cleanup])
+
+  useEffect(() => {
+    mutedRef.current = isMuted
+  }, [isMuted])
 
   useEffect(() => {
     return () => {
@@ -523,7 +402,6 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     }
   }, [fetchParticipants])
 
-  const streamEntries = Array.from(remoteStreams.entries())
   const localUserSpeaking = localVoiceLevel > 0.1
   const localLevelPercent = Math.round(localVoiceLevel * 100)
   const totalParticipants = voiceParticipants.length
@@ -535,7 +413,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
           <div>
             <h3 className="text-lg font-semibold">Voice Channel</h3>
             <p className="text-sm text-muted-foreground">
-              Audio is peer-to-peer. TeamNest only forwards signaling messages.
+              Audio is relayed over WebSockets with Opus frames and a jitter buffer.
             </p>
           </div>
 
@@ -613,24 +491,11 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
           </div>
         )}
 
-        {isJoined && streamEntries.length === 0 && (
-          <p className="text-sm text-muted-foreground">Connected to voice, waiting for remote audio streams.</p>
+        {isJoined && (
+          <p className="text-sm text-muted-foreground">
+            Connected to voice. Playback uses a jitter buffer for stable audio.
+          </p>
         )}
-
-        {streamEntries.map(([peerId, stream]) => (
-          <div key={peerId} className="rounded-md border bg-background p-3">
-            <p className="mb-2 text-xs text-muted-foreground">Peer {peerId.slice(0, 8)}</p>
-            <audio
-              autoPlay
-              controls
-              ref={(node) => {
-                if (node) {
-                  node.srcObject = stream
-                }
-              }}
-            />
-          </div>
-        ))}
       </div>
     </div>
   )

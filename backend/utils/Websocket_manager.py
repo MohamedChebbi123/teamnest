@@ -90,8 +90,21 @@ class VoiceWebsocketManager:
             except Exception:
                 self.disconnect(channel_id, ws)
 
+    async def broadcast_bytes(self, channel_id: int, payload: bytes, exclude: Optional[WebSocket] = None):
+        for ws in list(self.voice_channels.get(channel_id, [])):
+            if exclude is not None and ws is exclude:
+                continue
+
+            try:
+                await ws.send_bytes(payload)
+            except Exception:
+                self.disconnect(channel_id, ws)
+
     async def forward_signal(self, channel_id: int, sender: WebSocket, message: dict):
         await self.broadcast(channel_id, message, exclude=sender)
+
+    async def forward_audio(self, channel_id: int, sender: WebSocket, payload: bytes):
+        await self.broadcast_bytes(channel_id, payload, exclude=sender)
 
 
 

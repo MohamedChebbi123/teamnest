@@ -1,5 +1,6 @@
 ﻿from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from datetime import datetime, UTC
+import json
 import logging
 import os
 import re
@@ -1209,10 +1210,20 @@ async def voice_websocket_endpoint(
 
     try:
         while True:
-            message = await websocket.receive_json()
+            message = await websocket.receive()
 
-            if isinstance(message, dict):
-                await voice_manager.forward_signal(channel_id, websocket, message)
+            if message.get("bytes") is not None:
+                await voice_manager.forward_audio(channel_id, websocket, message["bytes"])
+                continue
+
+            if message.get("text"):
+                try:
+                    payload = json.loads(message["text"])
+                except Exception:
+                    continue
+
+                if isinstance(payload, dict):
+                    await voice_manager.forward_signal(channel_id, websocket, payload)
     except WebSocketDisconnect:
         disconnected_participant = voice_manager.disconnect(channel_id, websocket)
         if disconnected_participant:
