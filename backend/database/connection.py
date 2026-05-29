@@ -3,10 +3,15 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import os 
 from dotenv import load_dotenv
 
-load_dotenv()
+_running_on_render = bool(os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID"))
+
+if not _running_on_render:
+    load_dotenv()
 
 
 DATABASE_URL=os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not configured")
 DB_POOL_SIZE=int(os.getenv("DB_POOL_SIZE","50"))
 DB_MAX_OVERFLOW=int(os.getenv("DB_MAX_OVERFLOW","100"))
 DB_POOL_RECYCLE=int(os.getenv("DB_POOL_RECYCLE","1800"))
