@@ -1,5 +1,5 @@
 import os
-from database.connection import Base, engine, connect_databse
+from database.connection import connect_databse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, org_router, channels_router, team_router, direct_messages_router, tasks_router, friends_router, groupe_chat_router, assistant_router, logs_router, search_router
@@ -41,7 +41,8 @@ app.include_router(assistant_router.router)
 app.include_router(logs_router.router)
 app.include_router(search_router.router)
 
-Base.metadata.create_all(bind=engine)
+
+
 
 
 
