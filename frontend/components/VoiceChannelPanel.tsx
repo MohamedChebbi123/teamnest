@@ -91,6 +91,16 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
     ws.send(JSON.stringify(message))
   }, [])
 
+  const configureAudioSender = useCallback((sender: RTCRtpSender) => {
+    const params = sender.getParameters()
+    if (!params.encodings || params.encodings.length === 0) {
+      params.encodings = [{}]
+    }
+
+    params.encodings[0].maxBitrate = 32000
+    void sender.setParameters(params)
+  }, [])
+
   const upsertParticipant = useCallback((participant: VoiceParticipant) => {
     setVoiceParticipants((prev) => {
       const next = prev.filter((entry) => entry.user_id !== participant.user_id)
@@ -164,7 +174,10 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
 
       if (localStream) {
         for (const track of localStream.getTracks()) {
-          pc.addTrack(track, localStream)
+          const sender = pc.addTrack(track, localStream)
+          if (track.kind === "audio") {
+            configureAudioSender(sender)
+          }
         }
       }
 
@@ -203,7 +216,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       peerConnectionsRef.current.set(peerId, pc)
       return pc
     },
-    [removePeer, rtcConfig, sendSignal]
+    [configureAudioSender, removePeer, rtcConfig, sendSignal]
   )
 
   const handleOffer = useCallback(
@@ -282,7 +295,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
   const startLocalMeter = useCallback((stream: MediaStream) => {
     stopLocalMeter()
 
-    const audioContext = new AudioContext()
+    const audioContext = new AudioContext({ latencyHint: "interactive" })
     const source = audioContext.createMediaStreamSource(stream)
     const analyser = audioContext.createAnalyser()
     analyser.fftSize = 512
@@ -378,7 +391,14 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
         return
       }
 
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      })
       localStreamRef.current = localStream
       startLocalMeter(localStream)
 
