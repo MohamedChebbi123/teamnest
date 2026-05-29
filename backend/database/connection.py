@@ -3,9 +3,9 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import os 
 from dotenv import load_dotenv
 
-_running_on_render = bool(os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID"))
+_running_in_managed_host = bool(os.getenv("PORT"))
 
-if not _running_on_render:
+if not _running_in_managed_host:
     load_dotenv()
 
 
