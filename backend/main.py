@@ -18,7 +18,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 _frontend_origins = [
-    o.strip() for o in os.getenv("FRONTEND_URL", "http://localhost:3000").split(",") if o.strip()
+    o.strip()
+    for o in os.getenv("FRONTEND_URL", "http://localhost:3000,https://teamnest-lemon.vercel.app").split(",")
+    if o.strip()
 ]
 
 app.add_middleware(
