@@ -38,14 +38,6 @@ async def _send(to: str, subject: str, html: str) -> bool:
     return True
 
 
-async def simple_send(email: str, verification_code: str) -> bool:
-    html = f"""
-    <p>Hi 👋 thanks for registering!</p>
-    <p>Your verification code is: <b>{verification_code}</b></p>
-    """
-    return await _send(email, "Verify your account", html)
-
-
 async def send_password_reset_code(email: str, verification_code: str) -> bool:
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

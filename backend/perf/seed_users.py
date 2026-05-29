@@ -1,8 +1,4 @@
-"""Seed pre-verified users so the Locust load test can log in.
-
-The login endpoint rejects unverified accounts, so the load test needs
-accounts that already have ``is_verified=True``. This script writes them
-straight into the database using the app's own session and hasher.
+"""Seed users so the Locust load test can log in.
 
 Run from the ``backend/`` directory:
 
@@ -76,7 +72,6 @@ def seed(count: int) -> None:
             email = email_for(i)
             user = db.query(Users).filter(Users.email == email).first()
             if user:
-                user.is_verified = True
                 user.profile_completed = True
                 continue
             db.add(
@@ -86,7 +81,6 @@ def seed(count: int) -> None:
                     email=email,
                     password_hashed=hashed,
                     user_tag=str(secrets.randbelow(9_000_000) + 1_000_000),
-                    is_verified=True,
                     profile_completed=True,
                     status="offline",
                 )

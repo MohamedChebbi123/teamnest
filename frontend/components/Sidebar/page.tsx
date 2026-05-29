@@ -18,7 +18,6 @@ import {
   User,
   LogOut,
   Bell,
-  Mail,
   FileText,
   Users,
   MessageCircle,
@@ -64,7 +63,6 @@ interface UserData {
   last_name?: string;
   email?: string;
   avatar_url?: string;
-  is_verified?: boolean;
   profile_completed?: boolean;
 }
 
@@ -179,31 +177,10 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   };
 
   const handleCreateOrganization = () => {
-    if (!user?.is_verified) {
-      toast.error("Email Verification Required", {
-        description: "You need to verify your email before creating an organization.",
-        action: {
-          label: "Verify Email",
-          onClick: () => router.push("/auth/verify-email"),
-        },
-      });
-      return;
-    }
     router.push("/organization/create_organizattion");
   };
 
   const handleSendJoinRequest = async () => {
-    if (!user?.is_verified) {
-      toast.error("Email Verification Required", {
-        description: "You need to verify your email before joining an organization.",
-        action: {
-          label: "Verify Email",
-          onClick: () => router.push("/auth/verify-email"),
-        },
-      });
-      return;
-    }
-
     const token = getAccessToken();
     if (!token) {
       toast.error("Authentication Required", { description: "Please login again." });
@@ -290,14 +267,6 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const notifications = [
     {
       id: 1,
-      title: "Verify your email",
-      description: "Please verify your email address to access all features",
-      action: () => router.push('/auth/verify-email'),
-      show: user && !user.is_verified,
-      icon: Mail
-    },
-    {
-      id: 2,
       title: "Complete your profile",
       description: "Finalize your profile to get started",
       action: () => router.push('/auth/complete-profile'),

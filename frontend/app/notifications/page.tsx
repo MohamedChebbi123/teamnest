@@ -13,7 +13,6 @@ import { getAccessToken } from "@/lib/auth"
 import {
   Bell,
   Users,
-  Mail,
   FileText,
   Check,
   X,
@@ -32,7 +31,6 @@ interface UserData {
   last_name?: string
   email?: string
   avatar_url?: string
-  is_verified?: boolean
   profile_completed?: boolean
 }
 
@@ -81,17 +79,6 @@ export default function NotificationsPage() {
   }, [router])
 
   const systemNotifications = [
-    {
-      id: "verify-email",
-      title: "Verify your email",
-      description: "Please verify your email address to access all features of TeamNest",
-      icon: Mail,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
-      action: () => router.push("/auth/verify-email"),
-      actionLabel: "Verify now",
-      show: user && !user.is_verified,
-    },
     {
       id: "complete-profile",
       title: "Complete your profile",

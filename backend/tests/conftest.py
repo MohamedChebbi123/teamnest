@@ -129,7 +129,6 @@ def create_user(
     last_name: str,
     email: str,
     password: str = "Strong1!Pass",
-    verified: bool = True,
     status: str = "offline",
 ):
     user = Users(
@@ -138,7 +137,6 @@ def create_user(
         email=email,
         password_hashed=hash_password(password),
         user_tag=_stable_tag(email),
-        is_verified=verified,
         status=status,
     )
     db_session.add(user)
@@ -333,10 +331,6 @@ def auth_user(client, db_session):
     )
     assert response.status_code == 200
 
-    user = db_session.query(Users).filter(Users.email == email).one()
-    user.is_verified = True
-    db_session.commit()
-
     login = client.post(
         "/login",
         json={"email": email, "password": password},
@@ -364,7 +358,6 @@ def second_user(db_session):
         last_name="Example",
         email="bob@test.com",
         password="Strong1!Pass",
-        verified=True,
     )
     token = create_access_token({"sub": str(user.user_id)})
     return AuthAccount(
@@ -383,7 +376,6 @@ def third_user(db_session):
         last_name="Example",
         email="cara@test.com",
         password="Strong1!Pass",
-        verified=True,
     )
     token = create_access_token({"sub": str(user.user_id)})
     return AuthAccount(

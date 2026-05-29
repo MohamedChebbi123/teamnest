@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from utils.hasher import hash_password, hash_code, verify_code
 from utils.cloudinary_handler import upload_user_profile_image
-from utils.email_sender import simple_send, send_password_reset_code
+from utils.email_sender import send_password_reset_code
 from datetime import datetime, timedelta, UTC
 import logging
 import secrets
@@ -54,65 +54,6 @@ async def register_user_service(
         raise HTTPException(status_code=409, detail="Email already registered")
 
     return {"message": "Your account has been created. You can now log in."}
-
-
-async def verify_email_service(
-    email: str,
-    verification_code: str,
-    db: Session
-):
-    user = db.query(Users).filter(Users.email == email).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="Email is already verified")
-
-    if not user.verification_code or not verify_code(verification_code, user.verification_code):
-        raise HTTPException(status_code=400, detail="Invalid verification code")
-
-    if user.verification_code_expiry < datetime.now(UTC).replace(tzinfo=None):
-        raise HTTPException(status_code=400, detail="Verification code has expired")
-
-    user.is_verified = True
-    user.verification_code = None
-    user.verification_code_expiry = None
-
-    db.commit()
-    db.refresh(user)
-
-    return user
-
-
-async def resend_verification_service(
-    email: str,
-    db: Session
-):
-    user = db.query(Users).filter(Users.email == email).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="Email is already verified")
-
-    verification_code = str(secrets.randbelow(900_000) + 100_000)
-    verification_expiry = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
-
-    user.verification_code = hash_code(verification_code)
-    user.verification_code_expiry = verification_expiry
-
-    db.commit()
-    db.refresh(user)
-
-    try:
-        await simple_send(email, verification_code)
-    except Exception:
-        logger.exception("Failed to send verification email", extra={"email": email})
-        raise HTTPException(status_code=500, detail="Failed to send verification email")
-
-    return {"message": "Verification code sent successfully"}
 
 
 async def login_user_service(
@@ -246,7 +187,6 @@ async def view_profile_service(user: Users):
         "user_tag": user.user_tag,
         "joined_at": user.joined_at.isoformat() if user.joined_at else None,
         "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
-        "is_verified": user.is_verified,
         "profile_completed": user.profile_completed,
         "status": live_status,
         "last_seen_at": persisted_last_seen,
@@ -476,7 +416,6 @@ async def get_user_info_by_id_service(user_id: int, db: Session):
         "joined_at": user.joined_at,
         "last_login_at": user.last_login_at,
         "user_tag": user.user_tag,
-        "is_verified": user.is_verified,
         "status": live_status,
         "last_seen_at": persisted_last_seen,
     }

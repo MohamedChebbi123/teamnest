@@ -28,7 +28,6 @@ def test_register_persists_user_and_hashes_password(client, db_session):
     persisted = db_session.query(Users).filter(Users.email == "alice@integration.test").one()
     assert persisted.first_name == "Alice"
     assert persisted.last_name == "Example"
-    assert persisted.is_verified is False
     assert persisted.password_hashed != "Strong1Pass"
     assert persisted.password_hashed.startswith("$2")
 

@@ -23,9 +23,6 @@ def create_group_chat(
 ):
     user_id = user.user_id
 
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail="Please verify your account to create a group chat")
-
     image_url = upload_organization_picture(image)
 
     new_group = Group_chat(

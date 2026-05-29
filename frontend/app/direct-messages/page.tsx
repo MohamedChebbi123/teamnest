@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import {
   Loader2, MessageCircle, SendHorizontal, Smile, Paperclip,
   Pencil, Trash2, Search, Reply, X, Download, FileIcon,
-  UserRound, MapPin, Calendar, CheckCircle2, ChevronRight, Users,
+  UserRound, MapPin, Calendar, ChevronRight, Users,
   UserPlus, UserMinus,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -29,7 +29,6 @@ type ReceiverInfo = {
   joined_at?: string | null
   last_login_at?: string | null
   user_tag?: string | null
-  is_verified?: boolean
 }
 
 type DmReplyMessage = {
@@ -1645,11 +1644,6 @@ export default function ChannelsPage() {
                     <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-lg font-semibold ring-2 ring-background shadow">
                       {receiverInfo.first_name[0]}{receiverInfo.last_name[0]}
                     </div>
-                  )}
-                  {receiverInfo.is_verified && (
-                    <span className="absolute bottom-0 right-0 rounded-full bg-background p-0.5">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </span>
                   )}
                 </div>
 

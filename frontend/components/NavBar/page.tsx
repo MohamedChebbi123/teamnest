@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Bell, User, Settings, LogOut, Mail, FileText } from 'lucide-react'
+import { Bell, User, Settings, LogOut, FileText } from 'lucide-react'
 import { logout as logoutApi } from '@/lib/auth'
 
 interface NavBarProps {
@@ -23,7 +23,6 @@ interface NavBarProps {
     name?: string
     email?: string
     image?: string
-    emailVerified?: boolean
     portfolioCompleted?: boolean
   }
 }
@@ -40,14 +39,6 @@ export default function NavBar({ user }: NavBarProps) {
   const notifications = [
     {
       id: 1,
-      title: "Verify your email",
-      description: "Please verify your email address to access all features",
-      action: () => router.push('/auth/verify-email'),
-      show: !user.emailVerified,
-      icon: Mail
-    },
-    {
-      id: 2,
       title: "Finalize your portfolio",
       description: "Complete your portfolio to get started",
       action: () => router.push('/auth/complete-profile'),

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Mail, Phone, Globe, Calendar, Tag, ShieldCheck, AlertCircle, Edit } from "lucide-react"
+import { Loader2, Mail, Phone, Globe, Calendar, Tag } from "lucide-react"
 import { toast } from "sonner"
 import Image from "next/image"
 import Sidebar from "@/components/Sidebar/page"
@@ -23,7 +23,6 @@ interface UserProfile {
   user_tag: string
   joined_at: string | null
   last_login_at: string | null
-  is_verified: boolean
   profile_completed: boolean
 }
 
@@ -167,12 +166,6 @@ export default function ProfilePage() {
                   <Tag className="w-4 h-4" />
                   <span>#{profile.user_tag}</span>
                 </div>
-                {profile.is_verified && (
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-green-600">
-                    <ShieldCheck className="w-5 h-5" />
-                    <span className="font-medium">Verified Account</span>
-                  </div>
-                )}
               </div>
             </div>
           </CardHeader>
@@ -218,18 +211,12 @@ export default function ProfilePage() {
             {/* Account Stats */}
             <div className="pt-4 border-t">
               <h3 className="font-semibold mb-3">Account Information</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
                   <p className="text-2xl font-bold text-primary">{profile.user_id}</p>
                   <p className="text-sm text-muted-foreground">User ID</p>
                 </div>
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">
-                    {profile.is_verified ? "Yes" : "No"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Verified</p>
-                </div>
-                <div className="text-center p-4 bg-muted/50 rounded-lg col-span-2 md:col-span-1">
                   <p className="text-2xl font-bold text-primary">
                     {profile.last_login_at ? formatDate(profile.last_login_at) : "Never"}
                   </p>

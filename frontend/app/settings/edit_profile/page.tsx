@@ -22,7 +22,6 @@ interface UserProfile {
     user_tag: string
     joined_at: string | null
     last_login_at: string | null
-    is_verified: boolean
     profile_completed: boolean
 }
 

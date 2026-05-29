@@ -38,9 +38,6 @@ def create_organization_service(
     user: Users,
     db: Session
 ):
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail='Please verify your account to create an organization')
-
     _validate_org_name(organization_name)
 
     organaization_tag = str(random.randint(100000, 999999))

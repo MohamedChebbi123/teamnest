@@ -16,7 +16,6 @@ interface UserData {
     last_name?: string
     email?: string
     avatar_url?: string
-    is_verified?: boolean
     profile_completed?: boolean
 }
 
@@ -35,31 +34,10 @@ export default function WelcomePage() {
 
 
     const handleCreateOrganization = () => {
-        if (!user?.is_verified) {
-            toast.error("Email Verification Required", {
-                description: "You need to verify your email before creating an organization.",
-                action: {
-                    label: "Verify Email",
-                    onClick: () => router.push("/auth/verify-email")
-                }
-            })
-            return
-        }
         router.push("/organization/create_organizattion")
     }
 
     const handleSendJoinInvite = async () => {
-        if (!user?.is_verified) {
-            toast.error("Email Verification Required", {
-                description: "You need to verify your email before joining an organization.",
-                action: {
-                    label: "Verify Email",
-                    onClick: () => router.push("/auth/verify-email")
-                }
-            })
-            return
-        }
-
         const token = getAccessToken()
         if (!token) {
             toast.error("Authentication Required", {

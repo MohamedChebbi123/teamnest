@@ -26,12 +26,7 @@ def test_user_can_register_then_login_then_view_profile(client, db_session):
     )
     assert register_resp.status_code == 200
 
-    # Step 2 — simulate the user having completed email verification
-    user = db_session.query(Users).filter(Users.email == "eve@example.com").one()
-    user.is_verified = True
-    db_session.commit()
-
-    # Step 3 — login
+    # Step 2 — login
     login_resp = client.post(
         "/login",
         json={"email": "eve@example.com", "password": "Strong1Pass"},
@@ -40,7 +35,7 @@ def test_user_can_register_then_login_then_view_profile(client, db_session):
     access_token = login_resp.json()["access_token"]
     assert access_token
 
-    # Step 4 — use the bearer token to read the protected profile
+    # Step 3 — use the bearer token to read the protected profile
     profile_resp = client.get(
         "/profile",
         headers={"Authorization": f"Bearer {access_token}"},
@@ -49,4 +44,3 @@ def test_user_can_register_then_login_then_view_profile(client, db_session):
     body = profile_resp.json()
     assert body["email"] == "eve@example.com"
     assert body["first_name"] == "Eve"
-    assert body["is_verified"] is True

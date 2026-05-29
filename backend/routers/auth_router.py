@@ -2,8 +2,6 @@ import os
 from schemas.Logininput import Logininput
 from services.auth_service import (
     register_user_service,
-    verify_email_service,
-    resend_verification_service,
     login_user_service,
     refresh_access_token_service,
     logout_service,
@@ -78,35 +76,6 @@ async def register_new_user(
         password=password,
         db=db
     )
-
-
-@router.post("/verify-email")
-async def verify_email(
-    email: str = Form(...),
-    verification_code: str = Form(...),
-    db: Session = Depends(connect_databse)
-):
-    verified_user = await verify_email_service(
-        email=email,
-        verification_code=verification_code,
-        db=db
-    )
-    return {
-        "message": "Email verified successfully",
-        "user": {
-            "user_id": verified_user.user_id,
-            "email": verified_user.email,
-            "is_verified": verified_user.is_verified
-        }
-    }
-
-
-@router.post("/resend-verification")
-async def resend_verification(
-    email: str = Form(...),
-    db: Session = Depends(connect_databse)
-):
-    return await resend_verification_service(email=email, db=db)
 
 
 @router.post("/login")
