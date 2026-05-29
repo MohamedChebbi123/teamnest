@@ -1,4 +1,3 @@
-import os
 from database.connection import connect_databse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,9 +17,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 _frontend_origins = [
-    o.strip()
-    for o in os.getenv("FRONTEND_URL", "http://localhost:3000,https://teamnest-lemon.vercel.app").split(",")
-    if o.strip()
+    "http://localhost:3000",
+    "https://teamnest-nine.vercel.app/",
 ]
 
 app.add_middleware(
