@@ -275,7 +275,7 @@ export default function VoiceChannelPanel({ channelId, orgId }: VoiceChannelPane
       })
       workerRef.current = worker
 
-      worker.postMessage({ type: "init", sampleRate: SAMPLE_RATE, channels: 1 })
+      worker.postMessage({ type: "init", sampleRate: SAMPLE_RATE, channels: 1, frameSize: FRAME_SAMPLES })
 
       worker.onmessage = (event) => {
         const data = event.data

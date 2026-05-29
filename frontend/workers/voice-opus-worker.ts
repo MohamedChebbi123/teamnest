@@ -2,6 +2,7 @@ type InitMessage = {
   type: "init"
   sampleRate: number
   channels: number
+  frameSize: number
 }
 
 type EncodeMessage = {
@@ -32,11 +33,17 @@ self.onmessage = async (event: MessageEvent<VoiceWorkerMessage>) => {
 
   try {
     if (message.type === "init") {
-      const { OpusEncoder } = await import("opus-encoder")
-      const { OpusDecoder } = await import("opus-decoder")
+      const { createEncoder, createDecoder } = await import("libopus-wasm")
 
-      encoder = new OpusEncoder(message.sampleRate, message.channels)
-      decoder = new OpusDecoder(message.sampleRate, message.channels)
+      encoder = await createEncoder({
+        sampleRate: message.sampleRate,
+        channels: message.channels,
+        frameSize: message.frameSize,
+      })
+      decoder = await createDecoder({
+        sampleRate: message.sampleRate,
+        channels: message.channels,
+      })
       initialized = true
       const response: WorkerResponse = { type: "ready" }
       self.postMessage(response)
@@ -50,7 +57,7 @@ self.onmessage = async (event: MessageEvent<VoiceWorkerMessage>) => {
     }
 
     if (message.type === "encode") {
-      const opusPacket = encoder.encode(message.pcm)
+      const opusPacket = encoder.encodeFloat(message.pcm)
       const packet = opusPacket instanceof Uint8Array ? opusPacket : new Uint8Array(opusPacket)
       const response: WorkerResponse = { type: "opus", packet, seq: sequence }
       sequence += 1
@@ -59,7 +66,7 @@ self.onmessage = async (event: MessageEvent<VoiceWorkerMessage>) => {
     }
 
     if (message.type === "decode") {
-      const pcm = decoder.decode(message.packet)
+      const pcm = decoder.decodeFloat(message.packet)
       const pcmBuffer = pcm instanceof Float32Array ? pcm : new Float32Array(pcm)
       const response: WorkerResponse = { type: "pcm", pcm: pcmBuffer }
       self.postMessage(response, [pcmBuffer.buffer])
