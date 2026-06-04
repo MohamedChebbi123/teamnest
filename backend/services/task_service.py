@@ -64,6 +64,43 @@ def task_to_dict(task):
         ],
     }
 
+
+def _auto_complete_parent_tasks(task: Tasks, org_id: int, actor_id: int, db: Session) -> None:
+    parent_id = task.parent_task_id
+    while parent_id is not None:
+        parent = db.query(Tasks).filter(
+            Tasks.id == parent_id,
+            Tasks.is_deleted == False,
+        ).first()
+        if not parent:
+            break
+
+        subtask_statuses = db.query(Tasks.status).filter(
+            Tasks.parent_task_id == parent.id,
+            Tasks.is_deleted == False,
+        ).all()
+        if not subtask_statuses:
+            break
+
+        if not all(status[0] == "done" for status in subtask_statuses):
+            break
+
+        if parent.status != "done":
+            parent.status = "done"
+            db.commit()
+            db.refresh(parent)
+            create_log(
+                db,
+                org_id=org_id,
+                actor_id=actor_id,
+                action="task_status_updated",
+                target_id=parent.id,
+                target_type="task",
+                metadata={"status": parent.status, "team_id": parent.team_id},
+            )
+
+        parent_id = parent.parent_task_id
+
 def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user: Users, db: Session):
     user_id = user.user_id
 
@@ -168,10 +205,12 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
         task.description = task_data.description
     if task_data.priority is not None:
         task.priority = task_data.priority
+    marked_done = False
     if task_data.status is not None:
         if task_data.status == "done" and task.status != "review":
             raise HTTPException(status_code=400, detail="Task must be in review before it can be marked as done")
         task.status = task_data.status
+        marked_done = task.status == "done"
     if task_data.parent_task_id is not None:
         if task_data.parent_task_id == task.id:
             raise HTTPException(status_code=400, detail="A task cannot be its own parent")
@@ -216,6 +255,9 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
     db.refresh(task)
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_updated", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
+
+    if marked_done:
+        _auto_complete_parent_tasks(task, org_id, user_id, db)
 
     return task_to_dict(task)
 
@@ -300,6 +342,9 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_status_updated", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
 
+    if task.status == "done":
+        _auto_complete_parent_tasks(task, org_id, user_id, db)
+
     return task_to_dict(task)
 
 
@@ -344,6 +389,9 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
     db.refresh(task)
 
     create_log(db, org_id=org_id, actor_id=user_id, action=f"task_review_{action}ed", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
+
+    if task.status == "done":
+        _auto_complete_parent_tasks(task, org_id, user_id, db)
 
     return task_to_dict(task)
 

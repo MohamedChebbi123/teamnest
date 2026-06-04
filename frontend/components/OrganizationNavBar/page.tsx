@@ -66,7 +66,7 @@ import {
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
 import { cn } from "@/lib/utils"
-import { getAccessToken } from "@/lib/auth"
+import { getAccessToken, hydrateAccessToken } from "@/lib/auth"
 
 interface OrganizationNavBarProps {
   organizationId: string | number
@@ -405,11 +405,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
   }
 
   useEffect(() => {
-    const token = getAccessToken()
-    if (!token) {
-      return
-    }
-
+    let active = true
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
     let ws: WebSocket | null = null
 
@@ -457,7 +453,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       }
     }
 
-    const connect = () => {
+    const connect = (token: string) => {
       if (ws && ws.readyState === WebSocket.OPEN) return
 
       ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/notifications?token=${encodeURIComponent(token)}`)
@@ -484,6 +480,10 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           setLiveNotifications((prev) => [nextNotification, ...prev].slice(0, 30))
           playNotificationSound()
 
+          if (pathname === "/notifications") {
+            router.refresh()
+          }
+
           if (nextNotification.type === "channel_mention") {
             const sender = members.find((m) => m.user_id === nextNotification.sender_id)
             const channel = channels.find((c) => c.channel_id === nextNotification.channel_id)
@@ -509,13 +509,20 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       }
 
       ws.onclose = () => {
-        reconnectTimeout = setTimeout(connect, 3000)
+        reconnectTimeout = setTimeout(() => connect(token), 3000)
       }
     }
 
-    connect()
+    const init = async () => {
+      const token = getAccessToken() ?? await hydrateAccessToken()
+      if (!active || !token) return
+      connect(token)
+    }
+
+    void init()
 
     return () => {
+      active = false
       if (reconnectTimeout) clearTimeout(reconnectTimeout)
       ws?.close()
     }
@@ -604,11 +611,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       path: `/organization/${organizationId}/teams`,
       icon: Users
     },
-    {
-      name: "Projects",
-      path: `/organization/${organizationId}/projects`,
-      icon: FolderKanban
-    },
+ 
     {
       name: "Settings",
       path: `/organization/${organizationId}/settings`,

@@ -588,6 +588,11 @@ export default function TasksPage() {
   const canCreate = userRole === "OWNER" || canManageTasks
 
   const parentTasks = tasks.filter(t => t.parent_task_id === null)
+  const visibleBoardTasks = tasks
+  const parentTitleFor = (task: Task) => {
+    if (task.parent_task_id === null) return null
+    return tasks.find(t => t.id === task.parent_task_id)?.title || "parent task"
+  }
 
   const startOfToday = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })()
   const endOfToday = (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d })()
@@ -604,7 +609,7 @@ export default function TasksPage() {
     return true
   }
 
-  const filteredTasks = parentTasks
+  const filteredTasks = visibleBoardTasks
     .filter(t => filterPriority === "all" || t.priority === filterPriority)
     .filter(matchesDueFilter)
 
@@ -932,6 +937,7 @@ export default function TasksPage() {
                           const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
                           const subs = subtasksOf(task.id)
                           const doneSubs = subs.filter(s => s.status === "done").length
+                          const parentTitle = parentTitleFor(task)
                           return (
                             <button
                               key={task.id}
@@ -942,6 +948,11 @@ export default function TasksPage() {
                               <h3 className="text-[13px] font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                                 {task.title}
                               </h3>
+                              {parentTitle && (
+                                <p className="mt-1 text-[10px] text-muted-foreground truncate">
+                                  Subtask of {parentTitle}
+                                </p>
+                              )}
 
                               {/* Meta row */}
                               <div className="flex items-center justify-between mt-2.5">
@@ -1019,6 +1030,7 @@ export default function TasksPage() {
                           const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
                           const subs = subtasksOf(task.id)
                           const doneSubs = subs.filter(s => s.status === "done").length
+                          const parentTitle = parentTitleFor(task)
                           return (
                             <button
                               key={task.id}
@@ -1031,6 +1043,11 @@ export default function TasksPage() {
                                   <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">
                                     {task.title}
                                   </h3>
+                                  {parentTitle && (
+                                    <span className="text-[10px] text-muted-foreground shrink-0">
+                                      Subtask of {parentTitle}
+                                    </span>
+                                  )}
                                   <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0 text-[10px] font-semibold shrink-0 ${priority.bg} ${priority.color}`}>
                                     <Flag className={`h-2.5 w-2.5 ${priority.icon_color}`} />
                                     {priority.label}

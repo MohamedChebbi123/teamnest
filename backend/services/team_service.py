@@ -957,6 +957,12 @@ def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
+    import os
+    from urllib.parse import quote
+
+    if os.path.splitext(file.file_name)[1].lower() != ".pdf":
+        raise HTTPException(status_code=400, detail="Only PDF files can be viewed inline")
+
     client = httpx.Client(timeout=30.0, follow_redirects=True)
     try:
         upstream = client.stream("GET", file.file_url).__enter__()
@@ -969,7 +975,6 @@ def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
         client.close()
         raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
 
-    media_type = upstream.headers.get("content-type", "application/octet-stream")
     content_length = upstream.headers.get("content-length")
 
     def iterator():
@@ -980,14 +985,17 @@ def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
             upstream.close()
             client.close()
 
+    quoted_file_name = quote(file.file_name)
+    safe_file_name = file.file_name.replace('"', "")
     response_headers = {
-        "Content-Disposition": f'inline; filename="{file.file_name}"',
+        "Content-Disposition": f'inline; filename="{safe_file_name}"; filename*=UTF-8\'\'{quoted_file_name}',
+        "X-Content-Type-Options": "nosniff",
     }
     if content_length:
         response_headers["Content-Length"] = content_length
 
     return StreamingResponse(
         iterator(),
-        media_type=media_type,
+        media_type="application/pdf",
         headers=response_headers,
     )

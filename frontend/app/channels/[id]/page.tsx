@@ -631,7 +631,11 @@ export default function ChannelPage() {
       if (response.ok) {
         const data = await response.json()
 
-        const rawItems: RawFetchedMessage[] = Array.isArray(data) ? data : []
+        const rawItems: RawFetchedMessage[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.messages)
+            ? data.messages
+            : []
         const normalizedMessages = rawItems
           .map((item, index) => normalizeFetchedMessage(item, index))
           .filter(Boolean) as ChatMessage[]

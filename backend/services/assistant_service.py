@@ -39,8 +39,7 @@ NORMALIZED_THRESHOLD = 0.0
 
 
 def _normalize_hits(hits):
-    """Min-max normalize scores within a single source so scores from
-    different indexes become comparable before merging."""
+
     if not hits:
         return []
 
