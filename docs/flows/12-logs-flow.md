@@ -1,137 +1,35 @@
-# Logs Flow — Every Line of Code
+# Logs Flow
 
-## File: `backend/models/Logs.py` (19 lines)
+## Model
 
-| Lines | Code |
-|-------|------|
-| 7 | `class Logs(Base):` |
-| 8 | `__tablename__="logs"` |
-| 9 | `id=Column(Integer,primary_key=True)` |
-| 10 | `org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)` |
-| 11 | `actor_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)` |
-| 12 | `action=Column(String,nullable=False)` |
-| 13 | `target_id=Column(Integer,nullable=True)` |
-| 14 | `target_type=Column(String,nullable=True)` |
-| 15 | `log_metadata=Column(Text,nullable=True)` — stores JSON string |
-| 16 | `created_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
-| 18 | `organization=relationship("Organization", overlaps="logs")` |
-| 19 | `actor=relationship("Users",backref="logs")` |
+The `Logs` model (`backend/models/Logs.py:8`) maps to the `logs` table. It has `id` (Integer, PK, line 9), `org_id` (Integer FK to `organization.organization_id`, not null, line 10), `actor_id` (Integer FK to `users.user_id`, not null, line 11), `action` (String, not null, line 12), `target_id` (Integer, nullable, line 13), `target_type` (String, nullable, line 14), `log_metadata` (Text, nullable, storing a JSON string, line 15), and `created_at` (DateTime with timezone, defaulting to `lambda: datetime.now(UTC)`, line 16). Relationships include `organization` with `overlaps="logs"` (line 18) and `actor` (to `Users`) with `backref="logs"` (line 19).
 
-## File: `backend/utils/log_handler.py` (17 lines)
+## Log Handler
 
-| Lines | Code |
-|-------|------|
-| 6-17 | `def create_log(db: Session, org_id: int, actor_id: int, action: str, target_id: int = None, target_type: str = None, metadata: dict = None):` / `log = Logs(org_id=org_id, actor_id=actor_id, action=action, target_id=target_id, target_type=target_type, log_metadata=json.dumps(metadata) if metadata else None)` / `db.add(log); db.commit(); return log` |
+`backend/utils/log_handler.py:6` defines `create_log(db, org_id, actor_id, action, target_id=None, target_type=None, metadata=None)`. It constructs a `Logs` row with the given fields, serializing `metadata` via `json.dumps(metadata) if metadata else None` into the `log_metadata` column (lines 7-14). It calls `db.add(log)`, `db.commit()`, and returns the log (lines 15-17).
 
-## File: `backend/routers/logs_router.py` (320 lines)
+## Router
 
-### Constants & Imports (lines 1-31)
+`backend/routers/logs_router.py:19` defines `router = APIRouter()`. Lines 21-31 define `REVERSIBLE_ACTIONS` as a set of 9 action strings: `"channel_created"`, `"channel_deleted"`, `"team_created"`, `"team_member_added"`, `"team_member_kicked"`, `"team_member_permissions_updated"`, `"task_created"`, `"message_pinned"`, and `"message_unpinned"`.
 
-| Lines | Code |
-|-------|------|
-| 1-17 | Imports: `APIRouter, Depends`, `Session`, `connect_databse`, `HTTPException`, `Logs`, `Organization`, `Organization_members`, `Users`, `Channels`, `Teams`, `Team_association`, `Team_roles`, `Tasks`, `Pinned_messages`, `create_log`, `current_user`, `json` |
-| 19 | `router = APIRouter()` |
-| 21-31 | `REVERSIBLE_ACTIONS = {"channel_created", "channel_deleted", "team_created", "team_member_added", "team_member_kicked", "team_member_permissions_updated", "task_created", "message_pinned", "message_unpinned"}` — 9 reversible action types |
+`GET /organization/{org_id}/logs` at line 35 accepts `org_id` and requires authentication. It looks up the organization — if not found, raises `HTTPException(404, "Organization not found")` (lines 42-44). If the current user is not the owner, it checks for membership with `role_user` of `"OWNER"` or `"ADMIN"` — if neither, raises `HTTPException(403, "Only owners and admins can view logs")` (lines 46-53). It queries `Logs` joined with `Users` on `Logs.actor_id == Users.user_id`, filtered by `Logs.org_id == org_id`, ordered by `Logs.created_at.desc()` (lines 55-59). Returns a list of dicts with `id`, `action`, `target_id`, `target_type`, `metadata` (parsed via `json.loads(log.log_metadata)` if present), `created_at` (isoformat), `reversible` (boolean from `action in REVERSIBLE_ACTIONS`), and `actor` containing `user_id`, `first_name`, `last_name`, `avatar_url`, `user_tag` (lines 61-79).
 
-### `GET /organization/{org_id}/logs` (lines 34-79)
+`POST /organization/{org_id}/logs/{log_id}/undo` at line 83 requires authentication. It looks up the organization — if not found, raises `HTTPException(404, "Organization not found")` (lines 91-93). Only the organization owner can undo — if `organization.owner_id != user_id`, raises `HTTPException(403, "Only the organization owner can undo actions")` (lines 96-97). It queries `Logs` by `id` and `org_id` — if not found, raises `HTTPException(404, "Log entry not found")` (lines 99-101). If `log.action not in REVERSIBLE_ACTIONS`, raises `HTTPException(400, "This action cannot be undone")` (lines 103-104). It parses metadata via `json.loads(log.log_metadata) if log.log_metadata else {}` (line 106), then routes to action-specific logic.
 
-| Lines | Code |
-|-------|------|
-| 34-39 | `@router.get("/organization/{org_id}/logs")` / `async def get_organization_logs(org_id: int, user=Depends(current_user), db=Depends(connect_databse)):` |
-| 40 | `user_id = user.user_id` |
-| 42-44 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if not organization: raise HTTPException(404, "Organization not found")` |
-| 46-53 | `if organization.owner_id != user_id:` — checks ORG_OWNER or user must be an ADMIN member; `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id, Organization_members.role_user.in_(["OWNER", "ADMIN"])).first()` / `if not member: raise HTTPException(403, "Only owners and admins can view logs")` |
-| 55-59 | `logs = db.query(Logs, Users).join(Users, Logs.actor_id == Users.user_id).filter(Logs.org_id == org_id).order_by(Logs.created_at.desc()).all()` |
-| 61-79 | Returns `[{id, action, target_id, target_type, metadata: json.loads(log.log_metadata), created_at: .isoformat(), reversible: action in REVERSIBLE_ACTIONS, actor: {user_id, first_name, last_name, avatar_url, user_tag}}]` |
+For `"channel_created"` (lines 109-123): looks up `Channels` by `log.target_id` — if not found, raises `HTTPException(404, "Channel no longer exists")` (lines 110-112). Extracts `channel_name`, builds `undo_meta` with `channel_name` and `undone=True`, optionally includes `team_id` and `team_name` if the channel belonged to a team (lines 113-119). Deletes the channel via `db.delete(channel)`, commits, creates a log with `action="channel_deleted"` (lines 120-122). Returns `{"message": f'Channel "{channel_name}" has been deleted (undo)'}` (line 123).
 
-### `POST /organization/{org_id}/logs/{log_id}/undo` (lines 82-320)
+For `"channel_deleted"` (lines 125-172): extracts `channel_name`, `team_id`, `channel_mode` (defaults to `"teambased"` if `team_id` else `"orgbased"`), `channel_category` (defaults to `"text"`), and `description` from metadata (lines 126-131). If no `channel_name`, raises `HTTPException(400, "Missing channel info in log")` (lines 133-134). If `team_id`, checks for conflicting channel name in the team and verifies the team still exists — raises `HTTPException(404, "Team no longer exists")` if gone (lines 136-142). If no team, checks for conflict at the org level with `Channels.team_id.is_(None)` (lines 143-148). If a conflict exists, raises `HTTPException(400, f'A channel named "{channel_name}" already exists')` (lines 150-151). Creates a new `Channels` row with the restored properties, adds, commits, refreshes (lines 153-163). Creates a log with `action="channel_created"` and returns `{"message": f'Channel "{channel_name}" has been restored (undo)'}` (lines 165-172).
 
-| Lines | Code |
-|-------|------|
-| 82-88 | `@router.post("/organization/{org_id}/logs/{log_id}/undo")` / `async def undo_log_action(org_id: int, log_id: int, user=Depends(current_user), db=Depends(connect_databse)):` |
-| 89 | `user_id = user.user_id` |
-| 91-93 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if not organization: raise HTTPException(404, "Organization not found")` |
-| 96-97 | `if organization.owner_id != user_id: raise HTTPException(403, "Only the organization owner can undo actions")` |
-| 99-101 | `log = db.query(Logs).filter(Logs.id == log_id, Logs.org_id == org_id).first()` / `if not log: raise HTTPException(404, "Log entry not found")` |
-| 103-104 | `if log.action not in REVERSIBLE_ACTIONS: raise HTTPException(400, "This action cannot be undone")` |
-| 106 | `meta = json.loads(log.log_metadata) if log.log_metadata else {}` |
+For `"team_created"` (lines 174-183): looks up `Teams` by `log.target_id` — if not found, raises `HTTPException(404, "Team no longer exists")` (lines 176-178). Extracts `team_name`, deletes the team via `db.delete(team)`, commits, logs as `action="team_deleted"` with `metadata={"team_name": team_name, "undone": True}`, returns `{"message": f'Team "{team_name}" has been deleted (undo)'}` (lines 179-183).
 
-### Undo: `channel_created` → delete channel (lines 108-123)
+For `"team_member_added"` (lines 185-210): gets `team_id` from metadata and `member_user_id` from `log.target_id` (lines 186-188). If no `team_id`, raises `HTTPException(400, "Missing team info in log")` (lines 189-190). Looks up the team — if gone, raises `HTTPException(404, "Team no longer exists")` (lines 191-193). Queries `Team_association` for the member — if not found, raises `HTTPException(404, "Member is no longer in this team")` (lines 194-199). Deletes the `Team_roles` row (if exists) and the `Team_association` row (lines 200-206). Logs as `action="team_member_kicked"` and returns `{"message": f"{member_name} has been removed from team \"{team.team_name}\" (undo)"}` (lines 208-210).
 
-| Lines | Code |
-|-------|------|
-| 109-112 | `if log.action == "channel_created": channel = db.query(Channels).filter(Channels.channel_id == log.target_id).first()` / `if not channel: raise HTTPException(404, "Channel no longer exists")` |
-| 113-119 | `channel_name = channel.channel_name` / `undo_meta = {"channel_name": channel_name, "undone": True}` / `if channel.team_id: team = db.query(Teams).filter(Teams.team_id == channel.team_id).first(); if team: undo_meta["team_id"] = channel.team_id; undo_meta["team_name"] = team.team_name` |
-| 120-122 | `db.delete(channel); db.commit()` / `create_log(db, ..., action="channel_deleted", ...)` |
-| 123 | `return {"message": f'Channel "{channel_name}" has been deleted (undo)'}` |
+For `"team_member_kicked"` (lines 212-243): gets `team_id` and `member_user_id` (lines 213-216). Raises 400 if no `team_id`, 404 if team doesn't exist, `HTTPException(400, "Member is already back in the team")` if the association already exists (lines 218-226). Re-creates `Team_association` and `Team_roles` with default `MEMBER` permissions (`can_create_channels=False`, `can_send_messages=True`, `can_delete_messages=False`, `can_manage_roles=False`, `can_kick_members=False`, `can_make_announcement=False`, `can_manage_tasks=False`, lines 227-239). Logs as `action="team_member_added"` and returns `{"message": f"{member_name} has been re-added to team \"{team.team_name}\" (undo)"}` (lines 241-243).
 
-### Undo: `channel_deleted` → recreate channel (lines 125-172)
+For `"task_created"` (lines 245-254): looks up `Tasks` by `log.target_id` where `is_deleted == False` — if not found, raises `HTTPException(404, "Task no longer exists")` (lines 246-249). Sets `task.is_deleted = True` (soft delete), commits, logs as `action="task_deleted"`, returns `{"message": f'Task "{task_title}" has been deleted (undo)'}` (lines 250-254).
 
-| Lines | Code |
-|-------|------|
-| 126-131 | `if log.action == "channel_deleted": channel_name = meta.get("channel_name"); team_id = meta.get("team_id"); channel_mode = meta.get("channel_mode") or ("teambased" if team_id else "orgbased"); channel_category = meta.get("channel_category") or "text"; description = meta.get("description")` |
-| 133-134 | `if not channel_name: raise HTTPException(400, "Missing channel info in log")` |
-| 136-148 | `if team_id: conflict = db.query(Channels).filter(Channels.team_id == team_id, Channels.channel_name == channel_name).first()` / `if not db.query(Teams).filter(Teams.team_id == team_id).first(): raise HTTPException(404, "Team no longer exists")` / `else: conflict = db.query(Channels).filter(Channels.org_id == org_id, Channels.team_id.is_(None), Channels.channel_name == channel_name).first()` |
-| 150-151 | `if conflict: raise HTTPException(400, f'A channel named "{channel_name}" already exists')` |
-| 153-163 | `restored = Channels(channel_name=channel_name, channel_mode=channel_mode, channel_category=channel_category, description=description, org_id=org_id, team_id=team_id); db.add(restored); db.commit(); db.refresh(restored)` |
-| 165-171 | `undo_meta = {"channel_name": channel_name}` / `if team_id: undo_meta["team_id"] = team_id; undo_meta["team_name"] = meta.get("team_name")` / `undo_meta["undone"] = True` / `create_log(db, ..., action="channel_created", ...)` |
-| 172 | `return {"message": f'Channel "{channel_name}" has been restored (undo)'}` |
+For `"message_pinned"` (lines 256-267): queries `Pinned_messages` by `message_id == log.target_id` — if not found, raises `HTTPException(404, "Message is no longer pinned")` (lines 257-262). Gets `channel_id` from metadata, deletes the pinned record, logs as `action="message_unpinned"`, returns `{"message": "Message has been unpinned (undo)"}` (lines 263-267).
 
-### Undo: `team_created` → delete team (lines 174-183)
+For `"message_unpinned"` (lines 269-287): gets `channel_id` from metadata — if missing, raises `HTTPException(400, "Missing channel info in log")` (lines 270-273). Checks if the message is already pinned — if so, raises `HTTPException(400, "Message is already pinned")` (lines 274-279). Creates a new `Pinned_messages` row with `message_id`, `channel_id`, and `pinned_by=user_id` (lines 280-284). Logs as `action="message_pinned"`, returns `{"message": "Message has been re-pinned (undo)"}` (lines 286-287).
 
-| Lines | Code |
-|-------|------|
-| 175-179 | `if log.action == "team_created": team = db.query(Teams).filter(Teams.team_id == log.target_id).first()` / `if not team: raise HTTPException(404, "Team no longer exists")` / `team_name = team.team_name` |
-| 180-182 | `db.delete(team); db.commit()` / `create_log(db, ..., action="team_deleted", metadata={"team_name": team_name, "undone": True})` |
-| 183 | `return {"message": f'Team "{team_name}" has been deleted (undo)'}` |
-
-### Undo: `team_member_added` → kick member (lines 185-210)
-
-| Lines | Code |
-|-------|------|
-| 186-190 | `if log.action == "team_member_added": team_id = meta.get("team_id"); member_user_id = log.target_id` / `if not team_id: raise HTTPException(400, "Missing team info in log")` |
-| 191-193 | `team = db.query(Teams).filter(Teams.team_id == team_id).first()` / `if not team: raise HTTPException(404, "Team no longer exists")` |
-| 194-206 | `association = db.query(Team_association).filter(Team_association.team_id == team_id, Team_association.user_id == member_user_id).first()` / `if not association: raise HTTPException(404, "Member is no longer in this team")` / `role = db.query(Team_roles).filter(Team_roles.team_id == team_id, Team_roles.user_id == member_user_id).first()` / `if role: db.delete(role)` / `db.delete(association); db.commit()` |
-| 208-210 | `member_name = meta.get("member_name", str(member_user_id))` / `create_log(db, ..., action="team_member_kicked", ...)` / `return {"message": f"{member_name} has been removed from team ..."}` |
-
-### Undo: `team_member_kicked` → re-add member (lines 212-243)
-
-| Lines | Code |
-|-------|------|
-| 213-217 | `if log.action == "team_member_kicked": team_id = meta.get("team_id"); member_user_id = log.target_id` / `if not team_id: raise HTTPException(400, "Missing team info in log")` |
-| 218-220 | `team = db.query(Teams).filter(Teams.team_id == team_id).first()` / `if not team: raise HTTPException(404, "Team no longer exists")` |
-| 221-226 | `existing = db.query(Team_association).filter(Team_association.team_id == team_id, Team_association.user_id == member_user_id).first()` / `if existing: raise HTTPException(400, "Member is already back in the team")` |
-| 227-239 | `db.add(Team_association(team_id=team_id, user_id=member_user_id))` / `db.add(Team_roles(user_id=member_user_id, team_id=team_id, role="MEMBER", can_create_channels=False, can_send_messages=True, can_delete_messages=False, can_manage_roles=False, can_kick_members=False, can_make_announcement=False, can_manage_tasks=False))` / `db.commit()` |
-| 241-243 | `member_name = meta.get("member_name", str(member_user_id))` / `create_log(db, ..., action="team_member_added", ...)` / `return {"message": f"{member_name} has been re-added ..."}` |
-
-### Undo: `task_created` → soft-delete task (lines 245-254)
-
-| Lines | Code |
-|-------|------|
-| 246-249 | `if log.action == "task_created": task = db.query(Tasks).filter(Tasks.id == log.target_id, Tasks.is_deleted == False).first()` / `if not task: raise HTTPException(404, "Task no longer exists")` |
-| 250-253 | `task_title = task.title; task.is_deleted = True; db.commit()` / `create_log(db, ..., action="task_deleted", ...)` |
-| 254 | `return {"message": f'Task "{task_title}" has been deleted (undo)'}` |
-
-### Undo: `message_pinned` → unpin message (lines 256-267)
-
-| Lines | Code |
-|-------|------|
-| 257-262 | `if log.action == "message_pinned": pinned = db.query(Pinned_messages).filter(Pinned_messages.message_id == log.target_id).first()` / `if not pinned: raise HTTPException(404, "Message is no longer pinned")` |
-| 263-266 | `channel_id = meta.get("channel_id")` / `db.delete(pinned); db.commit()` / `create_log(db, ..., action="message_unpinned", ...)` |
-| 267 | `return {"message": "Message has been unpinned (undo)"}` |
-
-### Undo: `message_unpinned` → re-pin message (lines 269-287)
-
-| Lines | Code |
-|-------|------|
-| 270-277 | `if log.action == "message_unpinned": channel_id = meta.get("channel_id")` / `if not channel_id: raise HTTPException(400, "Missing channel info in log")` / `already_pinned = db.query(Pinned_messages).filter(Pinned_messages.message_id == log.target_id, Pinned_messages.channel_id == channel_id).first()` / `if already_pinned: raise HTTPException(400, "Message is already pinned")` |
-| 280-287 | `db.add(Pinned_messages(message_id=log.target_id, channel_id=channel_id, pinned_by=user_id)); db.commit()` / `create_log(db, ..., action="message_pinned", ...)` / `return {"message": "Message has been re-pinned (undo)"}` |
-
-### Undo: `team_member_permissions_updated` → revert permissions (lines 289-320)
-
-| Lines | Code |
-|-------|------|
-| 290-297 | `if log.action == "team_member_permissions_updated": team_id = meta.get("team_id"); member_user_id = log.target_id; changes = meta.get("changes", {})` / `if not team_id: raise HTTPException(400, "Missing team info in log")` / `if not changes: raise HTTPException(400, "No permission changes to revert")` |
-| 298-306 | `team = db.query(Teams).filter(Teams.team_id == team_id).first()` / `if not team: raise HTTPException(404, "Team no longer exists")` / `member_role = db.query(Team_roles).filter(Team_roles.team_id == team_id, Team_roles.user_id == member_user_id).first()` / `if not member_role: raise HTTPException(404, "Member role not found")` |
-| 308-315 | `reverse_changes = {}` / `for key, diff in changes.items(): old_val = diff.get("from"); new_val = diff.get("to")` / `if hasattr(member_role, key): setattr(member_role, key, old_val); reverse_changes[key] = {"from": new_val, "to": old_val}` |
-| 317-320 | `db.commit()` / `member_name = meta.get("member_name", str(member_user_id))` / `create_log(db, ..., action="team_member_permissions_updated", metadata={"team_id": ..., "team_name": ..., "role": ..., "member_name": ..., "changes": reverse_changes, "undone": True})` / `return {"message": f"Permissions for {member_name} have been reverted (undo)"}` |
+For `"team_member_permissions_updated"` (lines 289-320): gets `team_id`, `member_user_id`, and `changes` dict from metadata (lines 290-293). Raises 400 if no `team_id` or no changes (lines 294-297). Looks up team and `Team_roles` — raises 404 if either is missing (lines 298-306). Iterates through `changes`, where each key is a permission field with `{"from": old_val, "to": new_val}` — applies the old value via `setattr(member_role, key, old_val)` and builds `reverse_changes` with the swapped `from`/`to` (lines 308-315). Logs the reversal with the `reverse_changes` dict, returns `{"message": f"Permissions for {member_name} have been reverted (undo)"}` (lines 317-320).

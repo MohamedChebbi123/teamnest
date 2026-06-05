@@ -1,354 +1,121 @@
 # Channel Flow — Every Line of Code
 
-## File: `backend/models/Channels.py` (20 lines)
+## Models
 
-| Lines | Code |
-|-------|------|
-| 6-7 | `class Channels(Base):` / `__tablename__="channels"` |
-| 8 | `channel_id=Column(Integer,primary_key=True)` |
-| 9 | `channel_name=Column(String,nullable=False)` |
-| 10 | `channel_mode = Column(String, nullable=False)` |
-| 11 | `channel_category = Column(String, nullable=False)` |
-| 12 | `description=Column(Text,nullable=True)` |
-| 13 | `created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
-| 14 | `team_id=Column(Integer,ForeignKey("teams.team_id"),nullable=True)` |
-| 15 | `org_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)` |
-| 17 | `team = relationship("Teams", back_populates="channels")` |
-| 18 | `organization = relationship("Organization", back_populates="channels")` |
-| 19 | `messages = relationship("Messages", back_populates="channel", cascade="all, delete-orphan")` |
-| 20 | `files = relationship("Files", back_populates="channel", cascade="all, delete-orphan")` |
+The `Channels` model (`backend/models/Channels.py:6`) maps to the `channels` table. Each channel has a `channel_id` (Integer PK, line 8), `channel_name` (String, not null, line 9), `channel_mode` (String, not null, line 10), `channel_category` (String, not null, line 11), `description` (Text, nullable, line 12), `created_at` (DateTime(timezone=True) defaulting to `datetime.now(UTC)`, line 13), `team_id` (Integer FK→teams.team_id, nullable, line 14), and `org_id` (Integer FK→organization.organization_id, not null, line 15). It has relationships to `Teams` via `team` (line 17), `Organization` via `organization` (line 18), `Messages` via `messages` with cascade all delete-orphan (line 19), and `Files` via `files` with cascade all delete-orphan (line 20).
 
-## File: `backend/models/Messages.py` (19 lines)
+The `Messages` model (`backend/models/Messages.py:6`) maps to the `messages` table. Each message has a `message_id` (Integer PK, line 8), `message_content` (Text, not null, line 9), `sender_id` (Integer FK→users.user_id, not null, line 10), `channel_id` (Integer FK→channels.channel_id, not null, line 11), `is_deleted` (Boolean default False, line 12), `parent_id` (Integer FK→messages.message_id, nullable for replies, line 13), `edited_at` (DateTime(timezone=True) defaulting to now, line 14), and `sent_at` (DateTime(timezone=True) defaulting to now, line 15). It has a `parent_message` self-referential relationship with `remote_side=[message_id]` and `backref="replies"` (line 16), `notifications` with cascade all delete-orphan (line 17), `channel` back-populated to `Channels.messages` (line 18), and `pinned_entries` with cascade all delete-orphan and `overlaps="message,pinned_messages"` (line 19).
 
-| Lines | Code |
-|-------|------|
-| 6-7 | `class Messages(Base):` / `__tablename__="messages"` |
-| 8 | `message_id=Column(Integer,primary_key=True)` |
-| 9 | `message_content=Column(Text,nullable=False)` |
-| 10 | `sender_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)` |
-| 11 | `channel_id=Column(Integer,ForeignKey("channels.channel_id"),nullable=False)` |
-| 12 | `is_deleted=Column(Boolean,default=False)` |
-| 13 | `parent_id=Column(Integer,ForeignKey("messages.message_id"),nullable=True)` |
-| 14 | `edited_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
-| 15 | `sent_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
-| 16 | `parent_message = relationship("Messages", remote_side=[message_id], backref="replies")` |
-| 17 | `notifications = relationship("Notifications", back_populates="message", cascade="all, delete-orphan")` |
-| 18 | `channel = relationship("Channels", back_populates="messages")` |
-| 19 | `pinned_entries = relationship("Pinned_messages", backref="pinned_message_ref", cascade="all, delete-orphan", overlaps="message,pinned_messages")` |
+The `Pinned_messages` model (`backend/models/PInned_messages.py:7`) maps to the `pinned_messages` table. Each pinned entry has an `id` (Integer PK, line 10), `message_id` (Integer FK→messages.message_id, not null, line 11), `channel_id` (Integer FK→channels.channel_id, not null, line 12), `pinned_by` (Integer FK→users.user_id, not null, line 13), and `pinned_at` (DateTime(timezone=True) defaulting to now, line 14). It has a `message` relationship with `overlaps="pinned_entries,pinned_message_ref"` (line 16), a `channel` relationship with a backref that cascades all delete-orphan (line 17), and a `user` relationship to `Users` with `backref="pinned_messages"` (line 18).
 
-## File: `backend/models/PInned_messages.py` (18 lines)
+The `Notifications` model (`backend/models/Notifications.py:7`) maps to the `notifications` table. Each notification has an `id` (Integer PK, line 9), `user_id` (Integer FK→users.user_id, not null, line 10), `type` (String, not null, line 11), `message_id` (Integer FK→messages.message_id, nullable, line 12), `dm_message_id` (Integer FK→direct_messages.id, nullable, line 13), `is_seen` (Boolean default False, line 14), and `created_at` (DateTime(timezone=True) defaulting to now, line 15). It has relationships to `Users` (line 17), `Messages` (line 18), and `Direct_messages` (line 19), all back-populated.
 
-| Lines | Code |
-|-------|------|
-| 7-8 | `class Pinned_messages(Base):` / `__tablename__="pinned_messages"` |
-| 10 | `id=Column(Integer,primary_key=True)` |
-| 11 | `message_id=Column(Integer,ForeignKey("messages.message_id"),nullable=False)` |
-| 12 | `channel_id=Column(Integer,ForeignKey("channels.channel_id"),nullable=False)` |
-| 13 | `pinned_by=Column(Integer,ForeignKey("users.user_id"),nullable=False)` |
-| 14 | `pinned_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
-| 16 | `message=relationship("Messages", overlaps="pinned_entries,pinned_message_ref")` |
-| 17 | `channel=relationship("Channels", backref=backref("pinned_messages", cascade="all, delete-orphan"))` |
-| 18 | `user=relationship("Users",backref="pinned_messages")` |
+## Router Endpoints
 
-## File: `backend/models/Notifications.py` (19 lines)
+`backend/routers/channels_router.py:31` defines `router = APIRouter()`. Lines 1-31 import all service functions from `channel_service` and `message_service`, plus `Channels_input` and `Message_edit_input` schemas.
 
-| Lines | Code |
-|-------|------|
-| 7-8 | `class Notifications(Base):` / `__tablename__="notifications"` |
-| 9 | `id=Column(Integer,primary_key=True)` |
-| 10 | `user_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)` |
-| 11 | `type= Column(String, nullable=False)` |
-| 12 | `message_id=Column(Integer,ForeignKey("messages.message_id"),nullable=True)` |
-| 13 | `dm_message_id=Column(Integer,ForeignKey("direct_messages.id"),nullable=True)` |
-| 14 | `is_seen=Column(Boolean,default=False)` |
-| 15 | `created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
-| 17 | `user = relationship("Users", back_populates="notifications")` |
-| 18 | `message = relationship("Messages", back_populates="notifications")` |
-| 19 | `dm_message = relationship("Direct_messages", back_populates="notifications")` |
+`POST /organization/{org_id}/create_channel` at line 34 accepts a `Channels_input` body, depends on `current_user` and `connect_databse`, and delegates to `create_channel_service(data, org_id, user, db)` (lines 34-41).
 
-## File: `backend/routers/channels_router.py` (207 lines)
+`GET /organization/{org_id}/channels` at line 44 returns all channels for an org via `fetch_channels_service(org_id, user, db)` (lines 44-50).
 
-| Lines | Code |
-|-------|------|
-| 1-31 | Imports: `from services.channel_service import (create_channel_service, fetch_channels_service, fetch_single_channel_service, update_channel_service, delete_channel_service)` / `from services.message_service import (fetch_message_service, edit_message_service, delete_message_service, send_messages_realtime, notifications_ws_endpoint, pin_message_service, unpin_message_service, fetch_pinned_messages_service, search_messages_service, fetch_user_notifications_service, mark_notifications_seen_service, fetch_voice_participants_service, voice_websocket_endpoint)` / `from schemas.Channels_input import Channels_input` / `from schemas.Message_edit_input import Message_edit_input` / `router = APIRouter()` |
-| 34-41 | `@router.post("/organization/{org_id}/create_channel")` / `async def create_channel(org_id: int, data: Channels_input, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return create_channel_service(data, org_id, user, db)` |
-| 44-50 | `@router.get("/organization/{org_id}/channels")` / `async def get_channels(org_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return fetch_channels_service(org_id, user, db)` |
-| 53-59 | `@router.get("/channel/{channel_id}")` / `async def get_channel(channel_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return fetch_single_channel_service(channel_id, user, db)` |
-| 62-69 | `@router.put("/channel/{channel_id}")` / `async def update_channel(channel_id: int, data: Channels_input, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return update_channel_service(channel_id, data, user, db)` |
-| 72-78 | `@router.delete("/channel/{channel_id}")` / `async def delete_channel(channel_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return delete_channel_service(channel_id, user, db)` |
-| 81-90 | `@router.get("/organization/{org_id}/channel/{channel_id}/messages")` / `async def get_messages(channel_id: int, org_id: int, limit: int \| None = Query(None), offset: int \| None = Query(None), user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return fetch_message_service(channel_id, org_id, user, db, limit=limit, offset=offset)` |
-| 93-100 | `@router.put("/message/{message_id}")` / `async def edit_message(message_id: int, data: Message_edit_input, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return edit_message_service(message_id, data, user, db)` |
-| 103-109 | `@router.delete("/message/{message_id}")` / `async def delete_message(message_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return delete_message_service(message_id, user, db)` |
-| 112-119 | `@router.post("/organization/{org_id}/message/{message_id}/pin")` / `async def pin_message(message_id: int, org_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return pin_message_service(message_id, org_id, user, db)` |
-| 122-129 | `@router.delete("/organization/{org_id}/message/{message_id}/unpin")` / `async def unpin_message(message_id: int, org_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return unpin_message_service(message_id, org_id, user, db)` |
-| 132-139 | `@router.get("/organization/{org_id}/channel/{channel_id}/pinned")` / `async def get_pinned_messages(channel_id: int, org_id: int, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return fetch_pinned_messages_service(channel_id, org_id, user, db)` |
-| 142-152 | `@router.get("/organization/{org_id}/channel/{channel_id}/messages/search")` / `async def search_messages(channel_id: int, org_id: int, q: str = Query(""), limit: int \| None = Query(None), offset: int \| None = Query(None), user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return search_messages_service(channel_id, org_id, q, user, db, limit=limit, offset=offset)` |
-| 155-162 | `@router.websocket("/mesages/{channel_id}")` / `async def websocket_handler(websocket: WebSocket, channel_id: int, token: str = Query(...), org_id: int = Query(...)):` / `return await send_messages_realtime(websocket, channel_id, f"Bearer {token}", org_id)` |
-| 165-170 | `@router.get("/user/notifications")` / `async def get_user_notifications(user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return fetch_user_notifications_service(user, db)` |
-| 173-179 | `@router.post("/user/notifications/seen")` / `async def mark_notifications_seen(notification_ids: list[int] \| None = None, user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return mark_notifications_seen_service(user, db, notification_ids)` |
-| 182-187 | `@router.websocket("/ws/notifications")` / `async def notifications_websocket_handler(websocket: WebSocket, token: str = Query(...)):` / `return await notifications_ws_endpoint(websocket, f"Bearer {token}")` |
-| 190-197 | `@router.get("/voice/{channel_id}/participants")` / `async def get_voice_participants(channel_id: int, org_id: int = Query(...), user: Users = Depends(current_user), db: Session = Depends(connect_databse)):` / `return fetch_voice_participants_service(channel_id, org_id, user, db)` |
-| 200-207 | `@router.websocket("/voice/{channel_id}")` / `async def voice_ws(websocket: WebSocket, channel_id: int, authorization: str = Query(...), org_id: int = Query(...)):` / `return await voice_websocket_endpoint(websocket, channel_id, authorization, org_id)` |
+`GET /channel/{channel_id}` at line 53 returns a single channel with nested org info via `fetch_single_channel_service(channel_id, user, db)` (lines 53-59).
 
-## File: `backend/services/channel_service.py` (312 lines)
+`PUT /channel/{channel_id}` at line 62 accepts a `Channels_input` body and calls `update_channel_service(channel_id, data, user, db)` (lines 62-69).
 
-### `create_channel_service` (lines 18-78)
-| Line | Code |
-|------|------|
-| 19 | `user_id = user.user_id` |
-| 21 | `found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()` |
-| 23-24 | `if not found_organization: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 26 | `is_owner = found_organization.owner_id == user_id` |
-| 27-30 | `is_member = db.query(Organization_members).filter(Organization_members.org_id == org_id, Organization_members.memmber_id == user_id).first()` |
-| 32-33 | `if not is_owner and not is_member: raise HTTPException(status_code=403, detail="You must be a member of this organization to create channels")` |
-| 35 | `channel_limit = get_channel_limit(found_organization.organization_plan)` |
-| 36-42 | `if channel_limit is not None: current_count = db.query(Channels).filter(Channels.org_id == org_id).count(); if current_count >= channel_limit: raise HTTPException(status_code=403, detail=f"Free plan allows a maximum of {channel_limit} channels. Upgrade to Pro for unlimited channels.")` |
-| 44-47 | `existing_channel = db.query(Channels).filter(Channels.org_id == org_id, Channels.channel_name == data.channel_name).first()` |
-| 49-50 | `if existing_channel: raise HTTPException(status_code=400, detail="A channel with this name already exists in this organization")` |
-| 52-58 | `new_channel = Channels(channel_name=data.channel_name, channel_mode=data.channel_mode, channel_category=data.channel_category, description=data.description, org_id=org_id)` |
-| 60-62 | `db.add(new_channel); db.commit(); db.refresh(new_channel)` |
-| 64 | `create_log(db, org_id=org_id, actor_id=user_id, action="channel_created", target_id=new_channel.channel_id, target_type="channel", metadata={"channel_name": new_channel.channel_name})` |
-| 66-78 | Returns `{"message": "Channel created successfully", "channel": {"channel_id": ..., "channel_name": ..., "channel_mode": ..., "channel_category": ..., "description": ..., "org_id": ..., "team_id": ..., "created_at": ...}}` |
+`DELETE /channel/{channel_id}` at line 72 calls `delete_channel_service(channel_id, user, db)` (lines 72-78).
 
-### `fetch_channels_service` (lines 81-112)
-| Line | Code |
-|------|------|
-| 82 | `user_id = user.user_id` |
-| 84 | `found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()` |
-| 86-87 | `if not found_organization: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 89 | `is_owner = found_organization.owner_id == user_id` |
-| 90-93 | `is_member = db.query(Organization_members).filter(Organization_members.org_id == org_id, Organization_members.memmber_id == user_id).first()` |
-| 95-96 | `if not is_owner and not is_member: raise HTTPException(status_code=403, detail="You must be a member of this organization to view channels")` |
-| 98 | `found_channels = db.query(Channels).filter(Channels.org_id == org_id).all()` |
-| 100-112 | Returns `[{"channel_id": ..., "channel_name": ..., "channel_mode": ..., "channel_category": ..., "description": ..., "org_id": ..., "team_id": ..., "created_at": ...} for channel in found_channels]` |
+`GET /organization/{org_id}/channel/{channel_id}/messages` at line 81 accepts optional `limit` and `offset` query params and calls `fetch_message_service(channel_id, org_id, user, db, limit=limit, offset=offset)` (lines 81-90).
 
-### `fetch_single_channel_service` (lines 115-151)
-| Line | Code |
-|------|------|
-| 116 | `user_id = user.user_id` |
-| 118 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id).first()` |
-| 120-121 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found")` |
-| 123 | `found_organization = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()` |
-| 125-126 | `if not found_organization: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 128 | `is_owner = found_organization.owner_id == user_id` |
-| 129-132 | `is_member = db.query(Organization_members).filter(Organization_members.org_id == channel.org_id, Organization_members.memmber_id == user_id).first()` |
-| 134-135 | `if not is_owner and not is_member: raise HTTPException(status_code=403, detail="You must be a member of this organization to view this channel")` |
-| 137-151 | Returns `{"channel_id": ..., "channel_name": ..., "channel_mode": ..., "channel_category": ..., "description": ..., "org_id": ..., "created_at": ..., "organization": {"organization_id": ..., "organization_name": ..., "organaization_picture": ..., "organaization_tag": ...}}` |
+`PUT /message/{message_id}` at line 93 accepts a `Message_edit_input` body and calls `edit_message_service(message_id, data, user, db)` (lines 93-100).
 
-### `update_channel_service` (lines 154-237)
-| Line | Code |
-|------|------|
-| 155 | `user_id = user.user_id` |
-| 157 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id).first()` |
-| 159-160 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found")` |
-| 162 | `organization = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()` |
-| 164-165 | `if not organization: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 167-181 | **Org-level (team_id is None):** `is_owner = organization.owner_id == user_id` / `org_member = db.query(Organization_members).filter(Organization_members.org_id == channel.org_id, Organization_members.memmber_id == user_id).first()` / `is_admin = org_member and org_member.role_user == "ADMIN"` / `if not is_owner and not is_admin: raise HTTPException(status_code=403, detail="Only organization owners and admins can update organization-level channels")` |
-| 182-196 | **Team-level (team_id is not None):** `is_owner = organization.owner_id == user_id` / `user_role = db.query(Team_roles).filter(Team_roles.team_id == channel.team_id, Team_roles.user_id == user_id).first()` / `has_permission = is_owner or (user_role and user_role.can_create_channels)` / `if not has_permission: raise HTTPException(status_code=403, detail="You don't have permission to update channels in this team")` |
-| 198-213 | **Duplicate name check:** `if data.channel_name != channel.channel_name:` — queries by org_id first; if team_id exists, queries by team_id instead; `if existing_channel: raise HTTPException(status_code=400, detail="A channel with this name already exists")` |
-| 215-218 | `channel.channel_name = data.channel_name; channel.channel_mode = data.channel_mode; channel.channel_category = data.channel_category; channel.description = data.description` |
-| 220-221 | `db.commit(); db.refresh(channel)` |
-| 223 | `create_log(db, org_id=channel.org_id, actor_id=user_id, action="channel_updated", target_id=channel.channel_id, target_type="channel", metadata={"channel_name": channel.channel_name})` |
-| 225-237 | Returns `{"message": "Channel updated successfully", "channel": {"channel_id": ..., "channel_name": ..., "channel_mode": ..., "channel_category": ..., "description": ..., "org_id": ..., "team_id": ..., "created_at": ...}}` |
+`DELETE /message/{message_id}` at line 103 calls `delete_message_service(message_id, user, db)` (lines 103-109).
 
-### `delete_channel_service` (lines 240-312)
-| Line | Code |
-|------|------|
-| 241 | `user_id = user.user_id` |
-| 243 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id).first()` |
-| 245-246 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found")` |
-| 248 | `organization = db.query(Organization).filter(Organization.organization_id == channel.org_id).first()` |
-| 250-251 | `if not organization: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 253-267 | **Org-level:** `is_owner = organization.owner_id == user_id` / `org_member = db.query(Organization_members).filter(Organization_members.org_id == channel.org_id, Organization_members.memmber_id == user_id).first()` / `is_admin = org_member and org_member.role_user == "ADMIN"` / `if not is_owner and not is_admin: raise HTTPException(status_code=403, detail="Only organization owners and admins can delete organization-level channels")` |
-| 268-282 | **Team-level:** `is_owner = organization.owner_id == user_id` / `user_role = db.query(Team_roles).filter(Team_roles.team_id == channel.team_id, Team_roles.user_id == user_id).first()` / `has_permission = is_owner or (user_role and user_role.can_create_channels)` / `if not has_permission: raise HTTPException(status_code=403, detail="You don't have permission to delete channels in this team")` |
-| 284-295 | `channel_meta = {"channel_name": ..., "channel_mode": ..., "channel_category": ..., "description": ...}; if channel.team_id: channel_team = db.query(Teams).filter(Teams.team_id == channel.team_id).first(); if channel_team: channel_meta["team_id"] = ..., channel_meta["team_name"] = channel_team.team_name` |
-| 295 | `create_log(db, org_id=channel.org_id, actor_id=user_id, action="channel_deleted", target_id=channel_id, target_type="channel", metadata=channel_meta)` |
-| 297 | `channel_message_ids = [row[0] for row in db.query(Messages.message_id).filter(Messages.channel_id == channel_id).all()]` |
-| 298-302 | `if channel_message_ids: db.query(Pinned_messages).filter(Pinned_messages.channel_id == channel_id).delete(synchronize_session=False); db.query(Notifications).filter(Notifications.message_id.in_(channel_message_ids)).delete(synchronize_session=False); db.query(Messages).filter(Messages.parent_id.in_(channel_message_ids)).update({Messages.parent_id: None}, synchronize_session=False); db.query(Messages).filter(Messages.channel_id == channel_id).delete(synchronize_session=False)` |
-| 304 | `db.query(Files).filter(Files.channel_id == channel_id).delete(synchronize_session=False)` |
-| 306-307 | `db.delete(channel); db.commit()` |
-| 309-312 | Returns `{"message": "Channel deleted successfully", "channel_id": channel_id}` |
+`POST /organization/{org_id}/message/{message_id}/pin` at line 112 calls `pin_message_service(message_id, org_id, user, db)` (lines 112-119).
 
-## File: `backend/services/message_service.py` (1492 lines)
+`DELETE /organization/{org_id}/message/{message_id}/unpin` at line 122 calls `unpin_message_service(message_id, org_id, user, db)` (lines 122-129).
 
-### Helpers (lines 37-54)
-| Line | Code |
-|------|------|
-| 37-54 | `def user_can_announce(db, user_id, channel_team_id, org_id):` / `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if org and org.owner_id == user_id: return True` / `if channel_team_id is not None: role = db.query(Team_roles).filter(Team_roles.team_id == channel_team_id, Team_roles.user_id == user_id).first(); return bool(role and role.can_make_announcement)` / `admin = db.query(Organization_members).filter(Organization_members.org_id == org_id, Organization_members.memmber_id == user_id, Organization_members.role_user == "ADMIN").first(); return admin is not None` |
+`GET /organization/{org_id}/channel/{channel_id}/pinned` at line 132 calls `fetch_pinned_messages_service(channel_id, org_id, user, db)` (lines 132-139).
 
-### `_normalize_message_pagination` (lines 554-572)
-| Line | Code |
-|------|------|
-| 554 | `DEFAULT_MESSAGE_LIMIT = 50` |
-| 555 | `MAX_MESSAGE_LIMIT = 200` |
-| 558-572 | `def _normalize_message_pagination(limit, offset):` / `normalized_limit = int(limit if limit is not None else DEFAULT_MESSAGE_LIMIT)` / `normalized_offset = int(offset if offset is not None else 0)` / `if normalized_limit <= 0: raise HTTPException(status_code=400, detail="limit must be greater than 0")` / `if normalized_limit > MAX_MESSAGE_LIMIT: raise HTTPException(status_code=400, detail=f"limit cannot exceed {MAX_MESSAGE_LIMIT}")` / `if normalized_offset < 0: raise HTTPException(status_code=400, detail="offset must be >= 0")` / `return normalized_limit, normalized_offset` |
+`GET /organization/{org_id}/channel/{channel_id}/messages/search` at line 142 accepts `q` (query string, default ""), `limit`, and `offset` and calls `search_messages_service(channel_id, org_id, q, user, db, limit=limit, offset=offset)` (lines 142-152).
 
-### `fetch_message_service` (lines 575-746)
-| Line | Code |
-|------|------|
-| 583 | `user_id = user.user_id` |
-| 585-588 | `found_user_at_org = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` |
-| 590-591 | `if not found_user_at_org: raise HTTPException(status_code=403, detail="User is not a member of this organization")` |
-| 593-596 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` |
-| 598-599 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found in this organization")` |
-| 601-609 | `if channel.team_id is not None: in_team = db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): raise HTTPException(status_code=403, detail="Not a team member")` |
-| 611 | `limit, offset = _normalize_message_pagination(limit, offset)` |
-| 613-624 | `org_users = db.query(Users).join(Organization_members, Organization_members.memmber_id == Users.user_id).filter(Organization_members.org_id == org_id, Users.user_tag.isnot(None)).all(); users_by_tag = {str(member.user_tag).strip().lstrip("@").lower(): member for member in org_users if member.user_tag}` |
-| 626-631 | `page_rows = db.query(Messages, Users).join(Users, Messages.sender_id == Users.user_id).filter(Messages.channel_id == channel_id, Messages.is_deleted == False).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()` |
-| 633-635 | `has_more = len(page_rows) > limit; page_rows = page_rows[:limit]; messages = list(reversed(page_rows))` |
-| 637-647 | `parent_ids = {m.parent_id for m, _ in messages if m.parent_id}; parents_by_id = {}; if parent_ids: parent_rows = db.query(Messages, Users).join(Users, Messages.sender_id == Users.user_id).filter(Messages.message_id.in_(parent_ids), Messages.channel_id == channel_id, Messages.is_deleted == False).all(); parents_by_id = {pm.message_id: (pm, ps) for pm, ps in parent_rows}` |
-| 649-695 | Loop builds `result` with `message_id`, `message_content`, `mentions`, `parent_id`, `reply_to`, `sent_at`, `edited_at`, `sender` |
-| 697-709 | `window_start = min((m.sent_at for m, _ in messages), default=None); window_end = max((m.sent_at for m, _ in messages), default=None); files_query = db.query(Files, Users).join(Users, Files.sender_id == Users.user_id).filter(Files.is_deleted == False); if channel.team_id is not None: files_query = files_query.filter(Files.team_id == channel.team_id); else: files_query = files_query.filter(Files.team_id == None, Files.org_id == org_id); if window_start is not None and window_end is not None: files_query = files_query.filter(Files.sent_at >= window_start, Files.sent_at <= window_end); files = files_query.order_by(Files.sent_at.desc()).limit(MAX_MESSAGE_LIMIT).all()` |
-| 711-736 | Appends file entries as virtual message objects (`message_id = 1000000000 + file_record.id`, `is_file = True`, `file_attachment: {id, file_name, file_url, file_size, sent_at}`) |
-| 736 | `result.sort(key=lambda item: item["sent_at"])` |
-| 738-746 | Returns `{"messages": result, "pagination": {"limit": limit, "offset": offset, "returned": len(messages), "has_more": has_more}}` |
+`WS /mesages/{channel_id}` at line 155 takes `channel_id` as a path param, `token` and `org_id` as query params, and delegates to `send_messages_realtime(websocket, channel_id, f"Bearer {token}", org_id)` (lines 155-162).
 
-### `edit_message_service` (lines 749-774)
-| Line | Code |
-|------|------|
-| 750 | `user_id = user.user_id` |
-| 752-755 | `message = db.query(Messages).filter(Messages.message_id == message_id, Messages.is_deleted == False).first()` |
-| 757-758 | `if not message: raise HTTPException(status_code=404, detail="Message not found")` |
-| 761-762 | `if message.sender_id != user_id: raise HTTPException(status_code=403, detail="You can only edit your own messages")` |
-| 764-765 | `message.message_content = data.message_content; message.edited_at = datetime.now(UTC)` |
-| 767-768 | `db.commit(); db.refresh(message)` |
-| 770-774 | Returns `{"message_id": message.message_id, "message_content": message.message_content, "edited_at": message.edited_at}` |
+`GET /user/notifications` at line 165 calls `fetch_user_notifications_service(user, db)` (lines 165-170).
 
-### `delete_message_service` (lines 777-795)
-| Line | Code |
-|------|------|
-| 778 | `user_id = user.user_id` |
-| 780-783 | `message = db.query(Messages).filter(Messages.message_id == message_id, Messages.is_deleted == False).first()` |
-| 785-786 | `if not message: raise HTTPException(status_code=404, detail="Message not found")` |
-| 788-789 | `if message.sender_id != user_id: raise HTTPException(status_code=403, detail="You can only delete your own messages")` |
-| 791 | `message.is_deleted = True` |
-| 793 | `db.commit()` |
-| 795 | Returns `{"detail": "Message deleted successfully"}` |
+`POST /user/notifications/seen` at line 173 accepts an optional `notification_ids` list of ints and calls `mark_notifications_seen_service(user, db, notification_ids)` (lines 173-179).
 
-### `send_messages_realtime` (lines 797-1118)
-| Line | Code |
-|------|------|
-| 807 | `await websocket.accept()` |
-| 810-814 | `auth_db = SessionLocal(); user = await authenticate_ws(websocket, authorization, auth_db); if not user: return` |
-| 816-821 | `user_id = user.user_id; member = auth_db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` |
-| 823-825 | `if not member: await websocket.close(code=1008, reason="Not a member of this organization"); return` |
-| 827-830 | `channel = auth_db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` |
-| 832-834 | `if not channel: await websocket.close(code=1008, reason="Channel not found"); return` |
-| 836-845 | `if channel.team_id is not None: in_team = auth_db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = auth_db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): await websocket.close(code=1008, reason="Not a team member"); return` |
-| 847-849 | `channel_name = channel.channel_name; channel_team_id = channel.team_id; channel_mode = channel.channel_mode` |
-| 851 | `auth_db.close()` |
-| 853 | `await manager.connect(channel_id, websocket)` |
-| 856-1058 | **Loop:** `data = await websocket.receive_json()` — handles `"type": "send_message"` (checks channel_mode announcements permission, validates parent_id, creates Messages, creates mention/announcement notifications, pushes real-time notifications via `push_mention_notification` / `push_announcement_notification`, upserts to Pinecone, broadcasts via `manager.broadcast`) |
-| 1061-1079 | Handles `"type": "typing"` — broadcasts typing indicators via `manager.broadcast(channel_id, typing_data, exclude=websocket)` |
-| 1080-1112 | Handles `"type": "send_file"` — validates announcement permission, calls `send_file_realtime_service` |
-| 1113-1114 | Falls through: `await manager.broadcast(channel_id, data)` |
-| 1116-1117 | `except WebSocketDisconnect: manager.disconnect(channel_id, websocket)` |
+`WS /ws/notifications` at line 182 takes `token` as a query param and delegates to `notifications_ws_endpoint(websocket, f"Bearer {token}")` (lines 182-187).
 
-### `notifications_ws_endpoint` (lines 1120-1145)
-| Line | Code |
-|------|------|
-| 1125 | `await websocket.accept()` |
-| 1127-1135 | `auth_db = SessionLocal(); user = await authenticate_ws(websocket, authorization, auth_db); if not user: return; user_id = user.user_id; auth_db.close()` |
-| 1137 | `await notification_manager.connect(user_id, websocket)` |
-| 1139-1143 | Loop: `await websocket.receive_text()` |
-| 1144-1145 | `finally: notification_manager.disconnect(user_id)` |
+`GET /voice/{channel_id}/participants` at line 190 requires `org_id` as a query param and calls `fetch_voice_participants_service(channel_id, org_id, user, db)` (lines 190-197).
 
-### `voice_websocket_endpoint` (lines 1148-1225)
-| Line | Code |
-|------|------|
-| 1156-1192 | `auth_db = SessionLocal(); user = await authenticate_ws(websocket, authorization, auth_db); if not user: return; member = auth_db.query(Organization_members).filter(Organization_members.memmber_id == user.user_id, Organization_members.org_id == org_id).first(); if not member: await websocket.close(code=1008, reason="Not a member of this organization"); return; channel = auth_db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first(); if not channel: await websocket.close(code=1008, reason="Channel not found"); return; if str(channel.channel_category).lower() != "voice": await websocket.close(code=1008, reason="Channel is not a voice channel"); return; participant = {user_id, first_name, last_name, avatar_url, user_tag}` |
-| 1194 | `await voice_manager.connect(channel_id, websocket, participant=participant)` |
-| 1196-1199 | `await websocket.send_json({"type": "voice_participants", "participants": voice_manager.get_participants(channel_id)})` |
-| 1201-1208 | `await voice_manager.broadcast(channel_id, {"type": "voice_joined", "participant": participant}, exclude=websocket)` |
-| 1210-1225 | Loop: `message = await websocket.receive_json(); await voice_manager.forward_signal(channel_id, websocket, message)` / `except WebSocketDisconnect: disconnected_participant = voice_manager.disconnect(channel_id, websocket); if disconnected_participant: await voice_manager.broadcast(channel_id, {"type": "voice_left", "participant": ...})` |
+`WS /voice/{channel_id}` at line 200 takes `channel_id`, `authorization`, and `org_id` (as query params) and delegates to `voice_websocket_endpoint(websocket, channel_id, authorization, org_id)` (lines 200-207).
 
-### `search_messages_service` (lines 1228-1306)
-| Line | Code |
-|------|------|
-| 1237 | `user_id = user.user_id` |
-| 1239-1242 | `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` |
-| 1244-1245 | `if not member: raise HTTPException(status_code=403, detail="User is not a member of this organization")` |
-| 1247-1250 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` |
-| 1252-1253 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found in this organization")` |
-| 1255-1263 | `if channel.team_id is not None: in_team = db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): raise HTTPException(status_code=403, detail="Not a team member")` |
-| 1265-1266 | `if not query or not query.strip(): raise HTTPException(status_code=400, detail="Search query cannot be empty")` |
-| 1268 | `limit, offset = _normalize_message_pagination(limit, offset)` |
-| 1270 | `search_term = f"%{query.strip()}%"` |
-| 1272-1278 | `rows = db.query(Messages, Users).join(Users, Messages.sender_id == Users.user_id).filter(Messages.channel_id == channel_id, Messages.is_deleted == False, Messages.message_content.ilike(search_term)).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()` |
-| 1280-1281 | `has_more = len(rows) > limit; rows = rows[:limit]` |
-| 1283-1306 | Returns `{"messages": [{message_id, message_content, sent_at, edited_at, sender: {user_id, first_name, last_name, avatar_url, user_tag}}], "pagination": {limit, offset, returned, has_more}}` |
+## Channel Service
 
-### `pin_message_service` (lines 1309-1381)
-| Line | Code |
-|------|------|
-| 1310 | `user_id = user.user_id` |
-| 1312-1315 | `message = db.query(Messages).filter(Messages.message_id == message_id, Messages.is_deleted == False).first()` |
-| 1317-1318 | `if not message: raise HTTPException(status_code=404, detail="Message not found")` |
-| 1320-1323 | `channel = db.query(Channels).filter(Channels.channel_id == message.channel_id, Channels.org_id == org_id).first()` |
-| 1325-1326 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found in this organization")` |
-| 1328-1330 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` |
-| 1332-1333 | `if not org: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 1335-1353 | **Permission check:** `is_owner = org.owner_id == user_id; if not is_owner: member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first(); if not member: raise HTTPException(status_code=403, detail="User is not a member of this organization"); if channel.team_id is not None: team_member = db.query(Team_association).filter(Team_association.team_id == channel.team_id, Team_association.user_id == user_id).first(); if not team_member: raise HTTPException(status_code=403, detail="You must be a member of this team to pin messages in this channel")` |
-| 1355-1358 | `already_pinned = db.query(Pinned_messages).filter(Pinned_messages.message_id == message_id, Pinned_messages.channel_id == channel.channel_id).first()` |
-| 1360-1361 | `if already_pinned: raise HTTPException(status_code=400, detail="Message is already pinned")` |
-| 1363-1367 | `pinned = Pinned_messages(message_id=message_id, channel_id=channel.channel_id, pinned_by=user_id)` |
-| 1369-1371 | `db.add(pinned); db.commit(); db.refresh(pinned)` |
-| 1373 | `create_log(db, org_id=org_id, actor_id=user_id, action="message_pinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})` |
-| 1375-1381 | Returns `{"id": ..., "message_id": ..., "channel_id": ..., "pinned_by": ..., "pinned_at": ...}` |
+`create_channel_service(data, org_id, user, db)` at `backend/services/channel_service.py:18` starts by extracting `user_id` (line 19). It queries `Organization` by `organization_id == org_id` — if not found, raises `HTTPException(404, "Organization not found")` (lines 21-24). It checks if the user is the org owner via `found_organization.owner_id == user_id` (line 26) or an org member via `db.query(Organization_members).filter(Organization_members.org_id == org_id, Organization_members.memmber_id == user_id).first()` (lines 27-30). If neither, raises `HTTPException(403, "You must be a member of this organization to create channels")` (lines 32-33). It determines the channel limit from `get_channel_limit(found_organization.organization_plan)` — if the limit is not None and the current channel count for the org meets or exceeds it, raises `HTTPException(403, f"Free plan allows a maximum of {channel_limit} channels. Upgrade to Pro for unlimited channels.")` (FREE=5, PRO=unlimited, lines 35-42). It checks for a duplicate channel name by querying `Channels` filtered by `org_id` and `channel_name` — if found, raises `HTTPException(400, "A channel with this name already exists in this organization")` (lines 44-50). Creates a new `Channels` row with `channel_name`, `channel_mode`, `channel_category`, `description`, and `org_id` (lines 52-58). Adds, commits, refreshes (lines 60-62). Calls `create_log` with `action="channel_created"` and the channel name in metadata (line 64). Returns `{"message": "Channel created successfully", "channel": {"channel_id": ..., "channel_name": ..., "channel_mode": ..., "channel_category": ..., "description": ..., "org_id": ..., "team_id": ..., "created_at": ...}}` (lines 66-78).
 
-### `unpin_message_service` (lines 1384-1434)
-| Line | Code |
-|------|------|
-| 1385 | `user_id = user.user_id` |
-| 1387-1389 | `pinned = db.query(Pinned_messages).filter(Pinned_messages.message_id == message_id).first()` |
-| 1391-1392 | `if not pinned: raise HTTPException(status_code=404, detail="Pinned message not found")` |
-| 1394-1397 | `channel = db.query(Channels).filter(Channels.channel_id == pinned.channel_id, Channels.org_id == org_id).first()` |
-| 1399-1400 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found in this organization")` |
-| 1402-1404 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` |
-| 1406-1407 | `if not org: raise HTTPException(status_code=404, detail="Organization not found")` |
-| 1409-1427 | **Permission check:** `is_owner = org.owner_id == user_id; if not is_owner: member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first(); if not member: raise HTTPException(status_code=403, detail="User is not a member of this organization"); if channel.team_id is not None: team_member = db.query(Team_association).filter(Team_association.team_id == channel.team_id, Team_association.user_id == user_id).first(); if not team_member: raise HTTPException(status_code=403, detail="You must be a member of this team to unpin messages in this channel")` |
-| 1429-1430 | `db.delete(pinned); db.commit()` |
-| 1432 | `create_log(db, org_id=org_id, actor_id=user_id, action="message_unpinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})` |
-| 1434 | Returns `{"detail": "Message unpinned successfully"}` |
+`fetch_channels_service(org_id, user, db)` at line 81 starts with `user_id` (line 82). Queries the org — if not found, raises 404 "Organization not found" (lines 84-87). Checks owner or member — if neither, raises 403 "You must be a member of this organization to view channels" (lines 89-96). Fetches all channels for the org via `db.query(Channels).filter(Channels.org_id == org_id).all()` (line 98). Returns a list of channel dicts (lines 100-112).
 
-### `fetch_pinned_messages_service` (lines 1437-1492)
-| Line | Code |
-|------|------|
-| 1438 | `user_id = user.user_id` |
-| 1440-1443 | `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` |
-| 1445-1446 | `if not member: raise HTTPException(status_code=403, detail="User is not a member of this organization")` |
-| 1448-1451 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` |
-| 1453-1454 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found in this organization")` |
-| 1456-1464 | `if channel.team_id is not None: in_team = db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): raise HTTPException(status_code=403, detail="Not a team member")` |
-| 1466-1473 | `pinned_messages = db.query(Pinned_messages, Messages, Users).join(Messages, Pinned_messages.message_id == Messages.message_id).join(Users, Messages.sender_id == Users.user_id).filter(Pinned_messages.channel_id == channel_id, Messages.is_deleted == False).all()` |
-| 1475-1492 | Returns `[{"id": ..., "message_id": ..., "message_content": ..., "pinned_by": ..., "pinned_at": ..., "sender": {user_id, first_name, last_name, avatar_url, user_tag}}]` |
+`fetch_single_channel_service(channel_id, user, db)` at line 115 gets `user_id` (line 116). Queries the channel by `channel_id` — if not found, raises 404 "Channel not found" (lines 118-121). Queries the org via the channel's `org_id` — if not found, raises 404 "Organization not found" (lines 123-126). Checks owner or membership — if neither, raises 403 "You must be a member of this organization to view this channel" (lines 128-135). Returns the channel with a nested `organization` object containing `organization_id`, `organization_name`, `organaization_picture`, and `organaization_tag` (lines 137-151).
 
-### `fetch_voice_participants_service` (lines 525-551)
-| Line | Code |
-|------|------|
-| 526 | `user_id = user.user_id` |
-| 528-531 | `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` |
-| 533-534 | `if not member: raise HTTPException(status_code=403, detail="User is not a member of this organization")` |
-| 536-539 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` |
-| 541-542 | `if not channel: raise HTTPException(status_code=404, detail="Channel not found in this organization")` |
-| 544-545 | `if str(channel.channel_category).lower() != "voice": raise HTTPException(status_code=400, detail="Channel is not a voice channel")` |
-| 547-551 | `participants = voice_manager.get_participants(channel_id); return {"participants": participants, "total_participants": len(participants)}` |
+`update_channel_service(channel_id, data, user, db)` at line 154 extracts `user_id` (line 155). Queries the channel — if not found, raises 404 "Channel not found" (lines 157-160). Queries the org — if not found, raises 404 "Organization not found" (lines 162-165). Two permission paths follow. For org-level channels (team_id is None) at lines 167-181: checks if the user is the org owner, or an org member with `role_user == "ADMIN"` — if neither, raises `HTTPException(403, "Only organization owners and admins can update organization-level channels")`. For team-level channels (team_id is not None) at lines 182-196: checks if the user is the org owner, or has a `Team_roles` entry for that team with `can_create_channels == True` — if neither, raises `HTTPException(403, "You don't have permission to update channels in this team")`. If the new `channel_name` differs from the current one, it checks for duplicates: queries by `org_id` first, and if the channel has a `team_id`, scopes the duplicate check to that team instead — if a match is found, raises `HTTPException(400, "A channel with this name already exists")` (lines 198-213). Assigns the new `channel_name`, `channel_mode`, `channel_category`, and `description` to the channel (lines 215-218). Commits and refreshes (lines 220-221). Calls `create_log` with `action="channel_updated"` (line 223). Returns the updated channel dict (lines 225-237).
 
-### `fetch_user_notifications_service` (lines 187-280)
-| Line | Code |
-|------|------|
-| 188 | `user_id = user.user_id` |
-| 190-202 | `rows = db.query(Notifications, Messages, Channels, Users).join(Messages, Notifications.message_id == Messages.message_id).join(Channels, Messages.channel_id == Channels.channel_id).join(Users, Messages.sender_id == Users.user_id).filter(Notifications.user_id == user_id, Notifications.type.in_(["channel_mention", "channel_announcement"]), Messages.is_deleted == False).order_by(Notifications.created_at.desc()).limit(100).all()` |
-| 204-225 | Builds `mentions` and `announcements` lists from rows |
-| 227-238 | `dm_rows = db.query(Notifications, Direct_messages, Users).join(Direct_messages, Notifications.dm_message_id == Direct_messages.id).join(Users, Direct_messages.sender_id == Users.user_id).filter(Notifications.user_id == user_id, Notifications.type == "direct_message", Notifications.is_seen == False, Direct_messages.is_deleted == False).order_by(Notifications.created_at.desc()).limit(200).all()` |
-| 240-274 | Groups DM notifications by sender into `dm_by_sender` dict with `count`, `last_message_preview`, `latest_at`, `notification_ids` |
-| 270-274 | `direct_messages = sorted(dm_by_sender.values(), key=lambda x: x["latest_at"] or "", reverse=True)` |
-| 276-280 | Returns `{"mentions": mentions, "announcements": announcements, "direct_messages": direct_messages}` |
+`delete_channel_service(channel_id, user, db)` at line 240 extracts `user_id` (line 241). Queries the channel — if not found, raises 404 "Channel not found" (lines 243-246). Queries the org — if not found, raises 404 "Organization not found" (lines 248-251). The same dual permission check applies: org-level channels require owner or admin, otherwise raises 403 "Only organization owners and admins can delete organization-level channels" (lines 253-267); team-level channels require owner or `can_create_channels`, otherwise raises 403 "You don't have permission to delete channels in this team" (lines 268-282). Captures channel metadata for the audit log by building a `channel_meta` dict with `channel_name`, `channel_mode`, `channel_category`, and `description`, and if `channel.team_id` exists, also fetches the team name and includes `team_id` and `team_name` (lines 284-294). Calls `create_log` with `action="channel_deleted"`, `target_id=channel_id`, `target_type="channel"`, and the metadata (line 295). Collects all message IDs for the channel via `db.query(Messages.message_id).filter(Messages.channel_id == channel_id).all()` (line 297). Cascades deletes in order: deletes `Pinned_messages` filtered by `channel_id`; deletes `Notifications` filtered by `message_id` in the collected IDs; sets `Messages.parent_id` to None for any messages whose `parent_id` is in the collected IDs; deletes `Messages` by `channel_id`; deletes `Files` by `channel_id` (lines 298-304). Finally deletes the channel itself and commits (lines 306-307). Returns `{"message": "Channel deleted successfully", "channel_id": channel_id}` (lines 309-312).
 
-### `mark_notifications_seen_service` (lines 283-296)
-| Line | Code |
-|------|------|
-| 284 | `user_id = user.user_id` |
-| 286-291 | `query = db.query(Notifications).filter(Notifications.user_id == user_id, Notifications.is_seen == False)` / `if notification_ids: query = query.filter(Notifications.id.in_(notification_ids))` |
-| 293-294 | `query.update({Notifications.is_seen: True}, synchronize_session=False); db.commit()` |
-| 296 | Returns `{"detail": "Notifications marked as seen"}` |
+## Message Service Helpers
+
+`user_can_announce(db, user_id, channel_team_id, org_id)` at `backend/services/message_service.py:37` returns True if the user is the org owner. If the channel has a team, it checks `Team_roles` for `can_make_announcement`. Falls back to checking if the user is an org ADMIN (lines 37-54).
+
+`_normalize_message_pagination(limit, offset)` at line 558 sets `DEFAULT_MESSAGE_LIMIT = 50` and `MAX_MESSAGE_LIMIT = 200` (lines 554-555). Normalizes limit to the given value or 50, and offset to the given value or 0. Raises 400 "limit must be greater than 0" if limit ≤ 0, `f"limit cannot exceed {MAX_MESSAGE_LIMIT}"` if over 200, and "offset must be >= 0" if negative (lines 558-572).
+
+## `fetch_message_service`
+
+`fetch_message_service(channel_id, org_id, user, db, limit, offset)` at line 575 gets `user_id` (line 583). Queries `Organization_members` by member_id and org_id — if not found, raises 403 "User is not a member of this organization" (lines 585-591). Queries the channel by `channel_id` and `org_id` — if not found, raises 404 "Channel not found in this organization" (lines 593-599). If the channel is team-scoped (team_id is not None), checks `Team_association` for that team — if not a member and not the org owner, raises 403 "Not a team member" (lines 601-609). Normalizes pagination via `_normalize_message_pagination` (line 611). Builds a `users_by_tag` lookup by joining `Users` to `Organization_members` filtered by org_id with non-null `user_tag` (lines 613-624). Queries messages with a join to `Users` on `sender_id`, filtered by `channel_id` and `is_deleted == False`, ordered by `sent_at` and `message_id` descending, with offset and limit+1 to detect `has_more` (lines 626-635). Strips the extra row and reverses the list (line 637). Fetches parent messages for any messages with `parent_id` set, using the same join and filter (lines 637-647). Builds a result list with `message_id`, `message_content`, `mentions` (extracted via regex from content matching user tags), `parent_id`, `reply_to` (the parent message content and sender), `sent_at`, `edited_at`, and `sender` with user details (lines 649-695). Computes a time window from the messages' `sent_at` range, then queries `Files` joined to `Users` for files within that window (scoped to the channel's team or org), ordered by `sent_at` descending (lines 697-709). Appends each file as a virtual message object with `message_id = 1000000000 + file_record.id`, `is_file = True`, and a `file_attachment` object (lines 711-736). Sorts the combined result by `sent_at` (line 736). Returns `{"messages": result, "pagination": {"limit": limit, "offset": offset, "returned": len(messages), "has_more": has_more}}` (lines 738-746).
+
+## `edit_message_service`
+
+`edit_message_service(message_id, data, user, db)` at line 749 gets `user_id` (line 750). Queries `Messages` by `message_id` with `is_deleted == False` — if not found, raises 404 "Message not found" (lines 752-758). If `message.sender_id != user_id`, raises 403 "You can only edit your own messages" (lines 761-762). Sets `message_content` to the new value and `edited_at` to now (lines 764-765). Commits and refreshes (lines 767-768). Returns `{"message_id": ..., "message_content": ..., "edited_at": ...}` (lines 770-774).
+
+## `delete_message_service`
+
+`delete_message_service(message_id, user, db)` at line 777 gets `user_id` (line 778). Queries the message — if not found, raises 404 "Message not found" (lines 780-786). If the sender doesn't match, raises 403 "You can only delete your own messages" (lines 788-789). Sets `is_deleted = True` (line 791). Commits (line 793). Returns `{"detail": "Message deleted successfully"}` (line 795).
+
+## `send_messages_realtime` (WebSocket)
+
+`send_messages_realtime(websocket, channel_id, authorization, org_id)` at line 797 accepts the WebSocket (line 807). Opens a `SessionLocal` and authenticates via `authenticate_ws` — if it returns None, returns early (lines 810-814). Checks `Organization_members` membership — if not a member, closes WS with code 1008 reason "Not a member of this organization" (lines 816-825). Verifies the channel exists in the org — if not, closes with reason "Channel not found" (lines 827-834). If team-scoped, checks `Team_association` — if not a member and not the org owner, closes with "Not a team member" (lines 836-845). Captures `channel_name`, `channel_team_id`, `channel_mode` (lines 847-849). Closes the auth DB session (line 851). Connects to the `manager` (line 853). Enters a loop receiving JSON messages (line 856). On `"type": "send_message"`, validates announcements permission for announcement channels, validates `parent_id` if present, creates a `Messages` row, creates mention/announcement `Notifications`, pushes real-time notifications via `push_mention_notification` and `push_announcement_notification`, upserts the message to Pinecone, and broadcasts via `manager.broadcast` (lines 856-1058). On `"type": "typing"`, broadcasts a typing indicator excluding the sender (lines 1061-1079). On `"type": "send_file"`, validates announcement permission and calls `send_file_realtime_service` (lines 1080-1112). Falls through to `manager.broadcast` for other message types (lines 1113-1114). On `WebSocketDisconnect`, calls `manager.disconnect` (lines 1116-1117).
+
+## `notifications_ws_endpoint`
+
+`notifications_ws_endpoint(websocket, authorization)` at line 1120 accepts the WebSocket (line 1125). Opens a `SessionLocal`, authenticates — if None, returns (lines 1127-1135). Connects to `notification_manager` by user_id (line 1137). Loops receiving text (lines 1139-1143). In the `finally` block, disconnects from the manager (lines 1144-1145).
+
+## `voice_websocket_endpoint`
+
+`voice_websocket_endpoint(websocket, channel_id, authorization, org_id)` at line 1148 authenticates and validates: checks org membership (closes with "Not a member of this organization"), checks channel exists (closes with "Channel not found"), checks `channel_category` is "voice" (closes with "Channel is not a voice channel") (lines 1156-1192). Builds a `participant` dict with user_id, first_name, last_name, avatar_url, user_tag (line 1192). Connects via `voice_manager.connect` (line 1194). Sends the current participant list to the new joiner (lines 1196-1199). Broadcasts a "voice_joined" event to others (lines 1201-1208). Loops receiving JSON and forwarding signals via `voice_manager.forward_signal` (lines 1210-1225). On disconnect, removes the participant and broadcasts "voice_left" (lines 1210-1225).
+
+## `search_messages_service`
+
+`search_messages_service(channel_id, org_id, query, user, db, limit, offset)` at line 1228 gets `user_id` (line 1237). Checks org membership — if not, raises 403 "User is not a member of this organization" (lines 1239-1245). Checks the channel exists — if not, raises 404 "Channel not found in this organization" (lines 1247-1253). If team-scoped, checks team membership, otherwise raises 403 "Not a team member" (lines 1255-1263). If the query is empty or whitespace-only, raises 400 "Search query cannot be empty" (lines 1265-1266). Normalizes pagination (line 1268). Wraps the search term in `%...%` for ILIKE (line 1270). Queries `Messages` joined to `Users`, filtered by `channel_id`, `is_deleted == False`, and `message_content.ilike(search_term)`, ordered by `sent_at` and `message_id` descending (lines 1272-1278). Determines `has_more` and slices rows (lines 1280-1281). Returns messages with sender info and pagination metadata (lines 1283-1306).
+
+## `pin_message_service`
+
+`pin_message_service(message_id, org_id, user, db)` at line 1309 gets `user_id` (line 1310). Queries the message — if not found, raises 404 "Message not found" (lines 1312-1318). Queries the channel from the message's `channel_id` and org — if not found, raises 404 "Channel not found in this organization" (lines 1320-1326). Queries the org — if not found, raises 404 "Organization not found" (lines 1328-1333). Checks permission: if the user is not the org owner, checks org membership (raises 403 "User is not a member of this organization" if absent), and if the channel is team-scoped, checks `Team_association` (raises 403 "You must be a member of this team to pin messages in this channel" if absent) (lines 1335-1353). Checks if the message is already pinned — if so, raises 400 "Message is already pinned" (lines 1355-1361). Creates a `Pinned_messages` row with `message_id`, `channel_id`, and `pinned_by` (lines 1363-1367). Adds, commits, refreshes (lines 1369-1371). Calls `create_log` with `action="message_pinned"` (line 1373). Returns the pinned entry dict (lines 1375-1381).
+
+## `unpin_message_service`
+
+`unpin_message_service(message_id, org_id, user, db)` at line 1384 gets `user_id` (line 1385). Queries `Pinned_messages` by `message_id` — if not found, raises 404 "Pinned message not found" (lines 1387-1392). Queries the channel from the pinned entry — if not found, raises 404 "Channel not found in this organization" (lines 1394-1400). Queries the org — if not found, raises 404 "Organization not found" (lines 1402-1407). Same permission check structure as pin — if not owner, checks membership (raises 403 "User is not a member of this organization"), and if team-scoped checks team membership (raises 403 "You must be a member of this team to unpin messages in this channel") (lines 1409-1427). Deletes the pinned entry and commits (lines 1429-1430). Calls `create_log` with `action="message_unpinned"` (line 1432). Returns `{"detail": "Message unpinned successfully"}` (line 1434).
+
+## `fetch_pinned_messages_service`
+
+`fetch_pinned_messages_service(channel_id, org_id, user, db)` at line 1437 gets `user_id` (line 1438). Checks org membership — if not, raises 403 "User is not a member of this organization" (lines 1440-1446). Queries the channel — if not found, raises 404 "Channel not found in this organization" (lines 1448-1454). If team-scoped, checks team membership, otherwise raises 403 "Not a team member" (lines 1456-1464). Queries `Pinned_messages` joined to `Messages` and `Users`, filtered by `channel_id` and `is_deleted == False` (lines 1466-1473). Returns a list of pinned entries with message content and sender details (lines 1475-1492).
+
+## `fetch_voice_participants_service`
+
+`fetch_voice_participants_service(channel_id, org_id, user, db)` at `backend/services/message_service.py:525` gets `user_id` (line 526). Checks org membership — if not, raises 403 "User is not a member of this organization" (lines 528-534). Queries the channel — if not found, raises 404 "Channel not found in this organization" (lines 536-542). If `channel_category` is not "voice", raises 400 "Channel is not a voice channel" (lines 544-545). Returns `voice_manager.get_participants(channel_id)` with a count (lines 547-551).
+
+## `fetch_user_notifications_service`
+
+`fetch_user_notifications_service(user, db)` at line 187 gets `user_id` (line 188). Queries `Notifications` joined to `Messages`, `Channels`, and `Users`, filtered by `user_id`, type in `["channel_mention", "channel_announcement"]`, and `is_deleted == False`, ordered by `created_at` descending, limited to 100 (lines 190-202). Separates results into `mentions` and `announcements` lists (lines 204-225). Then queries DM notifications by joining `Notifications` to `Direct_messages` and `Users`, filtered by `type == "direct_message"`, `is_seen == False`, and `is_deleted == False`, ordered by `created_at` descending, limited to 200 (lines 227-238). Groups DM notifications by sender into a `dm_by_sender` dict with `count`, `last_message_preview`, `latest_at`, and `notification_ids` (lines 240-269). Sorts DMs by `latest_at` descending (lines 270-274). Returns `{"mentions": mentions, "announcements": announcements, "direct_messages": direct_messages}` (lines 276-280).
+
+## `mark_notifications_seen_service`
+
+`mark_notifications_seen_service(user, db, notification_ids)` at line 283 gets `user_id` (line 284). Builds a query on `Notifications` filtered by `user_id` and `is_seen == False`. If `notification_ids` is provided, further filters by those IDs (lines 286-291). Updates `is_seen` to True across the matching rows (lines 293-294). Returns `{"detail": "Notifications marked as seen"}` (line 296).

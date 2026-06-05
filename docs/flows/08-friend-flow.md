@@ -1,125 +1,69 @@
-# Friend Flow — Every Line of Code
+# Friend Flow
 
-## File: `backend/models/Friends.py` (16 lines)
+## Models
 
-| Lines | Code |
-|-------|------|
-| 7-16 | `class Friends(Base):` / `__tablename__ = "friends"` / `id = Column(Integer, primary_key=True)` / `user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` / `friend_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` / `added_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))` / `user = relationship("Users", foreign_keys=[user_id])` / `friend = relationship("Users", foreign_keys=[friend_id])` |
+The `Friends` model (`backend/models/Friends.py:7`) maps to the `friends` table. It stores `id` (Integer PK, line 10), `user_id` (Integer FK to `users.user_id`, not null, line 11), `friend_id` (Integer FK to `users.user_id`, not null, line 12), and `added_at` (DateTime(timezone=True) defaulting to `datetime.now(UTC)`, line 13). Relationships are `user` and `friend` pointing to `Users` with the respective foreign keys (lines 15-16). Note that each friendship is stored as a single directional row; bidirectional lookups use `OR` conditions on both columns.
 
-## File: `backend/models/Pending_friends_request.py` (17 lines)
+The `Pending_friends_request` model (`backend/models/Pending_friends_request.py:7`) maps to `pending_friends_requests`. It has `id` (Integer PK, line 10), `sender_id` (Integer FK to `users.user_id`, not null, line 11), `receiver_id` (Integer FK to `users.user_id`, not null, line 12), `status` (String(20) default "pending", for "pending"/"accepted"/"rejected", line 13), and `sent_at` (DateTime(timezone=True) defaulting to `datetime.now(UTC)`, line 14). Relationships for `sender` and `receiver` link to `Users` (lines 16-17).
 
-| Lines | Code |
-|-------|------|
-| 7-17 | `class Pending_friends_request(Base):` / `__tablename__ = "pending_friends_requests"` / `id = Column(Integer, primary_key=True)` / `sender_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` / `receiver_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` / `status = Column(String(20), default="pending")` / `sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))` / `sender = relationship("Users", foreign_keys=[sender_id])` / `receiver = relationship("Users", foreign_keys=[receiver_id])` |
+The `Blocked_users` model (`backend/models/Blocked_users.py:7`) maps to `blocked_users`. It stores `id` (Integer PK, line 10), `blocker_id` (Integer FK to `users.user_id`, not null, line 11), `blocked_id` (Integer FK to `users.user_id`, not null, line 12), and `blocked_at` (DateTime(timezone=True) defaulting to `datetime.now(UTC)`, line 13). Relationships for `blocker` and `blocked` link to `Users` (lines 15-16).
 
-## File: `backend/models/Blocked_users.py` (16 lines)
+## FriendRequestWSManager
 
-| Lines | Code |
-|-------|------|
-| 7-16 | `class Blocked_users(Base):` / `__tablename__ = "blocked_users"` / `id = Column(Integer, primary_key=True)` / `blocker_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` / `blocked_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` / `blocked_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))` / `blocker = relationship("Users", foreign_keys=[blocker_id])` / `blocked = relationship("Users", foreign_keys=[blocked_id])` |
+`FriendRequestWSManager` at `backend/utils/Websocket_manager.py:288` maintains a `connections` dict mapping user ID to a list of WebSockets. `connect(user_id, websocket)` at line 292 calls `websocket.accept()` and appends the WS to the user's connection list. `disconnect(user_id, websocket)` at line 298 removes the WS. `send(user_id, message)` at line 305 iterates all WS connections for the user and calls `send_json`, calling `disconnect` on failure.
 
-## File: `backend/routers/friends_router.py` (105 lines)
+## Router Endpoints
 
-| Lines | Code |
-|-------|------|
-| 1-20 | Imports: `from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect` / `from sqlalchemy.orm import Session` / `from database.connection import connect_databse` / `from schemas.Friend_input import FriendRequestInput, FriendRequestAction` / `from services.friends_service import (send_friend_request_service, accept_or_reject_friend_service, remove_friend_service, get_friends_service, get_pending_requests_service, block_user_service, unblock_user_service, get_blocked_users_service)` / `from utils.Websocket_manager import friend_request_ws_manager` / `from utils.jwt_handler import verify_token` / `from models.Users import Users` / `from utils.security import current_user` / `router = APIRouter()` |
-| 23-35 | `@router.websocket("/ws/friend-requests")` / `async def friend_requests_ws(websocket: WebSocket, token: str):` / `payload = verify_token(token, "access"); if not payload or "sub" not in payload: await websocket.close(code=4001); return` / `user_id = int(payload["sub"]); await friend_request_ws_manager.connect(user_id, websocket)` / `try: while True: await websocket.receive_text()` / `except WebSocketDisconnect: friend_request_ws_manager.disconnect(user_id, websocket)` |
-| 38-44 | `@router.post("/friends/request")` / `async def send_friend_request(data: FriendRequestInput, user=Depends(current_user), db=Depends(connect_databse)):` / `return await send_friend_request_service(user, db, user_tag=data.user_tag, receiver_id=data.receiver_id)` |
-| 47-54 | `@router.post("/friends/request/{request_id}")` / `async def accept_or_reject_friend_request(request_id: int, data: FriendRequestAction, user=Depends(current_user), db=Depends(connect_databse)):` / `return accept_or_reject_friend_service(request_id, data.action, user, db)` |
-| 57-63 | `@router.delete("/friends/{friend_id}")` / `async def remove_friend(friend_id: int, user=Depends(current_user), db=Depends(connect_databse)):` / `return remove_friend_service(friend_id, user, db)` |
-| 66-71 | `@router.get("/friends")` / `async def get_friends(user=Depends(current_user), db=Depends(connect_databse)):` / `return get_friends_service(user, db)` |
-| 74-79 | `@router.get("/friends/requests")` / `async def get_pending_requests(user=Depends(current_user), db=Depends(connect_databse)):` / `return get_pending_requests_service(user, db)` |
-| 82-88 | `@router.post("/friends/block/{user_id}")` / `async def block_user(user_id: int, user=Depends(current_user), db=Depends(connect_databse)):` / `return block_user_service(user_id, user, db)` |
-| 91-97 | `@router.delete("/friends/unblock/{user_id}")` / `async def unblock_user(user_id: int, user=Depends(current_user), db=Depends(connect_databse)):` / `return unblock_user_service(user_id, user, db)` |
-| 100-105 | `@router.get("/friends/blocked")` / `async def get_blocked_users(user=Depends(current_user), db=Depends(connect_databse)):` / `return get_blocked_users_service(user, db)` |
+`backend/routers/friends_router.py:20` defines `router = APIRouter()`.
 
-## File: `backend/services/friends_service.py` (262 lines)
+`WS /ws/friend-requests` at line 23 takes `token` as a query parameter, verifies it as an access token via `verify_token(token, "access")` — if the payload is invalid or missing `sub`, closes with code 4001 and returns (lines 25-28). Extracts `user_id` from the payload and calls `friend_request_ws_manager.connect(user_id, websocket)` (lines 29-30). Enters a `while True` loop receiving text (just to keep the connection alive) until `WebSocketDisconnect`, then disconnects via the manager (lines 31-35).
 
-### `send_friend_request_service` (lines 10-79)
-| Line | Code |
-|------|------|
-| 11 | `user_id = user.user_id` |
-| 13-14 | `if not user_tag and not receiver_id: raise HTTPException(status_code=400, detail="Provide either user_tag or receiver_id")` |
-| 17-20 | `if receiver_id: receiver = db.query(Users).filter(Users.user_id == receiver_id).first(); if not receiver: raise HTTPException(status_code=404, detail="User not found")` |
-| 21-24 | `else: receiver = db.query(Users).filter(Users.user_tag == user_tag).first(); if not receiver: raise HTTPException(status_code=404, detail="User not found with this tag")` |
-| 26-27 | `if receiver.user_id == user_id: raise HTTPException(status_code=400, detail="You cannot send a friend request to yourself")` |
-| 29-34 | `block_exists = db.query(Blocked_users).filter(((Blocked_users.blocker_id == user_id) & (Blocked_users.blocked_id == receiver.user_id)) | ((Blocked_users.blocker_id == receiver.user_id) & (Blocked_users.blocked_id == user_id))).first(); if block_exists: raise HTTPException(status_code=400, detail="Cannot send friend request to this user")` |
-| 36-41 | `existing_friendship = db.query(Friends).filter(((Friends.user_id == user_id) & (Friends.friend_id == receiver.user_id)) | ((Friends.user_id == receiver.user_id) & (Friends.friend_id == user_id))).first(); if existing_friendship: raise HTTPException(status_code=400, detail="You are already friends with this user")` |
-| 43-49 | `existing_request = db.query(Pending_friends_request).filter(Pending_friends_request.status == "pending", ((Pending_friends_request.sender_id == user_id) & (Pending_friends_request.receiver_id == receiver.user_id)) | ((Pending_friends_request.sender_id == receiver.user_id) & (Pending_friends_request.receiver_id == user_id))).first(); if existing_request: raise HTTPException(status_code=400, detail="A friend request already exists between you and this user")` |
-| 51-57 | `new_request = Pending_friends_request(sender_id=user_id, receiver_id=receiver.user_id); db.add(new_request); db.commit(); db.refresh(new_request)` |
-| 59-67 | `await friend_request_ws_manager.send(receiver.user_id, {"type": "friend_request_received", "request_id": new_request.id, "sender_id": user_id, "first_name": user.first_name, "last_name": user.last_name, "user_tag": user.user_tag or "", "avatar_url": user.avatar_url})` |
-| 69-79 | `return {"message": "Friend request sent successfully", "request_id": new_request.id, "receiver": {"user_id": receiver.user_id, "first_name": receiver.first_name, "last_name": receiver.last_name, "user_tag": receiver.user_tag, "avatar_url": receiver.avatar_url}}` |
+`POST /friends/request` at line 38 accepts a `FriendRequestInput` body (with optional `user_tag` and `receiver_id` fields from `backend/schemas/Friend_input.py:5-7`), requires auth, and calls `send_friend_request_service(user, db, user_tag=data.user_tag, receiver_id=data.receiver_id)` (lines 39-44).
 
-### `accept_or_reject_friend_service` (lines 82-111)
-| Line | Code |
-|------|------|
-| 83 | `user_id = user.user_id` |
-| 85-86 | `if action not in ("accepted", "rejected"): raise HTTPException(status_code=400, detail="Action must be 'accepted' or 'rejected'")` |
-| 88-92 | `friend_request = db.query(Pending_friends_request).filter(Pending_friends_request.id == request_id).first(); if not friend_request: raise HTTPException(status_code=404, detail="Friend request not found")` |
-| 94-95 | `if friend_request.receiver_id != user_id: raise HTTPException(status_code=403, detail="You can only respond to requests sent to you")` |
-| 97-98 | `if friend_request.status != "pending": raise HTTPException(status_code=400, detail="This request has already been handled")` |
-| 100 | `friend_request.status = action` |
-| 102-108 | `if action == "accepted": new_friendship = Friends(user_id=friend_request.sender_id, friend_id=friend_request.receiver_id); db.add(new_friendship)` |
-| 109 | `db.commit()` |
-| 111 | `return {"message": f"Friend request {action}"}` |
+`POST /friends/request/{request_id}` at line 47 takes `request_id` as a path param and a `FriendRequestAction` body (with `action` field from `backend/schemas/Friend_input.py:10`), requires auth, and calls `accept_or_reject_friend_service(request_id, data.action, user, db)` (lines 48-54).
 
-### `remove_friend_service` (lines 114-127)
-| Line | Code |
-|------|------|
-| 115 | `user_id = user.user_id` |
-| 117-122 | `friendship = db.query(Friends).filter(((Friends.user_id == user_id) & (Friends.friend_id == friend_id)) | ((Friends.user_id == friend_id) & (Friends.friend_id == user_id))).first(); if not friendship: raise HTTPException(status_code=404, detail="Friendship not found")` |
-| 124-125 | `db.delete(friendship); db.commit()` |
-| 127 | `return {"message": "Friend removed successfully"}` |
+`DELETE /friends/{friend_id}` at line 57 takes `friend_id` as a path param, requires auth, and calls `remove_friend_service(friend_id, user, db)` (lines 58-63).
 
-### `get_friends_service` (lines 130-152)
-| Line | Code |
-|------|------|
-| 131 | `user_id = user.user_id` |
-| 133-135 | `friendships = db.query(Friends).filter((Friends.user_id == user_id) | (Friends.friend_id == user_id)).all()` |
-| 137-152 | `friends_list = []` / `for f in friendships:` / `friend_user_id = f.friend_id if f.user_id == user_id else f.user_id` / `friend_user = db.query(Users).filter(Users.user_id == friend_user_id).first()` / `if friend_user: friends_list.append({"friendship_id": f.id, "user_id": friend_user.user_id, "first_name": friend_user.first_name, "last_name": friend_user.last_name, "user_tag": friend_user.user_tag, "avatar_url": friend_user.avatar_url, "added_at": str(f.added_at)})` / `return friends_list` |
+`GET /friends` at line 66 requires auth and calls `get_friends_service(user, db)` (lines 67-71).
 
-### `get_pending_requests_service` (lines 155-177)
-| Line | Code |
-|------|------|
-| 156 | `user_id = user.user_id` |
-| 158-161 | `pending_requests = db.query(Pending_friends_request).filter(Pending_friends_request.receiver_id == user_id, Pending_friends_request.status == "pending").all()` |
-| 163-177 | `requests_list = []` / `for req in pending_requests:` / `sender = db.query(Users).filter(Users.user_id == req.sender_id).first()` / `if sender: requests_list.append({"request_id": req.id, "sender_id": sender.user_id, "first_name": sender.first_name, "last_name": sender.last_name, "user_tag": sender.user_tag, "avatar_url": sender.avatar_url, "sent_at": str(req.sent_at)})` / `return requests_list` |
+`GET /friends/requests` at line 74 requires auth and calls `get_pending_requests_service(user, db)` (lines 75-79).
 
-### `block_user_service` (lines 180-219)
-| Line | Code |
-|------|------|
-| 181 | `user_id = user.user_id` |
-| 183-184 | `if blocked_id == user_id: raise HTTPException(status_code=400, detail="You cannot block yourself")` |
-| 186-188 | `blocked_user = db.query(Users).filter(Users.user_id == blocked_id).first(); if not blocked_user: raise HTTPException(status_code=404, detail="User not found")` |
-| 190-195 | `already_blocked = db.query(Blocked_users).filter(Blocked_users.blocker_id == user_id, Blocked_users.blocked_id == blocked_id).first(); if already_blocked: raise HTTPException(status_code=400, detail="User is already blocked")` |
-| 197-202 | `friendship = db.query(Friends).filter(((Friends.user_id == user_id) & (Friends.friend_id == blocked_id)) | ((Friends.user_id == blocked_id) & (Friends.friend_id == user_id))).first(); if friendship: db.delete(friendship)` |
-| 204-210 | `pending = db.query(Pending_friends_request).filter(Pending_friends_request.status == "pending", ((Pending_friends_request.sender_id == user_id) & (Pending_friends_request.receiver_id == blocked_id)) | ((Pending_friends_request.sender_id == blocked_id) & (Pending_friends_request.receiver_id == user_id))).all(); for req in pending: db.delete(req)` |
-| 212-217 | `new_block = Blocked_users(blocker_id=user_id, blocked_id=blocked_id); db.add(new_block); db.commit()` |
-| 219 | `return {"message": "User blocked successfully"}` |
+`POST /friends/block/{user_id}` at line 82 takes `user_id` as a path param, requires auth, and calls `block_user_service(user_id, user, db)` (lines 83-88).
 
-### `unblock_user_service` (lines 222-236)
-| Line | Code |
-|------|------|
-| 223 | `user_id = user.user_id` |
-| 225-231 | `block = db.query(Blocked_users).filter(Blocked_users.blocker_id == user_id, Blocked_users.blocked_id == blocked_id).first(); if not block: raise HTTPException(status_code=404, detail="Block not found")` |
-| 233-234 | `db.delete(block); db.commit()` |
-| 236 | `return {"message": "User unblocked successfully"}` |
+`DELETE /friends/unblock/{user_id}` at line 91 takes `user_id` as a path param, requires auth, and calls `unblock_user_service(user_id, user, db)` (lines 92-97).
 
-### `get_blocked_users_service` (lines 239-260)
-| Line | Code |
-|------|------|
-| 240 | `user_id = user.user_id` |
-| 242-244 | `blocks = db.query(Blocked_users).filter(Blocked_users.blocker_id == user_id).all()` |
-| 246-260 | `blocked_list = []` / `for block in blocks:` / `blocked_user = db.query(Users).filter(Users.user_id == block.blocked_id).first()` / `if blocked_user: blocked_list.append({"block_id": block.id, "user_id": blocked_user.user_id, "first_name": blocked_user.first_name, "last_name": blocked_user.last_name, "user_tag": blocked_user.user_tag, "avatar_url": blocked_user.avatar_url, "blocked_at": str(block.blocked_at)})` / `return blocked_list` |
+`GET /friends/blocked` at line 100 requires auth and calls `get_blocked_users_service(user, db)` (lines 101-105).
 
-## File: `backend/utils/Websocket_manager.py — FriendRequestWSManager` (lines 288-313)
+## Service Functions
 
-| Lines | Code |
-|-------|------|
-| 288-290 | `class FriendRequestWSManager:` / `def __init__(self):` / `self.connections: Dict[int, List[WebSocket]] = {}` |
-| 292-296 | `async def connect(self, user_id: int, websocket: WebSocket):` / `await websocket.accept()` / `user_connections = self.connections.setdefault(user_id, [])` / `if websocket not in user_connections: user_connections.append(websocket)` |
-| 298-303 | `def disconnect(self, user_id: int, websocket: WebSocket):` / `if user_id in self.connections:` / `if websocket in self.connections[user_id]: self.connections[user_id].remove(websocket)` / `if not self.connections[user_id]: self.connections.pop(user_id, None)` |
-| 305-310 | `async def send(self, user_id: int, message: dict):` / `for ws in list(self.connections.get(user_id, [])):` / `try: await ws.send_json(message)` / `except Exception: self.disconnect(user_id, ws)` |
-| 313 | `friend_request_ws_manager = FriendRequestWSManager()` |
+### Sending a Friend Request
 
-(End of file - total lines in document: 115)
+`send_friend_request_service(user, db, user_tag, receiver_id)` at `backend/services/friends_service.py:10` checks that at least one of `user_tag` or `receiver_id` is provided — raises HTTPException(400, "Provide either user_tag or receiver_id") at lines 13-14. If `receiver_id` is given, queries by ID (lines 17-20); otherwise queries by `user_tag` (lines 22-24). Either branch raises HTTPException(404, "User not found") or HTTPException(404, "User not found with this tag") respectively. Raises HTTPException(400, "You cannot send a friend request to yourself") if the receiver is the same user (lines 26-27). Checks `Blocked_users` in both directions — if any block exists, raises HTTPException(400, "Cannot send friend request to this user") (lines 29-34). Checks `Friends` in both directions — if an existing friendship is found, raises HTTPException(400, "You are already friends with this user") (lines 36-41). Checks `Pending_friends_request` with `status == "pending"` in both directions — if one exists, raises HTTPException(400, "A friend request already exists between you and this user") (lines 43-49). Creates a new `Pending_friends_request` row with `sender_id=user_id` and `receiver_id=receiver.user_id` (lines 51-54). Commits and refreshes (lines 55-57). Sends a real-time push via `friend_request_ws_manager.send(receiver.user_id, {"type": "friend_request_received", "request_id", "sender_id", "first_name", "last_name", "user_tag", "avatar_url"})` (lines 59-67). Returns `{"message": "Friend request sent successfully", "request_id": ..., "receiver": {...}}` (lines 69-79).
+
+### Accepting or Rejecting a Friend Request
+
+`accept_or_reject_friend_service(request_id, action, user, db)` at line 82 validates the action — raises HTTPException(400, "Action must be 'accepted' or 'rejected'") if not one of the two (lines 85-86). Queries the pending request by ID — raises HTTPException(404, "Friend request not found") if missing (lines 88-92). Raises HTTPException(403, "You can only respond to requests sent to you") if the caller is not the `receiver_id` (lines 94-95). Raises HTTPException(400, "This request has already been handled") if the status is no longer "pending" (lines 97-98). Sets `friend_request.status = action` (line 100). If the action is `"accepted"`, creates a new `Friends` row with `user_id=sender_id` and `friend_id=receiver_id` (lines 102-107). Commits and returns `{"message": f"Friend request {action}"}` (lines 109-111).
+
+### Removing a Friend
+
+`remove_friend_service(friend_id, user, db)` at line 114 queries the `Friends` row in both directions — raises HTTPException(404, "Friendship not found") if missing (lines 117-122). Deletes the single row and commits (lines 124-125). Returns `{"message": "Friend removed successfully"}` (line 127).
+
+### Fetching Friends
+
+`get_friends_service(user, db)` at line 130 queries all `Friends` rows where the user is either side (lines 133-135). For each friendship, derives the friend's user_id, queries the `Users` table, and appends a dict with `friendship_id`, `user_id`, `first_name`, `last_name`, `user_tag`, `avatar_url`, and `added_at` (lines 137-152). Returns the list (line 152).
+
+### Fetching Pending Requests
+
+`get_pending_requests_service(user, db)` at line 155 queries `Pending_friends_request` where the user is the `receiver_id` and status is "pending" (lines 158-161). For each request, queries the sender's `Users` row and returns a list of dicts with `request_id`, `sender_id`, `first_name`, `last_name`, `user_tag`, `avatar_url`, and `sent_at` (lines 163-177).
+
+### Blocking a User
+
+`block_user_service(blocked_id, user, db)` at line 180 checks `if blocked_id == user_id` — raises HTTPException(400, "You cannot block yourself") (lines 183-184). Queries the target user — raises HTTPException(404, "User not found") if missing (lines 186-188). Checks if already blocked by this blocker — raises HTTPException(400, "User is already blocked") if found (lines 190-195). Deletes any existing `Friends` row between the two users (lines 197-202). Deletes all pending friend requests in either direction (lines 204-210). Creates a new `Blocked_users` row (lines 212-215). Commits and returns `{"message": "User blocked successfully"}` (lines 217-219).
+
+### Unblocking a User
+
+`unblock_user_service(blocked_id, user, db)` at line 222 queries the `Blocked_users` row by blocker and blocked — raises HTTPException(404, "Block not found") if missing (lines 225-231). Deletes the row and commits (lines 233-234). Returns `{"message": "User unblocked successfully"}` (line 236).
+
+### Fetching Blocked Users
+
+`get_blocked_users_service(user, db)` at line 239 queries all `Blocked_users` rows where the user is the blocker (lines 242-244). For each block, queries the blocked user's `Users` row and returns a list of dicts with `block_id`, `user_id`, `first_name`, `last_name`, `user_tag`, `avatar_url`, and `blocked_at` (lines 246-260).

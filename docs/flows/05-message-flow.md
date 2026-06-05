@@ -2,343 +2,172 @@
 
 ## File: `backend/services/message_service.py` (1492 lines)
 
-### Imports & Globals (lines 1-35)
+### Imports & Globals (lines 1-34)
 
-| Line | Code |
-|------|------|
-| 1-30 | `from fastapi import HTTPException, WebSocket, WebSocketDisconnect` / `from datetime import datetime, UTC` / `import logging, os, re` / `from utils.jwt_handler import verify_token` / `from models.Messages import Messages` / `from models.Files import Files` / `from sqlalchemy.orm import Session` / `from models.Organization_members import Organization_members` / `from models.Channels import Channels` / `from models.Users import Users` / `from models.Notifications import Notifications` / `from models.PInned_messages import Pinned_messages` / `from models.Organization import Organization` / `from models.Teams import Teams` / `from models.Team_association import Team_association` / `from models.Team_roles import Team_roles` / `from models.Direct_messages import Direct_messages` / `from schemas.Message_input import Message_input` / `from schemas.Message_edit_input import Message_edit_input` / `from utils.Websocket_manager import Text_Websocket_manager, VoiceWebsocketManager, notification_manager` / `from utils.cloudinary_handler import upload_chat_file_from_base64` / `from utils.plan_limits import get_file_size_limit` / `from utils.document_handler import embed_document` / `from utils.messages_handler import upsert_message` / `from utils.log_handler import create_log` / `from database.connection import SessionLocal` / `from utils.security import authenticate_ws` |
-| 31 | `logger = logging.getLogger(__name__)` |
-| 33 | `manager = Text_Websocket_manager()` |
-| 34 | `voice_manager = VoiceWebsocketManager()` |
+The file imports `HTTPException, WebSocket, WebSocketDisconnect` from `fastapi` (line 1), `datetime, UTC` from `datetime` (line 2), `logging` (line 3), `os` (line 4), `re` (line 5). From `utils.jwt_handler` it imports `verify_token` (line 6). From `models` it imports `Messages` (line 7), `Files` (line 8), `Organization_members` (line 10), `Channels` (line 11), `Users` (line 12), `Notifications` (line 13), `Pinned_messages` (note the capital "I" in "PInned", line 14), `Organization` (line 15), `Teams` (line 16), `Team_association` (line 17), `Team_roles` (line 18), `Direct_messages` (line 19). From `sqlalchemy.orm` it imports `Session` (line 9). From `schemas` it imports `Message_input` (line 20) and `Message_edit_input` (line 21). From `utils.Websocket_manager` it imports `Text_Websocket_manager`, `VoiceWebsocketManager`, and `notification_manager` (line 22). From `utils.cloudinary_handler` it imports `upload_chat_file_from_base64` (line 23). From `utils.plan_limits` it imports `get_file_size_limit` (line 24). From `utils.document_handler` it imports `embed_document` (line 25). From `utils.messages_handler` it imports `upsert_message` (line 26). From `utils.log_handler` it imports `create_log` (line 27). From `database.connection` it imports `SessionLocal` (line 28). From `utils.security` it imports `authenticate_ws` (line 29). A module-level logger is created via `logging.getLogger(__name__)` at line 31. A global `Text_Websocket_manager` instance is created as `manager` at line 33. A global `VoiceWebsocketManager` instance is created as `voice_manager` at line 34.
 
 ### `user_can_announce` (lines 37-54)
 
-| Line | Code |
-|------|------|
-| 37 | `def user_can_announce(db: Session, user_id: int, channel_team_id: int \| None, org_id: int) -> bool:` |
-| 38-40 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if org and org.owner_id == user_id: return True` |
-| 42-47 | `if channel_team_id is not None:` / `role = db.query(Team_roles).filter(Team_roles.team_id == channel_team_id, Team_roles.user_id == user_id).first()` / `return bool(role and role.can_make_announcement)` |
-| 49-54 | `admin = db.query(Organization_members).filter(Organization_members.org_id == org_id, Organization_members.memmber_id == user_id, Organization_members.role_user == "ADMIN").first()` / `return admin is not None` |
+`user_can_announce(db, user_id, channel_team_id, org_id)` at line 37 first queries `Organization` filtered by `organization_id == org_id` — if the org exists and `org.owner_id == user_id`, returns `True` (lines 38-40). If `channel_team_id is not None`, it queries `Team_roles` filtered by `team_id == channel_team_id` and `user_id == user_id` (lines 43-46) and returns `bool(role and role.can_make_announcement)` (line 47). Otherwise, it queries `Organization_members` filtered by `org_id == org_id`, `memmber_id == user_id`, and `role_user == "ADMIN"` (lines 49-53), and returns `admin is not None` (line 54).
 
 ### `get_user_tag` (lines 57-61)
 
-| Line | Code |
-|------|------|
-| 57 | `def get_user_tag(content: str):` |
-| 58-61 | `if not content: return []` / `tags = re.findall(r"(?<!\w)@([A-Za-z0-9_]{2,32})", str(content))` / `return list({tag.lower() for tag in tags})` |
+`get_user_tag(content)` at line 57 checks `if not content` — returns `[]` (lines 58-59). Otherwise runs `re.findall(r"(?<!\w)@([A-Za-z0-9_]{2,32})", str(content))` (line 60) and returns a deduplicated list of lowercase tags via `list({tag.lower() for tag in tags})` (line 61).
 
 ### `resolve_mentioned_users` (lines 64-84)
 
-| Line | Code |
-|------|------|
-| 64 | `def resolve_mentioned_users(db: Session, org_id: int, tags: list[str], sender_id: int) -> list[Users]:` |
-| 65-66 | `if not tags: return []` |
-| 68 | `tag_set = set(tags)` |
-| 69-76 | `org_users = db.query(Users).join(Organization_members, Organization_members.memmber_id == Users.user_id).filter(Organization_members.org_id == org_id, Users.user_tag.isnot(None), Users.user_id != sender_id).all()` |
-| 78-84 | `result: list[Users] = []` / `for user in org_users:` / `normalized_tag = str(user.user_tag).strip().lstrip("@").lower()` / `if normalized_tag in tag_set: result.append(user)` / `return result` |
+`resolve_mentioned_users(db, org_id, tags, sender_id)` at line 64 returns `[]` if `not tags` (lines 65-66). It builds `tag_set = set(tags)` (line 68). It queries `Users` joined with `Organization_members` on `memmber_id == Users.user_id`, filtered by `org_id == org_id`, `user_tag.isnot(None)`, and `user_id != sender_id`, calling `.all()` (lines 69-76). For each user in `org_users`, it normalizes the tag via `str(user.user_tag).strip().lstrip("@").lower()` (line 80) and appends the user to the result list if the normalized tag is in `tag_set` (lines 81-82). Returns the result list (line 84).
 
 ### `create_mention_notifications` (lines 87-104)
 
-| Line | Code |
-|------|------|
-| 87 | `def create_mention_notifications(db: Session, mentioned_users: list[Users], message_id: int):` |
-| 88-89 | `if not mentioned_users: return` |
-| 91-104 | `for user in mentioned_users:` / `notification_kwargs = {"user_id": user.user_id, "type": "channel_mention", "message_id": message_id, "created_at": datetime.now(UTC)}` / `if hasattr(Notifications, "is_seen"): notification_kwargs["is_seen"] = False` / `elif hasattr(Notifications, "is_read"): notification_kwargs["is_read"] = False` / `db.add(Notifications(**notification_kwargs))` |
+`create_mention_notifications(db, mentioned_users, message_id)` at line 87 returns early if `not mentioned_users` (lines 88-89). For each user in `mentioned_users`, it builds a `notification_kwargs` dict with `user_id=user.user_id`, `type="channel_mention"`, `message_id=message_id`, and `created_at=datetime.now(UTC)` (lines 92-97). If `Notifications` has an `is_seen` attribute, it sets `is_seen=False` (lines 99-100); else if it has `is_read`, sets `is_read=False` (lines 101-102). It then calls `db.add(Notifications(**notification_kwargs))` (line 104).
 
 ### `get_announcement_recipients` (lines 107-131)
 
-| Line | Code |
-|------|------|
-| 107 | `def get_announcement_recipients(db: Session, channel_team_id: int \| None, org_id: int, sender_id: int) -> list[Users]:` |
-| 108-115 | `if channel_team_id is not None:` / `return db.query(Users).join(Team_association, Team_association.user_id == Users.user_id).filter(Team_association.team_id == channel_team_id, Users.user_id != sender_id).all()` |
-| 117-123 | `recipients = db.query(Users).join(Organization_members, Organization_members.memmber_id == Users.user_id).filter(Organization_members.org_id == org_id, Users.user_id != sender_id).all()` |
-| 125-129 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if org and org.owner_id != sender_id and not any(u.user_id == org.owner_id for u in recipients):` / `owner = db.query(Users).filter(Users.user_id == org.owner_id).first()` / `if owner: recipients.append(owner)` |
-| 131 | `return recipients` |
+`get_announcement_recipients(db, channel_team_id, org_id, sender_id)` at line 107, if `channel_team_id is not None`, queries `Users` joined with `Team_association` on `user_id`, filtered by `team_id == channel_team_id` and `user_id != sender_id`, returning the list (lines 108-115). Otherwise, it queries `Users` joined with `Organization_members` on `memmber_id`, filtered by `org_id == org_id` and `user_id != sender_id`, calling `.all()` (lines 117-123). Then it queries `Organization` by `organization_id == org_id` (line 125). If the org exists and `org.owner_id != sender_id` and the owner isn't already in `recipients`, it queries the owner by `user_id` and appends them (lines 126-129). Returns `recipients` (line 131).
 
 ### `create_announcement_notifications` (lines 134-151)
 
-| Line | Code |
-|------|------|
-| 134 | `def create_announcement_notifications(db: Session, recipients: list[Users], message_id: int):` |
-| 135-136 | `if not recipients: return` |
-| 138-151 | `for user in recipients:` / `notification_kwargs = {"user_id": user.user_id, "type": "channel_announcement", "message_id": message_id, "created_at": datetime.now(UTC)}` / `if hasattr(Notifications, "is_seen"): notification_kwargs["is_seen"] = False` / `elif hasattr(Notifications, "is_read"): notification_kwargs["is_read"] = False` / `db.add(Notifications(**notification_kwargs))` |
+`create_announcement_notifications(db, recipients, message_id)` at line 134 returns early if `not recipients` (lines 135-136). For each user in `recipients`, it builds a `notification_kwargs` dict with `user_id=user.user_id`, `type="channel_announcement"`, `message_id=message_id`, and `created_at=datetime.now(UTC)` (lines 139-144). If `Notifications` has `is_seen`, sets `is_seen=False` (lines 146-147); else if `is_read`, sets `is_read=False` (lines 148-149). Calls `db.add(Notifications(**notification_kwargs))` (line 151).
 
 ### `push_announcement_notification` (lines 154-184)
 
-| Line | Code |
-|------|------|
-| 154-165 | `async def push_announcement_notification(receiver_id: int, sender_id: int, message_id: int, channel_id: int, org_id: int, sender_first_name: str = "", sender_last_name: str = "", sender_avatar_url: str \| None = None, sender_user_tag: str \| None = None, channel_name: str = ""):` |
-| 166-184 | `await notification_manager.send(receiver_id, {"type": "new_notification", "notification": {"type": "channel_announcement", "message_id": message_id, "sender_id": sender_id, "channel_id": channel_id, "org_id": org_id, "created_at": datetime.now(UTC).isoformat(), "sender_first_name": sender_first_name, "sender_last_name": sender_last_name, "sender_avatar_url": sender_avatar_url, "sender_user_tag": sender_user_tag, "channel_name": channel_name}})` |
+`push_announcement_notification(receiver_id, sender_id, message_id, channel_id, org_id, sender_first_name="", sender_last_name="", sender_avatar_url=None, sender_user_tag=None, channel_name="")` at line 154 calls `await notification_manager.send(receiver_id, {"type": "new_notification", "notification": {"type": "channel_announcement", "message_id": message_id, "sender_id": sender_id, "channel_id": channel_id, "org_id": org_id, "created_at": datetime.now(UTC).isoformat(), "sender_first_name": sender_first_name, "sender_last_name": sender_last_name, "sender_avatar_url": sender_avatar_url, "sender_user_tag": sender_user_tag, "channel_name": channel_name}})` (lines 166-184).
 
 ### `fetch_user_notifications_service` (lines 187-280)
 
-| Line | Code |
-|------|------|
-| 187 | `def fetch_user_notifications_service(user: Users, db: Session):` |
-| 188 | `user_id = user.user_id` |
-| 190-202 | `rows = db.query(Notifications, Messages, Channels, Users).join(Messages, Notifications.message_id == Messages.message_id).join(Channels, Messages.channel_id == Channels.channel_id).join(Users, Messages.sender_id == Users.user_id).filter(Notifications.user_id == user_id, Notifications.type.in_(["channel_mention", "channel_announcement"]), Messages.is_deleted == False).order_by(Notifications.created_at.desc()).limit(100).all()` |
-| 204-205 | `mentions = []` / `announcements = []` |
-| 207-225 | `for notification, message, channel, sender in rows:` / builds `item` dict with id, message_id, channel_id, channel_name, org_id, sender_id, sender_first_name, sender_last_name, sender_avatar_url, sender_user_tag, created_at, is_seen / `if notification.type == "channel_mention": mentions.append(item) else: announcements.append(item)` |
-| 227-238 | `dm_rows = db.query(Notifications, Direct_messages, Users).join(Direct_messages, Notifications.dm_message_id == Direct_messages.id).join(Users, Direct_messages.sender_id == Users.user_id).filter(Notifications.user_id == user_id, Notifications.type == "direct_message", Notifications.is_seen == False, Direct_messages.is_deleted == False).order_by(Notifications.created_at.desc()).limit(200).all()` |
-| 240-268 | `dm_by_sender: dict[int, dict] = {}` / iterates dm_rows; `sender_id = sender.user_id`; `is_file = bool(dm.content and dm.content.startswith("__FILE__::"))`; `preview = "Sent a file" if is_file else (dm.content or "")`; `sent_at = dm.sent_at.isoformat() if dm.sent_at else (notification.created_at.isoformat() if notification.created_at else "")` / if sender_id in dm_by_sender: increments count, updates latest_at and last_message_preview, appends notification_ids / else: creates entry with id, sender_id, sender_first_name, sender_last_name, sender_avatar_url, sender_user_tag, last_message_preview, count=1, latest_at, notification_ids |
-| 270-274 | `direct_messages = sorted(dm_by_sender.values(), key=lambda x: x["latest_at"] or "", reverse=True)` |
-| 276-280 | `return {"mentions": mentions, "announcements": announcements, "direct_messages": direct_messages}` |
+`fetch_user_notifications_service(user, db)` at line 187 extracts `user_id = user.user_id` (line 188). It runs a 4-table join: queries `Notifications, Messages, Channels, Users` — joining `Messages` on `Notifications.message_id == Messages.message_id`, joining `Channels` on `Messages.channel_id == Channels.channel_id`, joining `Users` on `Messages.sender_id == Users.user_id`, filtering by `Notifications.user_id == user_id`, `Notifications.type.in_(["channel_mention", "channel_announcement"])`, and `Messages.is_deleted == False`, ordered by `Notifications.created_at.desc()`, limited to 100 (lines 190-202). It initializes `mentions = []` and `announcements = []` (lines 204-205). For each `(notification, message, channel, sender)` row, it builds an `item` dict with `id=notification.id`, `message_id=message.message_id`, `channel_id=channel.channel_id`, `channel_name=channel.channel_name`, `org_id=channel.org_id`, `sender_id=sender.user_id`, `sender_first_name=sender.first_name or ""`, `sender_last_name=sender.last_name or ""`, `sender_avatar_url=sender.avatar_url`, `sender_user_tag=sender.user_tag`, `created_at=notification.created_at.isoformat() if notification.created_at else None`, `is_seen=bool(notification.is_seen)` (lines 208-221). If `notification.type == "channel_mention"`, it appends to `mentions`; otherwise to `announcements` (lines 222-225).
+
+A separate DM query runs: `dm_rows = db.query(Notifications, Direct_messages, Users).join(Direct_messages, Notifications.dm_message_id == Direct_messages.id).join(Users, Direct_messages.sender_id == Users.user_id).filter(Notifications.user_id == user_id, Notifications.type == "direct_message", Notifications.is_seen == False, Direct_messages.is_deleted == False).order_by(Notifications.created_at.desc()).limit(200).all()` (lines 227-238).
+
+It iterates `dm_rows` grouping by sender. For each `(notification, dm, sender)`, it extracts `sender_id = sender.user_id`, checks `is_file = bool(dm.content and dm.content.startswith("__FILE__::"))`, sets `preview = "Sent a file" if is_file else (dm.content or "")`, sets `sent_at = dm.sent_at.isoformat() if dm.sent_at else (notification.created_at.isoformat() if notification.created_at else "")` (lines 241-247). If `sender_id` is already in `dm_by_sender`, it increments `count`, updates `latest_at` and `last_message_preview` if `sent_at > entry["latest_at"]`, and appends `notification.id` to `notification_ids` (lines 249-255). Otherwise it creates a new entry with `id=f"dm-{sender_id}"`, `sender_id`, `sender_first_name`, `sender_last_name`, `sender_avatar_url`, `sender_user_tag`, `last_message_preview`, `count=1`, `latest_at=sent_at`, `notification_ids=[notification.id]` (lines 257-268).
+
+The `direct_messages` list is sorted by `latest_at` descending (lines 270-274). Returns `{"mentions": mentions, "announcements": announcements, "direct_messages": direct_messages}` (lines 276-280).
 
 ### `mark_notifications_seen_service` (lines 283-296)
 
-| Line | Code |
-|------|------|
-| 283 | `def mark_notifications_seen_service(user: Users, db: Session, notification_ids: list[int] \| None = None):` |
-| 284 | `user_id = user.user_id` |
-| 286-291 | `query = db.query(Notifications).filter(Notifications.user_id == user_id, Notifications.is_seen == False)` / `if notification_ids: query = query.filter(Notifications.id.in_(notification_ids))` |
-| 293-294 | `query.update({Notifications.is_seen: True}, synchronize_session=False)` / `db.commit()` |
-| 296 | `return {"detail": "Notifications marked as seen"}` |
+`mark_notifications_seen_service(user, db, notification_ids=None)` at line 283 extracts `user_id = user.user_id` (line 284). Builds a query on `Notifications` filtered by `user_id == user_id` and `is_seen == False` (lines 286-289). If `notification_ids` is provided, filters further by `Notifications.id.in_(notification_ids)` (lines 290-291). Updates all matched rows setting `is_seen = True` with `synchronize_session=False` (line 293). Calls `db.commit()` (line 294). Returns `{"detail": "Notifications marked as seen"}` (line 296).
 
 ### `push_mention_notification` (lines 299-329)
 
-| Line | Code |
-|------|------|
-| 299-310 | `async def push_mention_notification(receiver_id: int, sender_id: int, message_id: int, channel_id: int, org_id: int, sender_first_name: str = "", sender_last_name: str = "", sender_avatar_url: str \| None = None, sender_user_tag: str \| None = None, channel_name: str = ""):` |
-| 311-329 | `await notification_manager.send(receiver_id, {"type": "new_notification", "notification": {"type": "channel_mention", "message_id": message_id, "sender_id": sender_id, "channel_id": channel_id, "org_id": org_id, "created_at": datetime.now(UTC).isoformat(), "sender_first_name": sender_first_name, "sender_last_name": sender_last_name, "sender_avatar_url": sender_avatar_url, "sender_user_tag": sender_user_tag, "channel_name": channel_name}})` |
+`push_mention_notification(receiver_id, sender_id, message_id, channel_id, org_id, sender_first_name="", sender_last_name="", sender_avatar_url=None, sender_user_tag=None, channel_name="")` at line 299 calls `await notification_manager.send(receiver_id, {"type": "new_notification", "notification": {"type": "channel_mention", "message_id": message_id, "sender_id": sender_id, "channel_id": channel_id, "org_id": org_id, "created_at": datetime.now(UTC).isoformat(), "sender_first_name": sender_first_name, "sender_last_name": sender_last_name, "sender_avatar_url": sender_avatar_url, "sender_user_tag": sender_user_tag, "channel_name": channel_name}})` (lines 311-329).
 
 ### `_check_duplicate_file` (lines 332-349)
 
-| Line | Code |
-|------|------|
-| 332 | `def _check_duplicate_file(db: Session, file_name: str, org_id: int, team_id: int \| None) -> str \| None:` |
-| 333 | Docstring: returns error message if duplicate, None otherwise |
-| 334-336 | `normalized_file_name = file_name.strip()` / `if not normalized_file_name: return "file_name is required"` |
-| 338-341 | `query = db.query(Files).filter(Files.file_name == normalized_file_name, Files.is_deleted == False)` |
-| 342-345 | `if team_id is not None: query = query.filter(Files.team_id == team_id)` / `else: query = query.filter(Files.team_id == None, Files.org_id == org_id)` |
-| 347-349 | `if query.first(): return f"A file named '{normalized_file_name}' has already been uploaded. Please rename your file or use the existing one."` / `return None` |
+`_check_duplicate_file(db, file_name, org_id, team_id)` at line 332 has a docstring "Returns an error message if a file with the same name already exists in the same scope, None otherwise." (line 333). It strips `file_name` (line 334), and if empty returns `"file_name is required"` (lines 335-336). It queries `Files` filtered by `file_name == normalized_file_name` and `is_deleted == False` (lines 338-341). If `team_id is not None`, it further filters by `Files.team_id == team_id` (lines 342-343); otherwise filters by `Files.team_id == None` and `Files.org_id == org_id` (lines 344-345). If a row is found, returns `f"A file named '{normalized_file_name}' has already been uploaded. Please rename your file or use the existing one."` (line 348). Otherwise returns `None` (line 349).
 
 ### `send_file_realtime_service` (lines 352-522)
 
-| Line | Code |
-|------|------|
-| 352-358 | `async def send_file_realtime_service(data: dict, websocket: WebSocket, channel_id: int, user_id: int, channel: Channels, db: Session):` |
-| 360-364 | `file_name = data.get("file_name")` / `file_size = data.get("file_size")` / `file_base64 = data.get("file_base64")` / `mime_type = data.get("mime_type")` / `provided_file_url = data.get("file_url")` |
-| 366-371 | `if not file_name or file_size is None: await websocket.send_json({"type": "error", "detail": "file_name and file_size are required"}); return` |
-| 373-379 | `ext = os.path.splitext(file_name)[1].lower()` / `if ext != ".pdf": await websocket.send_json({"type": "error", "detail": "Only PDF files are supported. Please upload a .pdf file."}); return` |
-| 381-388 | `try: file_size = int(file_size)` / `except (TypeError, ValueError): await websocket.send_json({"type": "error", "detail": "file_size must be a valid integer"}); return` |
-| 390-395 | `if file_size <= 0: await websocket.send_json({"type": "error", "detail": "file_size must be greater than 0"}); return` |
-| 397-423 | `if file_base64:` / `payload = file_base64.strip()` / `if payload.startswith("data:"): comma_idx = payload.find(","); if comma_idx == -1: await websocket.send_json({"type": "error", "detail": "Invalid base64 file payload"}); return; payload = payload[comma_idx + 1:]` / `payload = "".join(payload.split())` / `if not payload or len(payload) % 4 != 0: await websocket.send_json({"type": "error", "detail": "Invalid base64 file payload"}); return` / `padding = len(payload) - len(payload.rstrip("=")); actual_size = (len(payload) // 4) * 3 - padding` / `if actual_size <= 0: await websocket.send_json({"type": "error", "detail": "file_size must be greater than 0"}); return; file_size = actual_size` |
-| 425-432 | `org = db.query(Organization).filter(Organization.organization_id == channel.org_id).first(); file_size_limit = get_file_size_limit(org.organization_plan if org else None)` / `if file_size_limit is not None and file_size > file_size_limit: await websocket.send_json({"type": "error", "detail": f"Free plan allows a maximum of {file_size_limit // (1024 * 1024)} MB. Upgrade to Pro for larger uploads."}); return` |
-| 434-441 | `stored_file_name = file_name.strip(); duplicate_error = _check_duplicate_file(db, stored_file_name, channel.org_id, channel.team_id)` / `if duplicate_error: await websocket.send_json({"type": "error", "detail": duplicate_error}); return` |
-| 443-459 | `file_url = provided_file_url` / `if file_base64: try: file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type); except HTTPException as exc: await websocket.send_json({"type": "error", "detail": exc.detail}); return; except Exception as e: logger.exception("Cloudinary upload failed"); await websocket.send_json({"type": "error", "detail": f"Failed to upload file: {str(e)}"}); return` |
-| 461-466 | `if not file_url: await websocket.send_json({"type": "error", "detail": "Provide file_base64 (preferred) or file_url"}); return` |
-| 468-474 | `sender = db.query(Users).filter(Users.user_id == user_id).first()` / `if not sender: await websocket.send_json({"type": "error", "detail": "Sender not found"}); return` |
-| 476-488 | `new_file = Files(file_name=stored_file_name, file_url=file_url, sender_id=user_id, team_id=channel.team_id, channel_id=channel.channel_id, org_id=channel.org_id, file_size=file_size)` / `db.add(new_file); db.commit(); db.refresh(new_file)` |
-| 490-506 | `file_data = {"type": "new_file", "file": {"id": new_file.id, "file_name": new_file.file_name, "file_url": new_file.file_url, "file_size": new_file.file_size, "sent_at": new_file.sent_at.isoformat(), "sender": {"user_id": sender.user_id, "first_name": sender.first_name, "last_name": sender.last_name, "avatar_url": sender.avatar_url, "user_tag": sender.user_tag}}}` |
-| 508 | `await manager.broadcast(channel_id, file_data)` |
-| 510-522 | `try: embed_document(file_url=file_url, file_name=stored_file_name, document_id=str(new_file.id), user_id=str(user_id), team_id=channel.team_id)` / `except Exception: logger.exception("Failed to embed document")` |
+`send_file_realtime_service(data, websocket, channel_id, user_id, channel, db)` at line 352 extracts `file_name`, `file_size`, `file_base64`, `mime_type`, and `provided_file_url` from `data` (lines 360-364). If `not file_name or file_size is None`, sends `{"type": "error", "detail": "file_name and file_size are required"}` and returns (lines 366-371). Gets the file extension via `os.path.splitext(file_name)[1].lower()` — if it's not `".pdf"`, sends `{"type": "error", "detail": "Only PDF files are supported. Please upload a .pdf file."}` and returns (lines 373-379). Tries to cast `file_size` to `int` — on `TypeError`/`ValueError`, sends `{"type": "error", "detail": "file_size must be a valid integer"}` and returns (lines 381-388). If `file_size <= 0`, sends `{"type": "error", "detail": "file_size must be greater than 0"}` and returns (lines 390-395).
+
+If `file_base64` is truthy, it strips the payload (line 398). If it starts with `"data:"`, it finds the comma; if no comma found, sends error `"Invalid base64 file payload"` and returns (lines 399-407). Removes all whitespace via `"".join(payload.split())` (line 408). If empty or length not divisible by 4, sends `"Invalid base64 file payload"` and returns (lines 409-414). Calculates `padding = len(payload) - len(payload.rstrip("="))` and `actual_size = (len(payload) // 4) * 3 - padding` (lines 415-416). If `actual_size <= 0`, sends `"file_size must be greater than 0"` and returns (lines 417-422). Sets `file_size = actual_size` (line 423).
+
+Queries `Organization` by `channel.org_id` and calls `get_file_size_limit(org.organization_plan if org else None)` (lines 425-426). If `file_size_limit is not None and file_size > file_size_limit`, sends `{"type": "error", "detail": f"Free plan allows a maximum file size of {file_size_limit // (1024 * 1024)} MB. Upgrade to Pro for larger uploads."}` and returns (lines 427-432).
+
+Strips `file_name` to `stored_file_name` and calls `_check_duplicate_file(db, stored_file_name, channel.org_id, channel.team_id)` — if it returns an error, sends that error and returns (lines 434-441).
+
+Sets `file_url = provided_file_url` (line 443). If `file_base64` is truthy, tries to upload via `upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)` (line 446). On `HTTPException as exc`, sends `exc.detail` (lines 447-452). On generic `Exception as e`, logs `"Cloudinary upload failed"` with `logger.exception` and sends `f"Failed to upload file: {str(e)}"` (lines 453-459). If `not file_url` after all that, sends `"Provide file_base64 (preferred) or file_url"` and returns (lines 461-466). Queries `sender = db.query(Users).filter(Users.user_id == user_id).first()` — if `not sender`, sends `"Sender not found"` and returns (lines 468-474).
+
+Creates a new `Files` row with `file_name=stored_file_name`, `file_url=file_url`, `sender_id=user_id`, `team_id=channel.team_id`, `channel_id=channel.channel_id`, `org_id=channel.org_id`, `file_size=file_size` (lines 476-484). Adds, commits, and refreshes (lines 486-488).
+
+Builds a `file_data` dict with `{"type": "new_file", "file": {"id": new_file.id, "file_name": new_file.file_name, "file_url": new_file.file_url, "file_size": new_file.file_size, "sent_at": new_file.sent_at.isoformat(), "sender": {"user_id": sender.user_id, "first_name": sender.first_name, "last_name": sender.last_name, "avatar_url": sender.avatar_url, "user_tag": sender.user_tag}}}` (lines 490-506). Broadcasts via `await manager.broadcast(channel_id, file_data)` (line 508). Then tries to call `embed_document(file_url=file_url, file_name=stored_file_name, document_id=str(new_file.id), user_id=str(user_id), team_id=channel.team_id)` — on any exception, logs `"Failed to embed document"` (lines 510-522).
 
 ### `fetch_voice_participants_service` (lines 525-551)
 
-| Line | Code |
-|------|------|
-| 525 | `def fetch_voice_participants_service(channel_id: int, org_id: int, user: Users, db: Session):` |
-| 526 | `user_id = user.user_id` |
-| 528-534 | `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` / `if not member: raise HTTPException(403, detail="User is not a member of this organization")` |
-| 536-542 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` / `if not channel: raise HTTPException(404, detail="Channel not found in this organization")` |
-| 544-545 | `if str(channel.channel_category).lower() != "voice": raise HTTPException(400, detail="Channel is not a voice channel")` |
-| 547-551 | `participants = voice_manager.get_participants(channel_id)` / `return {"participants": participants, "total_participants": len(participants)}` |
+`fetch_voice_participants_service(channel_id, org_id, user, db)` at line 525 extracts `user_id = user.user_id` (line 526). Queries `Organization_members` filtered by `memmber_id == user_id` and `org_id == org_id` — if no match, raises `HTTPException(403, detail="User is not a member of this organization")` (lines 528-534). Queries `Channels` filtered by `channel_id == channel_id` and `org_id == org_id` — if no match, raises `HTTPException(404, detail="Channel not found in this organization")` (lines 536-542). If `str(channel.channel_category).lower() != "voice"`, raises `HTTPException(400, detail="Channel is not a voice channel")` (lines 544-545). Calls `voice_manager.get_participants(channel_id)` and returns `{"participants": participants, "total_participants": len(participants)}` (lines 547-551).
 
 ### Constants (lines 554-555)
 
-| Line | Code |
-|------|------|
-| 554 | `DEFAULT_MESSAGE_LIMIT = 50` |
-| 555 | `MAX_MESSAGE_LIMIT = 200` |
+`DEFAULT_MESSAGE_LIMIT = 50` at line 554. `MAX_MESSAGE_LIMIT = 200` at line 555.
 
 ### `_normalize_message_pagination` (lines 558-572)
 
-| Line | Code |
-|------|------|
-| 558 | `def _normalize_message_pagination(limit: int \| None, offset: int \| None) -> tuple[int, int]:` |
-| 559-563 | `try: normalized_limit = int(limit if limit is not None else DEFAULT_MESSAGE_LIMIT); normalized_offset = int(offset if offset is not None else 0)` / `except (TypeError, ValueError): raise HTTPException(400, detail="limit and offset must be valid integers")` |
-| 565-570 | `if normalized_limit <= 0: raise HTTPException(400, detail="limit must be greater than 0")` / `if normalized_limit > MAX_MESSAGE_LIMIT: raise HTTPException(400, detail=f"limit cannot exceed {MAX_MESSAGE_LIMIT}")` / `if normalized_offset < 0: raise HTTPException(400, detail="offset must be >= 0")` |
-| 572 | `return normalized_limit, normalized_offset` |
+`_normalize_message_pagination(limit, offset)` at line 558 tries to parse `normalized_limit = int(limit if limit is not None else DEFAULT_MESSAGE_LIMIT)` and `normalized_offset = int(offset if offset is not None else 0)` (lines 560-561). On `TypeError`/`ValueError`, raises `HTTPException(400, detail="limit and offset must be valid integers")` (line 563). If `normalized_limit <= 0`, raises `HTTPException(400, detail="limit must be greater than 0")` (lines 565-566). If `normalized_limit > MAX_MESSAGE_LIMIT`, raises `HTTPException(400, detail=f"limit cannot exceed {MAX_MESSAGE_LIMIT}")` (lines 567-568). If `normalized_offset < 0`, raises `HTTPException(400, detail="offset must be >= 0")` (lines 569-570). Returns the tuple `(normalized_limit, normalized_offset)` (line 572).
 
 ### `fetch_message_service` (lines 575-746)
 
-| Line | Code |
-|------|------|
-| 575-582 | `def fetch_message_service(channel_id: int, org_id: int, user: Users, db: Session, limit: int \| None = None, offset: int \| None = None):` |
-| 583 | `user_id = user.user_id` |
-| 585-591 | `found_user_at_org = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` / `if not found_user_at_org: raise HTTPException(403, detail="User is not a member of this organization")` |
-| 593-599 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` / `if not channel: raise HTTPException(404, detail="Channel not found in this organization")` |
-| 601-609 | `if channel.team_id is not None: in_team = db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): raise HTTPException(403, detail="Not a team member")` |
-| 611 | `limit, offset = _normalize_message_pagination(limit, offset)` |
-| 613-624 | `org_users = db.query(Users).join(Organization_members, Organization_members.memmber_id == Users.user_id).filter(Organization_members.org_id == org_id, Users.user_tag.isnot(None)).all()` / `users_by_tag = {str(member.user_tag).strip().lstrip("@").lower(): member for member in org_users if member.user_tag}` |
-| 626-631 | `page_rows = db.query(Messages, Users).join(Users, Messages.sender_id == Users.user_id).filter(Messages.channel_id == channel_id, Messages.is_deleted == False).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()` |
-| 633-635 | `has_more = len(page_rows) > limit; page_rows = page_rows[:limit]; messages = list(reversed(page_rows))` |
-| 637-647 | `parent_ids = {m.parent_id for m, _ in messages if m.parent_id}` / `parents_by_id: dict[int, tuple[Messages, Users]] = {}` / `if parent_ids: parent_rows = db.query(Messages, Users).join(Users, Messages.sender_id == Users.user_id).filter(Messages.message_id.in_(parent_ids), Messages.channel_id == channel_id, Messages.is_deleted == False).all(); parents_by_id = {pm.message_id: (pm, ps) for pm, ps in parent_rows}` |
-| 649-695 | For each message: computes mention_tags via `get_user_tag`, resolves mentions from `users_by_tag`, resolves `reply_to` from `parents_by_id` if `parent_id` exists; builds result item with message_id, message_content, mentions, parent_id, reply_to, sent_at, edited_at, sender |
-| 697-709 | `window_start = min((m.sent_at for m, _ in messages), default=None); window_end = max((m.sent_at for m, _ in messages), default=None)` / `files_query = db.query(Files, Users).join(Users, Files.sender_id == Users.user_id).filter(Files.is_deleted == False)` / if channel.team_id: `files_query = files_query.filter(Files.team_id == channel.team_id)` else: `files_query = files_query.filter(Files.team_id == None, Files.org_id == org_id)` / if window_start and window_end: `files_query = files_query.filter(Files.sent_at >= window_start, Files.sent_at <= window_end)` / `files = files_query.order_by(Files.sent_at.desc()).limit(MAX_MESSAGE_LIMIT).all()` |
-| 711-734 | For each file: appends result dict with `message_id = 1000000000 + file_record.id`, `is_file = True`, `file_attachment`, sender info |
-| 736 | `result.sort(key=lambda item: item["sent_at"])` |
-| 738-746 | `return {"messages": result, "pagination": {"limit": limit, "offset": offset, "returned": len(messages), "has_more": has_more}}` |
+`fetch_message_service(channel_id, org_id, user, db, limit=None, offset=None)` at line 575 extracts `user_id = user.user_id` (line 583). Queries `Organization_members` filtered by `memmber_id == user_id` and `org_id == org_id` — if no match, raises `HTTPException(403, detail="User is not a member of this organization")` (lines 585-591). Queries `Channels` filtered by `channel_id == channel_id` and `org_id == org_id` — if no match, raises `HTTPException(404, detail="Channel not found in this organization")` (lines 593-599). If `channel.team_id is not None`, queries `Team_association` via `filter_by(team_id=channel.team_id, user_id=user_id)` and also queries `Organization` by `org_id` — if the user is not in the team and is not the org owner, raises `HTTPException(403, detail="Not a team member")` (lines 601-609). Calls `_normalize_message_pagination(limit, offset)` to get `limit` and `offset` (line 611).
+
+Queries `org_users = db.query(Users).join(Organization_members, memmber_id == Users.user_id).filter(org_id == org_id, user_tag.isnot(None)).all()` and builds `users_by_tag = {str(member.user_tag).strip().lstrip("@").lower(): member for member in org_users if member.user_tag}` (lines 613-624).
+
+Queries `page_rows = db.query(Messages, Users).join(Users, sender_id == Users.user_id).filter(Messages.channel_id == channel_id, Messages.is_deleted == False).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()` (lines 626-631). Sets `has_more = len(page_rows) > limit`, truncates to `limit`, and reverses via `messages = list(reversed(page_rows))` (lines 633-635).
+
+Collects `parent_ids = {m.parent_id for m, _ in messages if m.parent_id}` (line 637). If non-empty, queries parent messages by joining `Messages` with `Users` filtered by `message_id.in_(parent_ids)`, `channel_id == channel_id`, `is_deleted == False`, building `parents_by_id` dict (lines 639-647).
+
+For each message, calls `get_user_tag(message.message_content)` to get `mention_tags`, then resolves each tag in `users_by_tag` to build a `mentions` list with `user_id`, `first_name`, `last_name`, `user_tag` (lines 652-663). Resolves `reply_to` from `parents_by_id` if `parent_id` exists — builds dict with `message_id`, `message_content`, and nested `sender` (lines 665-678). Appends a result item with `message_id`, `message_content`, `mentions`, `parent_id`, `reply_to`, `sent_at` (raw), `edited_at` (raw), and nested `sender` (lines 680-695).
+
+Computes `window_start` and `window_end` from message timestamps (lines 697-698). Queries `Files` joined with `Users`, filtered by `is_deleted == False`, scoped to `team_id` if `channel.team_id is not None` else `team_id == None` and `org_id == org_id`, further filtered by `sent_at` window, ordered by `sent_at.desc()`, limited to `MAX_MESSAGE_LIMIT` (lines 700-709). For each file, appends a result item with `message_id = 1000000000 + file_record.id`, `message_content=""`, `is_file=True`, `file_attachment` dict, `parent_id=None`, `reply_to=None`, `sent_at=file_record.sent_at`, `edited_at=file_record.sent_at`, and nested `sender` (lines 711-734). Sorts `result` by `sent_at` (line 736). Returns `{"messages": result, "pagination": {"limit": limit, "offset": offset, "returned": len(messages), "has_more": has_more}}` (lines 738-746).
 
 ### `edit_message_service` (lines 749-774)
 
-| Line | Code |
-|------|------|
-| 749 | `def edit_message_service(message_id: int, data: Message_edit_input, user: Users, db: Session):` |
-| 750 | `user_id = user.user_id` |
-| 752-758 | `message = db.query(Messages).filter(Messages.message_id == message_id, Messages.is_deleted == False).first()` / `if not message: raise HTTPException(404, detail="Message not found")` |
-| 761-762 | `if message.sender_id != user_id: raise HTTPException(403, detail="You can only edit your own messages")` |
-| 764-768 | `message.message_content = data.message_content; message.edited_at = datetime.now(UTC); db.commit(); db.refresh(message)` |
-| 770-774 | `return {"message_id": message.message_id, "message_content": message.message_content, "edited_at": message.edited_at}` |
+`edit_message_service(message_id, data, user, db)` at line 749 extracts `user_id = user.user_id` (line 750). Queries `Messages` by `message_id` and `is_deleted == False` — if not found, raises `HTTPException(404, detail="Message not found")` (lines 752-758). If `message.sender_id != user_id`, raises `HTTPException(403, detail="You can only edit your own messages")` (lines 761-762). Sets `message.message_content = data.message_content` and `message.edited_at = datetime.now(UTC)` (lines 764-765). Calls `db.commit()` and `db.refresh(message)` (lines 767-768). Returns `{"message_id": message.message_id, "message_content": message.message_content, "edited_at": message.edited_at}` (lines 770-774).
 
 ### `delete_message_service` (lines 777-795)
 
-| Line | Code |
-|------|------|
-| 777 | `def delete_message_service(message_id: int, user: Users, db: Session):` |
-| 778 | `user_id = user.user_id` |
-| 780-786 | `message = db.query(Messages).filter(Messages.message_id == message_id, Messages.is_deleted == False).first()` / `if not message: raise HTTPException(404, detail="Message not found")` |
-| 788-789 | `if message.sender_id != user_id: raise HTTPException(403, detail="You can only delete your own messages")` |
-| 791-793 | `message.is_deleted = True; db.commit()` |
-| 795 | `return {"detail": "Message deleted successfully"}` |
+`delete_message_service(message_id, user, db)` at line 777 extracts `user_id = user.user_id` (line 778). Queries `Messages` by `message_id` and `is_deleted == False` — if not found, raises `HTTPException(404, detail="Message not found")` (lines 780-786). If `message.sender_id != user_id`, raises `HTTPException(403, detail="You can only delete your own messages")` (lines 788-789). Sets `message.is_deleted = True` (line 791). Calls `db.commit()` (line 793). Returns `{"detail": "Message deleted successfully"}` (line 795).
 
 ### `send_messages_realtime` (lines 797-1117)
 
-| Line | Code |
-|------|------|
-| 797-802 | `async def send_messages_realtime(websocket: WebSocket, channel_id: int, authorization: str, org_id: int):` |
-| 803-808 | `logger.info("messages websocket handler entered", extra={...})` / `await websocket.accept()` / `logger.info("messages websocket accepted", extra={...})` |
-| 810-825 | `auth_db = SessionLocal()` / `try: user = await authenticate_ws(websocket, authorization, auth_db); if not user: return; user_id = user.user_id` / `member = auth_db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` / `if not member: await websocket.close(code=1008, reason="Not a member of this organization"); return` |
-| 827-845 | `channel = auth_db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` / `if not channel: await websocket.close(code=1008, reason="Channel not found"); return` / `if channel.team_id is not None: in_team = auth_db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = auth_db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): await websocket.close(code=1008, reason="Not a team member"); return` |
-| 847-849 | `channel_name = channel.channel_name; channel_team_id = channel.team_id; channel_mode = channel.channel_mode` |
-| 850-851 | `finally: auth_db.close()` |
-| 853 | `await manager.connect(channel_id, websocket)` |
-| 855-857 | `try: while True: data = await websocket.receive_json()` |
-| 859-883 | `if data.get("type") == "send_message":` / `msg_db = SessionLocal()` / `try: parent_id = data.get("parent_id"); content = str(data.get("message_content") or "").strip()` / `if not content: await websocket.send_json({"type": "error", "detail": "Message content cannot be empty"}); continue` / `if channel_mode == "announcement" and not user_can_announce(msg_db, user_id, channel_team_id, org_id):` / sends error with detail based on channel_team_id / `continue` |
-| 885-906 | `if parent_id is not None: try: parent_id = int(parent_id); except (TypeError, ValueError): await websocket.send_json({"type": "error", "detail": "Invalid parent_id"}); continue` / `parent_message = msg_db.query(Messages).filter(Messages.message_id == parent_id, Messages.channel_id == channel_id, Messages.is_deleted == False).first()` / `if not parent_message: await websocket.send_json({"type": "error", "detail": "Reply target not found"}); continue` |
-| 908-913 | `new_message = Messages(message_content=content, sender_id=user_id, channel_id=channel_id, parent_id=parent_message.message_id if parent_message else None)` |
-| 915-927 | `sender = msg_db.query(Users).filter(Users.user_id == user_id).first()` / `mention_tags = get_user_tag(content); mentioned_users = resolve_mentioned_users(msg_db, org_id, mention_tags, user_id)` / `mentions_payload = [{"user_id": mentioned.user_id, "first_name": mentioned.first_name, "last_name": mentioned.last_name, "user_tag": mentioned.user_tag} for mentioned in mentioned_users]` |
-| 929-935 | `announcement_recipients: list[Users] = []` / `if channel_mode == "announcement": mentioned_ids = {m.user_id for m in mentioned_users}; announcement_recipients = [r for r in get_announcement_recipients(msg_db, channel_team_id, org_id, user_id) if r.user_id not in mentioned_ids]` |
-| 937-953 | `try: msg_db.add(new_message); msg_db.flush(); create_mention_notifications(msg_db, mentioned_users, new_message.message_id); create_announcement_notifications(msg_db, announcement_recipients, new_message.message_id); msg_db.commit()` / `except Exception: msg_db.rollback(); logger.exception(...); await websocket.send_json({"type": "error", "detail": "Failed to send message"}); continue` |
-| 955 | `msg_db.refresh(new_message)` |
-| 957-979 | `try: team = msg_db.query(Teams).filter(Teams.team_id == channel_team_id).first() if channel_team_id else None; org = msg_db.query(Organization).filter(Organization.organization_id == org_id).first()` / `upsert_message(message_id=new_message.message_id, team_id=..., org_id=org_id, content=content, channel_id=channel_id, channel_name=channel_name, sender_id=user_id, sender_first_name=..., sender_last_name=..., sent_at=..., team_name=..., org_name=..., parent_id=...)` / `except Exception: logger.exception("Failed to upsert message to Pinecone")` |
-| 981-1000 | `for mentioned in mentioned_users: try: await push_mention_notification(receiver_id=mentioned.user_id, sender_id=user_id, message_id=new_message.message_id, channel_id=channel_id, org_id=org_id, sender_first_name=..., sender_last_name=..., sender_avatar_url=..., sender_user_tag=..., channel_name=channel_name)` / `except Exception: logger.exception(...); continue` |
-| 1002-1021 | `for recipient in announcement_recipients: try: await push_announcement_notification(receiver_id=recipient.user_id, sender_id=user_id, message_id=new_message.message_id, channel_id=channel_id, org_id=org_id, ...)` / `except Exception: logger.exception(...); continue` |
-| 1023-1037 | `reply_to = None` / `if parent_message: parent_sender = msg_db.query(Users).filter(Users.user_id == parent_message.sender_id).first(); if parent_sender: reply_to = {"message_id": parent_message.message_id, "message_content": parent_message.message_content, "sender": {"user_id": parent_sender.user_id, "first_name": ..., "last_name": ..., "avatar_url": ..., "user_tag": ...}}` |
-| 1039-1058 | `message_data = {"type": "new_message", "message": {"message_id": new_message.message_id, "message_content": new_message.message_content, "mentions": mentions_payload, "parent_id": new_message.parent_id, "reply_to": reply_to, "sent_at": new_message.sent_at.isoformat(), "edited_at": new_message.edited_at.isoformat(), "sender": {...}}}` / `await manager.broadcast(channel_id, message_data)` |
-| 1059-1060 | `finally: msg_db.close()` |
-| 1061-1079 | `elif data.get("type") == "typing":` / `typing_db = SessionLocal(); try: user_obj = typing_db.query(Users).filter(Users.user_id == user_id).first(); typing_data = {"type": "typing", "channel_id": channel_id, "user": {...}, "is_typing": bool(data.get("is_typing", False))}; await manager.broadcast(channel_id, typing_data, exclude=websocket); finally: typing_db.close()` |
-| 1080-1112 | `elif data.get("type") == "send_file":` / `file_db = SessionLocal(); try: if channel_mode == "announcement" and not user_can_announce(file_db, user_id, channel_team_id, org_id): sends error; continue; await send_file_realtime_service(data=data, websocket=websocket, channel_id=channel_id, user_id=user_id, channel=channel, db=file_db)` / `except Exception: logger.exception("File upload failed"); await websocket.send_json({"type": "error", "detail": f"File upload failed: {str(e)}"}); finally: file_db.close()` |
-| 1113-1117 | `else: await manager.broadcast(channel_id, data)` / `except WebSocketDisconnect: manager.disconnect(channel_id, websocket)` |
+`send_messages_realtime(websocket, channel_id, authorization, org_id)` at line 797 logs `"messages websocket handler entered"` with `channel_id`, `org_id`, and `token_len` (lines 803-806). Calls `await websocket.accept()` and logs `"messages websocket accepted"` (lines 807-808). Opens an `auth_db = SessionLocal()` and enters a try/finally block (lines 810-851). Calls `await authenticate_ws(websocket, authorization, auth_db)` — if returns falsy, returns (lines 812-814). Extracts `user_id = user.user_id` (line 816). Queries `Organization_members` by `memmber_id == user_id` and `org_id == org_id` — if no match, sends `await websocket.close(code=1008, reason="Not a member of this organization")` and returns (lines 818-825). Queries `Channels` by `channel_id == channel_id` and `org_id == org_id` — if no match, closes with `"Channel not found"` (lines 827-834). If `channel.team_id is not None`, checks `Team_association` membership and org ownership — if not in team and not owner, closes with `"Not a team member"` (lines 836-845). Stores `channel_name`, `channel_team_id`, and `channel_mode` (lines 847-849). The `finally` block closes `auth_db` (line 851).
+
+Connects to the text manager via `await manager.connect(channel_id, websocket)` (line 853). Enters a try/except loop (lines 855-1117). Within `while True`, calls `data = await websocket.receive_json()` (line 857).
+
+**`"send_message"` handler (lines 859-1060):** Opens `msg_db = SessionLocal()` with a `try/finally`. Gets `parent_id = data.get("parent_id")`, sets `content = str(data.get("message_content") or "").strip()` (lines 862-864). If `not content`, sends error `"Message content cannot be empty"` and `continue` (lines 866-871). If `channel_mode == "announcement"` and the user cannot announce (via `user_can_announce`), sends error string `"Only members with announcement permission can post in this channel"` if `channel_team_id is not None`, else `"Only the organization owner and admins can post in this channel"`, and `continue` (lines 873-883). If `parent_id is not None`, tries to parse as int — on error sends `"Invalid parent_id"` and `continue` (lines 885-893). Queries the parent message filtered by `message_id == parent_id`, `channel_id == channel_id`, `is_deleted == False` — if not found, sends `"Reply target not found"` and `continue` (lines 895-906).
+
+Creates a new `Messages` row with `message_content=content`, `sender_id=user_id`, `channel_id=channel_id`, and `parent_id=parent_message.message_id if parent_message else None` (lines 908-913). Queries the `sender` user (line 915). Calls `get_user_tag(content)` and `resolve_mentioned_users(msg_db, org_id, mention_tags, user_id)` to get `mentioned_users`, then builds `mentions_payload` with `user_id`, `first_name`, `last_name`, `user_tag` for each (lines 917-927). If `channel_mode == "announcement"`, computes `announcement_recipients` by getting all announcement recipients via `get_announcement_recipients` and excluding those already in `mentioned_users` (lines 929-935).
+
+Persists via `msg_db.add(new_message)`, `msg_db.flush()`, calls `create_mention_notifications` and `create_announcement_notifications`, then `msg_db.commit()` — on any exception, rolls back, logs `"Failed to persist message"`, sends `"Failed to send message"`, and `continue` (lines 937-953). Refreshes `new_message` (line 955).
+
+Tries to upsert to Pinecone via `upsert_message` with `message_id`, `team_id=channel_team_id if channel_team_id is not None else 0`, `org_id`, `content`, `channel_id`, `channel_name`, `sender_id`, `sender_first_name`, `sender_last_name`, `sent_at=new_message.sent_at.isoformat()`, `team_name`, `org_name`, `parent_id` — on exception, logs `"Failed to upsert message to Pinecone"` (lines 957-979).
+
+For each `mentioned_users`, calls `await push_mention_notification` with all sender info and `channel_name` — on exception, logs and `continue` (lines 981-1000). For each `announcement_recipients`, calls `await push_announcement_notification` similarly (lines 1002-1021).
+
+Resolves `reply_to` if `parent_message` exists: queries the parent sender, builds a dict with `message_id`, `message_content`, and nested `sender` (lines 1023-1037). Builds `message_data` with `{"type": "new_message", "message": {"message_id": ..., "message_content": ..., "mentions": mentions_payload, "parent_id": ..., "reply_to": reply_to, "sent_at": new_message.sent_at.isoformat(), "edited_at": new_message.edited_at.isoformat(), "sender": {user_id, first_name, last_name, avatar_url, user_tag}}}` (lines 1039-1057). Broadcasts via `await manager.broadcast(channel_id, message_data)` (line 1058). The `finally` block closes `msg_db` (line 1060).
+
+**`"typing"` handler (lines 1061-1079):** Opens `typing_db = SessionLocal()`. Queries the user object. Builds `typing_data` with `{"type": "typing", "channel_id": channel_id, "user": {user_id, first_name, last_name, avatar_url, user_tag}, "is_typing": bool(data.get("is_typing", False))}`. Broadcasts to the channel excluding the sender via `await manager.broadcast(channel_id, typing_data, exclude=websocket)`. Closes `typing_db` in `finally`.
+
+**`"send_file"` handler (lines 1080-1112):** Opens `file_db = SessionLocal()`. If `channel_mode == "announcement"` and user cannot announce, sends the same announcement permission error and `continue`. Otherwise calls `await send_file_realtime_service(data=data, websocket=websocket, channel_id=channel_id, user_id=user_id, channel=channel, db=file_db)`. On any exception, logs `"File upload failed"` and sends `{"type": "error", "detail": f"File upload failed: {str(e)}"}`. Closes `file_db` in `finally`.
+
+**Else branch (line 1114):** Any unrecognized message type is rebroadcast via `await manager.broadcast(channel_id, data)`.
+
+On `WebSocketDisconnect`, calls `manager.disconnect(channel_id, websocket)` (line 1117).
 
 ### `notifications_ws_endpoint` (lines 1120-1145)
 
-| Line | Code |
-|------|------|
-| 1120-1123 | `async def notifications_ws_endpoint(websocket: WebSocket, authorization: str):` |
-| 1124-1125 | `from utils.security import authenticate_ws` / `await websocket.accept()` |
-| 1127-1135 | `auth_db = SessionLocal(); try: user = await authenticate_ws(websocket, authorization, auth_db); if not user: return; user_id = user.user_id; finally: auth_db.close()` |
-| 1137 | `await notification_manager.connect(user_id, websocket)` |
-| 1139-1145 | `try: while True: await websocket.receive_text()` / `except WebSocketDisconnect: pass` / `finally: notification_manager.disconnect(user_id)` |
+`notifications_ws_endpoint(websocket, authorization)` at line 1120 imports `authenticate_ws` from `utils.security` locally (line 1124). Calls `await websocket.accept()` (line 1125). Opens `auth_db = SessionLocal()` (lines 1127-1135), calls `await authenticate_ws(websocket, authorization, auth_db)` — if `not user`, returns. Extracts `user_id = user.user_id`. Closes `auth_db` in `finally`. Connects to `notification_manager` via `await notification_manager.connect(user_id, websocket)` (line 1137). Enters a `while True` loop calling `await websocket.receive_text()` — this keeps the connection alive, discarding any received text (lines 1139-1141). On `WebSocketDisconnect`, passes (line 1143). In the `finally` block, calls `notification_manager.disconnect(user_id)` (line 1145).
 
 ### `voice_websocket_endpoint` (lines 1148-1225)
 
-| Line | Code |
-|------|------|
-| 1148-1153 | `async def voice_websocket_endpoint(websocket: WebSocket, channel_id: int, authorization: str, org_id: int):` |
-| 1154 | `from utils.security import authenticate_ws` |
-| 1156-1192 | `auth_db = SessionLocal(); try: user = await authenticate_ws(websocket, authorization, auth_db); if not user: return` / `member = auth_db.query(Organization_members).filter(Organization_members.memmber_id == user.user_id, Organization_members.org_id == org_id).first()` / `if not member: await websocket.close(code=1008, reason="Not a member of this organization"); return` / `channel = auth_db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` / `if not channel: await websocket.close(code=1008, reason="Channel not found"); return` / `if str(channel.channel_category).lower() != "voice": await websocket.close(code=1008, reason="Channel is not a voice channel"); return` / `participant = {"user_id": user.user_id, "first_name": user.first_name, "last_name": user.last_name, "avatar_url": user.avatar_url, "user_tag": user.user_tag}; finally: auth_db.close()` |
-| 1194 | `await voice_manager.connect(channel_id, websocket, participant=participant)` |
-| 1196-1199 | `await websocket.send_json({"type": "voice_participants", "participants": voice_manager.get_participants(channel_id)})` |
-| 1201-1208 | `await voice_manager.broadcast(channel_id, {"type": "voice_joined", "participant": participant}, exclude=websocket)` |
-| 1210-1225 | `try: while True: message = await websocket.receive_json(); if isinstance(message, dict): await voice_manager.forward_signal(channel_id, websocket, message)` / `except WebSocketDisconnect: disconnected_participant = voice_manager.disconnect(channel_id, websocket); if disconnected_participant: await voice_manager.broadcast(channel_id, {"type": "voice_left", "participant": disconnected_participant})` |
+`voice_websocket_endpoint(websocket, channel_id, authorization, org_id)` at line 1148 imports `authenticate_ws` locally (line 1154). Opens `auth_db = SessionLocal()` (lines 1156-1192). Calls `await authenticate_ws(websocket, authorization, auth_db)` — if `not user`, returns. Queries `Organization_members` by `memmber_id == user.user_id` and `org_id == org_id` — if no match, closes with code 1008 and reason `"Not a member of this organization"` and returns (lines 1162-1169). Queries `Channels` by `channel_id == channel_id` and `org_id == org_id` — if no match, closes with `"Channel not found"` (lines 1171-1178). If `str(channel.channel_category).lower() != "voice"`, closes with `"Channel is not a voice channel"` (lines 1180-1182). Builds a `participant` dict with `user_id`, `first_name`, `last_name`, `avatar_url`, `user_tag` (lines 1184-1190). Closes `auth_db` in `finally`.
+
+Connects to `voice_manager` via `await voice_manager.connect(channel_id, websocket, participant=participant)` (line 1194). Sends the current participant list to the newly connected user via `await websocket.send_json({"type": "voice_participants", "participants": voice_manager.get_participants(channel_id)})` (lines 1196-1199). Broadcasts `{"type": "voice_joined", "participant": participant}` to all others in the channel via `await voice_manager.broadcast(channel_id, ..., exclude=websocket)` (lines 1201-1208). Enters a `while True` loop: calls `await websocket.receive_json()` and if the message is a dict, forwards it via `await voice_manager.forward_signal(channel_id, websocket, message)` (lines 1210-1215). On `WebSocketDisconnect`, calls `voice_manager.disconnect(channel_id, websocket)` — if a `disconnected_participant` is returned, broadcasts `{"type": "voice_left", "participant": disconnected_participant}` (lines 1216-1225).
 
 ### `search_messages_service` (lines 1228-1306)
 
-| Line | Code |
-|------|------|
-| 1228-1236 | `def search_messages_service(channel_id: int, org_id: int, query: str, user: Users, db: Session, limit: int \| None = None, offset: int \| None = None):` |
-| 1237 | `user_id = user.user_id` |
-| 1239-1245 | `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` / `if not member: raise HTTPException(403, detail="User is not a member of this organization")` |
-| 1247-1253 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` / `if not channel: raise HTTPException(404, detail="Channel not found in this organization")` |
-| 1255-1263 | `if channel.team_id is not None: in_team = db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): raise HTTPException(403, detail="Not a team member")` |
-| 1265-1266 | `if not query or not query.strip(): raise HTTPException(400, detail="Search query cannot be empty")` |
-| 1268 | `limit, offset = _normalize_message_pagination(limit, offset)` |
-| 1270 | `search_term = f"%{query.strip()}%"` |
-| 1272-1278 | `rows = db.query(Messages, Users).join(Users, Messages.sender_id == Users.user_id).filter(Messages.channel_id == channel_id, Messages.is_deleted == False, Messages.message_content.ilike(search_term)).order_by(Messages.sent_at.desc(), Messages.message_id.desc()).offset(offset).limit(limit + 1).all()` |
-| 1280-1281 | `has_more = len(rows) > limit; rows = rows[:limit]` |
-| 1283-1306 | `return {"messages": [{"message_id": ..., "message_content": ..., "sent_at": ..., "edited_at": ..., "sender": {...}} for message, sender in rows], "pagination": {"limit": limit, "offset": offset, "returned": len(rows), "has_more": has_more}}` |
+`search_messages_service(channel_id, org_id, query, user, db, limit=None, offset=None)` at line 1228 extracts `user_id = user.user_id` (line 1237). Queries `Organization_members` by `memmber_id == user_id` and `org_id == org_id` — if no match, raises `HTTPException(403, detail="User is not a member of this organization")` (lines 1239-1245). Queries `Channels` by `channel_id == channel_id` and `org_id == org_id` — if no match, raises `HTTPException(404, detail="Channel not found in this organization")` (lines 1247-1253). If `channel.team_id is not None`, checks team membership and org ownership; if not a member and not owner, raises `HTTPException(403, detail="Not a team member")` (lines 1255-1263). If `not query or not query.strip()`, raises `HTTPException(400, detail="Search query cannot be empty")` (lines 1265-1266). Calls `_normalize_message_pagination(limit, offset)` (line 1268). Builds `search_term = f"%{query.strip()}%"` (line 1270). Queries `Messages` joined with `Users`, filtered by `channel_id == channel_id`, `is_deleted == False`, and `message_content.ilike(search_term)`, ordered by `sent_at.desc(), message_id.desc()`, with `offset(offset).limit(limit + 1)` (lines 1272-1278). Sets `has_more = len(rows) > limit`, truncates to `limit` (lines 1280-1281). Returns `{"messages": [{"message_id": ..., "message_content": ..., "sent_at": ..., "edited_at": ..., "sender": {user_id, first_name, last_name, avatar_url, user_tag}} for message, sender in rows], "pagination": {"limit": limit, "offset": offset, "returned": len(rows), "has_more": has_more}}` (lines 1283-1306).
 
 ### `pin_message_service` (lines 1309-1381)
 
-| Line | Code |
-|------|------|
-| 1309 | `def pin_message_service(message_id: int, org_id: int, user: Users, db: Session):` |
-| 1310 | `user_id = user.user_id` |
-| 1312-1318 | `message = db.query(Messages).filter(Messages.message_id == message_id, Messages.is_deleted == False).first()` / `if not message: raise HTTPException(404, detail="Message not found")` |
-| 1320-1326 | `channel = db.query(Channels).filter(Channels.channel_id == message.channel_id, Channels.org_id == org_id).first()` / `if not channel: raise HTTPException(404, detail="Channel not found in this organization")` |
-| 1328-1333 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if not org: raise HTTPException(404, detail="Organization not found")` |
-| 1335-1353 | `is_owner = org.owner_id == user_id` / `if not is_owner: member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first(); if not member: raise HTTPException(403, detail="User is not a member of this organization")` / `if channel.team_id is not None: team_member = db.query(Team_association).filter(Team_association.team_id == channel.team_id, Team_association.user_id == user_id).first(); if not team_member: raise HTTPException(403, detail="You must be a member of this team to pin messages in this channel")` |
-| 1355-1361 | `already_pinned = db.query(Pinned_messages).filter(Pinned_messages.message_id == message_id, Pinned_messages.channel_id == channel.channel_id).first()` / `if already_pinned: raise HTTPException(400, detail="Message is already pinned")` |
-| 1363-1371 | `pinned = Pinned_messages(message_id=message_id, channel_id=channel.channel_id, pinned_by=user_id)` / `db.add(pinned); db.commit(); db.refresh(pinned)` |
-| 1373 | `create_log(db, org_id=org_id, actor_id=user_id, action="message_pinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})` |
-| 1375-1381 | `return {"id": pinned.id, "message_id": pinned.message_id, "channel_id": pinned.channel_id, "pinned_by": pinned.pinned_by, "pinned_at": pinned.pinned_at}` |
+`pin_message_service(message_id, org_id, user, db)` at line 1309 extracts `user_id = user.user_id` (line 1310). Queries `Messages` by `message_id` and `is_deleted == False` — if not found, raises `HTTPException(404, detail="Message not found")` (lines 1312-1318). Queries `Channels` by `message.channel_id` and `org_id == org_id` — if not found, raises `HTTPException(404, detail="Channel not found in this organization")` (lines 1320-1326). Queries `Organization` by `org_id` — if not found, raises `HTTPException(404, detail="Organization not found")` (lines 1328-1333). Checks `is_owner = org.owner_id == user_id` (line 1335). If not owner, queries `Organization_members` — if no match, raises `HTTPException(403, detail="User is not a member of this organization")` (lines 1337-1344). If `channel.team_id is not None`, queries `Team_association` — if no match, raises `HTTPException(403, detail="You must be a member of this team to pin messages in this channel")` (lines 1346-1353). Queries `Pinned_messages` by `message_id == message_id` and `channel_id == channel.channel_id` — if already pinned, raises `HTTPException(400, detail="Message is already pinned")` (lines 1355-1361). Creates a new `Pinned_messages` row with `message_id=message_id`, `channel_id=channel.channel_id`, `pinned_by=user_id` (lines 1363-1367). Adds, commits, refreshes (lines 1369-1371). Calls `create_log(db, org_id=org_id, actor_id=user_id, action="message_pinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})` (line 1373). Returns `{"id": pinned.id, "message_id": pinned.message_id, "channel_id": pinned.channel_id, "pinned_by": pinned.pinned_by, "pinned_at": pinned.pinned_at}` (lines 1375-1381).
 
 ### `unpin_message_service` (lines 1384-1434)
 
-| Line | Code |
-|------|------|
-| 1384 | `def unpin_message_service(message_id: int, org_id: int, user: Users, db: Session):` |
-| 1385 | `user_id = user.user_id` |
-| 1387-1392 | `pinned = db.query(Pinned_messages).filter(Pinned_messages.message_id == message_id).first()` / `if not pinned: raise HTTPException(404, detail="Pinned message not found")` |
-| 1394-1400 | `channel = db.query(Channels).filter(Channels.channel_id == pinned.channel_id, Channels.org_id == org_id).first()` / `if not channel: raise HTTPException(404, detail="Channel not found in this organization")` |
-| 1402-1407 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first()` / `if not org: raise HTTPException(404, detail="Organization not found")` |
-| 1409-1427 | `is_owner = org.owner_id == user_id` / `if not is_owner: member = db.query(Organization_members).filter(...).first(); if not member: raise HTTPException(403, detail="User is not a member of this organization")` / `if channel.team_id is not None: team_member = db.query(Team_association).filter(...).first(); if not team_member: raise HTTPException(403, detail="You must be a member of this team to unpin messages in this channel")` |
-| 1429-1430 | `db.delete(pinned); db.commit()` |
-| 1432 | `create_log(db, org_id=org_id, actor_id=user_id, action="message_unpinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})` |
-| 1434 | `return {"detail": "Message unpinned successfully"}` |
+`unpin_message_service(message_id, org_id, user, db)` at line 1384 extracts `user_id = user.user_id` (line 1385). Queries `Pinned_messages` by `message_id == message_id` — if not found, raises `HTTPException(404, detail="Pinned message not found")` (lines 1387-1392). Queries `Channels` by `pinned.channel_id` and `org_id == org_id` — if not found, raises `HTTPException(404, detail="Channel not found in this organization")` (lines 1394-1400). Queries `Organization` by `org_id` — if not found, raises `HTTPException(404, detail="Organization not found")` (lines 1402-1407). Checks `is_owner = org.owner_id == user_id` (line 1409). If not owner, queries `Organization_members` — if no match, raises `HTTPException(403, detail="User is not a member of this organization")` (lines 1411-1418). If `channel.team_id is not None`, queries `Team_association` — if no match, raises `HTTPException(403, detail="You must be a member of this team to unpin messages in this channel")` (lines 1420-1427). Calls `db.delete(pinned)` and `db.commit()` (lines 1429-1430). Calls `create_log(db, org_id=org_id, actor_id=user_id, action="message_unpinned", target_id=message_id, target_type="message", metadata={"channel_id": channel.channel_id})` (line 1432). Returns `{"detail": "Message unpinned successfully"}` (line 1434).
 
 ### `fetch_pinned_messages_service` (lines 1437-1492)
 
-| Line | Code |
-|------|------|
-| 1437 | `def fetch_pinned_messages_service(channel_id: int, org_id: int, user: Users, db: Session):` |
-| 1438 | `user_id = user.user_id` |
-| 1440-1446 | `member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` / `if not member: raise HTTPException(403, detail="User is not a member of this organization")` |
-| 1448-1454 | `channel = db.query(Channels).filter(Channels.channel_id == channel_id, Channels.org_id == org_id).first()` / `if not channel: raise HTTPException(404, detail="Channel not found in this organization")` |
-| 1456-1464 | `if channel.team_id is not None: in_team = db.query(Team_association).filter_by(team_id=channel.team_id, user_id=user_id).first(); organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not in_team and (not organization or organization.owner_id != user_id): raise HTTPException(403, detail="Not a team member")` |
-| 1466-1473 | `pinned_messages = db.query(Pinned_messages, Messages, Users).join(Messages, Pinned_messages.message_id == Messages.message_id).join(Users, Messages.sender_id == Users.user_id).filter(Pinned_messages.channel_id == channel_id, Messages.is_deleted == False).all()` |
-| 1475-1490 | `result = []` / `for pinned, message, sender in pinned_messages: result.append({"id": pinned.id, "message_id": message.message_id, "message_content": message.message_content, "pinned_by": pinned.pinned_by, "pinned_at": pinned.pinned_at, "sender": {"user_id": sender.user_id, "first_name": sender.first_name, "last_name": sender.last_name, "avatar_url": sender.avatar_url, "user_tag": sender.user_tag}})` |
-| 1492 | `return result` |
+`fetch_pinned_messages_service(channel_id, org_id, user, db)` at line 1437 extracts `user_id = user.user_id` (line 1438). Queries `Organization_members` by `memmber_id == user_id` and `org_id == org_id` — if no match, raises `HTTPException(403, detail="User is not a member of this organization")` (lines 1440-1446). Queries `Channels` by `channel_id == channel_id` and `org_id == org_id` — if no match, raises `HTTPException(404, detail="Channel not found in this organization")` (lines 1448-1454). If `channel.team_id is not None`, checks team membership and org ownership; if not a member and not owner, raises `HTTPException(403, detail="Not a team member")` (lines 1456-1464). Runs a 3-table join: `db.query(Pinned_messages, Messages, Users).join(Messages, Pinned_messages.message_id == Messages.message_id).join(Users, Messages.sender_id == Users.user_id).filter(Pinned_messages.channel_id == channel_id, Messages.is_deleted == False).all()` (lines 1466-1473). Builds a result list where each item contains `id`, `message_id`, `message_content`, `pinned_by`, `pinned_at`, and a nested `sender` dict with `user_id`, `first_name`, `last_name`, `avatar_url`, `user_tag` (lines 1475-1490). Returns the list (line 1492).
 
 ## File: `backend/utils/Websocket_manager.py` (313 lines)
 
 ### `Text_Websocket_manager` class (lines 6-36)
 
-| Line | Code |
-|------|------|
-| 6-8 | `class Text_Websocket_manager():` / `def __init__(self): self.channels: Dict[int, List[WebSocket]] = {}` |
-| 10-16 | `async def connect(self, channel_id: int, websocket: WebSocket):` / `channel_connections = self.channels.setdefault(channel_id, [])` / `if websocket not in channel_connections: channel_connections.append(websocket)` |
-| 18-27 | `def disconnect(self, channel_id: int, websocket: WebSocket):` / `channel_connections = self.channels.get(channel_id)` / `if not channel_connections: return` / `if websocket in channel_connections: channel_connections.remove(websocket)` / `if not channel_connections: self.channels.pop(channel_id, None)` |
-| 29-36 | `async def broadcast(self, channel_id: int, message: dict, exclude: Optional[WebSocket] = None):` / `for ws in list(self.channels.get(channel_id, [])):` / `if exclude is not None and ws is exclude: continue` / `try: await ws.send_json(message)` / `except Exception: self.disconnect(channel_id, ws)` |
+`Text_Websocket_manager` at line 6 has an `__init__` that initializes `self.channels: Dict[int, List[WebSocket]] = {}` (lines 7-8). `connect(channel_id, websocket)` at line 10 expects the caller to have already accepted the websocket (to allow auth rejections with proper close codes). It calls `self.channels.setdefault(channel_id, [])` and appends the websocket if not already present (lines 14-16). `disconnect(channel_id, websocket)` at line 18 gets the channel's connection list; if it exists, removes the websocket, and if the list is then empty, pops the channel (lines 19-27). `broadcast(channel_id, message, exclude=None)` at line 29 iterates a snapshot of the channel's connections; for each websocket not excluded, calls `await ws.send_json(message)`; on any exception, calls `self.disconnect(channel_id, ws)` (lines 29-36).
 
 ### `VoiceWebsocketManager` class (lines 40-94)
 
-| Line | Code |
-|------|------|
-| 40-43 | `class VoiceWebsocketManager:` / `def __init__(self): self.voice_channels: Dict[int, List[WebSocket]] = {}; self.voice_participants: Dict[int, Dict[WebSocket, dict]] = {}` |
-| 45-49 | `async def connect(self, channel_id: int, websocket: WebSocket, participant: Optional[dict] = None):` / `await websocket.accept()` / `self.voice_channels.setdefault(channel_id, []).append(websocket)` / `if participant is not None: self.voice_participants.setdefault(channel_id, {})[websocket] = participant` |
-| 51-70 | `def disconnect(self, channel_id: int, websocket: WebSocket):` / `channel_connections = self.voice_channels.get(channel_id); participant = None` / `if not channel_connections: return participant` / `participant_map = self.voice_participants.get(channel_id)` / `if participant_map and websocket in participant_map: participant = participant_map.pop(websocket); if not participant_map: self.voice_participants.pop(channel_id, None)` / `if websocket in channel_connections: channel_connections.remove(websocket)` / `if not channel_connections: self.voice_channels.pop(channel_id, None)` / `return participant` |
-| 72-81 | `def get_participants(self, channel_id: int) -> List[dict]:` / `participants = self.voice_participants.get(channel_id, {})` / `unique_by_user_id: Dict[Any, dict] = {}` / `for participant in participants.values(): user_id = participant.get("user_id"); if user_id not in unique_by_user_id: unique_by_user_id[user_id] = participant` / `return list(unique_by_user_id.values())` |
-| 83-91 | `async def broadcast(self, channel_id: int, message: dict, exclude: Optional[WebSocket] = None):` / `for ws in list(self.voice_channels.get(channel_id, [])):` / `if exclude is not None and ws is exclude: continue` / `try: await ws.send_json(message)` / `except Exception: self.disconnect(channel_id, ws)` |
-| 93-94 | `async def forward_signal(self, channel_id: int, sender: WebSocket, message: dict):` / `await self.broadcast(channel_id, message, exclude=sender)` |
+`VoiceWebsocketManager` at line 40 has an `__init__` that initializes `self.voice_channels: Dict[int, List[WebSocket]] = {}` and `self.voice_participants: Dict[int, Dict[WebSocket, dict]] = {}` (lines 41-43). `connect(channel_id, websocket, participant=None)` at line 45 calls `await websocket.accept()`, appends the websocket to `self.voice_channels`, and if participant is provided, stores it in `self.voice_participants[channel_id][websocket] = participant` (lines 45-49). `disconnect(channel_id, websocket)` at line 51 gets the channel connections, defaults `participant = None`; if the participant map exists and contains this websocket, removes it and cleans up the map if empty; removes the websocket from `voice_channels` list; if the list is empty, pops the channel; returns the removed participant dict (or None) (lines 51-70). `get_participants(channel_id)` at line 72 gets the participants dict for the channel, deduplicates by `user_id` (keeping the first occurrence), and returns a list of unique participant dicts (lines 72-81). `broadcast(channel_id, message, exclude=None)` at line 83 iterates voice channel connections, sends JSON to each non-excluded websocket, disconnecting on errors (lines 83-91). `forward_signal(channel_id, sender, message)` at line 93 calls `self.broadcast(channel_id, message, exclude=sender)` (lines 93-94).
 
 ### `NotificationManager` class (lines 130-146)
 
-| Line | Code |
-|------|------|
-| 130-132 | `class NotificationManager:` / `def __init__(self): self.connections = {}` |
-| 134-136 | `async def connect(self, user_id, websocket):` / `self.connections[user_id] = websocket` |
-| 138-139 | `def disconnect(self, user_id):` / `self.connections.pop(user_id, None)` |
-| 141-143 | `async def send(self, user_id, data):` / `if user_id in self.connections: await self.connections[user_id].send_json(data)` |
-| 146 | `notification_manager = NotificationManager()` |
+`NotificationManager` at line 130 has an `__init__` that initializes `self.connections = {}` (lines 131-132). `connect(user_id, websocket)` at line 134 sets `self.connections[user_id] = websocket` — the caller is expected to have already accepted the websocket (lines 134-136). `disconnect(user_id)` at line 138 pops the user's connection via `self.connections.pop(user_id, None)` (lines 138-139). `send(user_id, data)` at line 141 checks if the user is connected and calls `await self.connections[user_id].send_json(data)` (lines 141-143). A module-level singleton `notification_manager = NotificationManager()` is created at line 146.
