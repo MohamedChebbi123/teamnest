@@ -15,7 +15,7 @@ from utils.Websocket_manager import connectivity_manager, VALID_STATUSES
 from utils.validators import validate_email, validate_password, validate_phone, validate_name
 from models.Friends import Friends
 from database.connection import connect_databse as connect_databse_factory
-
+from sqlalchemy import or_
 logger = logging.getLogger(__name__)
 
 ConnectivityManager = connectivity_manager
@@ -486,7 +486,7 @@ async def get_user_info_by_id_service(user_id: int, db: Session):
 async def check_connectivity(websocket, user: Users, db: Session):
     user_id = user.user_id
 
-    from sqlalchemy import or_
+    
     user_friends = db.query(Friends).filter(
         or_(Friends.user_id == user_id, Friends.friend_id == user_id)
     ).all()
