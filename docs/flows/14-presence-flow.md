@@ -1,73 +1,71 @@
-# Presence / Connectivity Flow
+# Presence Flow — Every Line of Code
 
-## Files
-- `backend/routers/auth_router.py` — WS route + REST endpoints
-- `backend/services/auth_service.py` — `check_connectivity`, `get_online_status`, `set_my_status_service`
-- `backend/utils/Websocket_manager.py` — `ConnectivityManager`, `cleanup_task`
-- `backend/models/Users.py`, `Friends.py`, `Refresh_tokens.py`
+## File: `backend/utils/Websocket_manager.py` — `ConnectivityManager` (lines 149-250)
 
-## ConnectivityManager (Websocket_manager.py)
+| Lines | Code |
+|-------|------|
+| 149 | `VALID_STATUSES = {"online", "away", "dnd", "offline"}` |
 
-| Method | Purpose |
-|--------|---------|
-| `connect(user_id, websocket)` | Accepts WS, adds to connections, sets last_seen + status |
-| `disconnect(user_id, websocket)` | Removes socket, cleans up if last connection |
-| `is_online(user_id)` | Check if any WS connection exists |
-| `get_status(user_id)` | Returns "offline" or stored status (online/away/dnd) |
-| `set_status(user_id, status)` | Validates status ∈ {online, away, dnd}, sets value |
-| `send(user_id, data)` | Send JSON to all user's sockets |
-| `broadcast(user_ids, data)` | Send to multiple users |
+### `ConnectivityManager` class (lines 152-200)
 
-## WebSocket: /ws/connectivity?token=
+| Lines | Code |
+|-------|------|
+| 152 | `class ConnectivityManager:` |
+| 153-156 | `def __init__(self):` / `self.connections: Dict[int, List[WebSocket]] = {}` — maps user_id to active WS list / `self.last_seen: Dict[int, datetime] = {}` / `self.user_status: Dict[int, str] = {}` |
+| 158-164 | `async def connect(self, user_id: int, websocket: WebSocket):` / `await websocket.accept()` / `user_connections = self.connections.setdefault(user_id, [])` / `if websocket not in user_connections: user_connections.append(websocket)` / `self.last_seen[user_id] = datetime.now(timezone.utc)` / `self.user_status.setdefault(user_id, "online")` |
+| 166-172 | `def disconnect(self, user_id: int, websocket: WebSocket):` / `if user_id in self.connections:` / `if websocket in self.connections[user_id]: self.connections[user_id].remove(websocket)` / `if not self.connections[user_id]: self.connections.pop(user_id, None); self.user_status.pop(user_id, None)` — removes user entirely when last WS disconnects |
+| 174-175 | `def is_online(self, user_id: int) -> bool:` / `return user_id in self.connections and len(self.connections[user_id]) > 0` |
+| 177-180 | `def get_status(self, user_id: int) -> str:` / `if not self.is_online(user_id): return "offline"` / `return self.user_status.get(user_id, "online")` |
+| 182-188 | `def set_status(self, user_id: int, status: str) -> str | None:` / `if status not in VALID_STATUSES or status == "offline": return None` — rejects offline as a set_status / `if not self.is_online(user_id): return None` / `self.user_status[user_id] = status; return status` |
+| 190-195 | `async def send(self, user_id: int, data: dict):` — iterates WS list, `ws.send_json(data)`, disconnects on exception |
+| 197-199 | `async def broadcast(self, user_ids: List[int], data: dict):` — calls `self.send(user_id, data)` for each user_id |
+| 202 | `connectivity_manager = ConnectivityManager()` — singleton instance |
 
-**Service:** `check_connectivity`
+### `cleanup_task` (lines 205-252)
 
-### Connection Flow
-1. Accept WebSocket
-2. Verify JWT token — extract user_id
-3. Fetch user's friends list (Friends table — bidirectional)
-4. Set initial status: use `user.status` if valid (not offline), else "online"
-5. Update DB: set `status`, `last_seen_at` in Users table
-6. Broadcast `{type: "user_status", user_id, status}` to all friends
-7. Send `{type: "friends_status", users: [{user_id, status}]}` to connecting user (list of currently online friends)
+| Lines | Code |
+|-------|------|
+| 205 | `async def cleanup_task(db_factory):` |
+| 206-208 | `while True: now = datetime.now(timezone.utc); timeout = timedelta(seconds=60)` |
+| 210-215 | `for user_id in list(connectivity_manager.last_seen.keys()):` / `last = connectivity_manager.last_seen[user_id]` / `if now - last > timeout: dead_sockets = connectivity_manager.connections.pop(user_id, []); connectivity_manager.last_seen.pop(user_id, None); connectivity_manager.user_status.pop(user_id, None)` |
+| 217-221 | `for ws in dead_sockets: try: await ws.close(); except Exception: pass` |
+| 223-241 | Opens DB session: queries `Friends` table for friend_ids of the timed-out user / `rows = db.query(Friends).filter(or_(Friends.user_id == user_id, Friends.friend_id == user_id)).all()` / `friend_ids = [r.friend_id if r.user_id == user_id else r.user_id for r in rows]` / `db.query(Users).filter(Users.user_id == user_id).update({"status": "offline", "last_seen_at": last})` / `db.commit()` / `finally: db.close()` |
+| 243-250 | `await connectivity_manager.broadcast(friend_ids, {"type": "user_offline", "user_id": user_id, "last_seen_at": last.isoformat()})` |
+| 252 | `await asyncio.sleep(10)` — runs every 10 seconds |
 
-### Message Loop
+## File: `backend/services/auth_service.py` — Connection Flow (lines 486-572)
 
-#### "ping"
-- Update `last_seen` timestamp
-- Send `{type: "pong"}`
+### `check_connectivity` (lines 486-572)
 
-#### "set_status"
-- Requested status must be in {online, away, dnd}
-- Apply via `ConnectivityManager.set_status()`
-- Persist to DB (in a separate session to avoid commit conflicts)
-- Broadcast `{type: "user_status", user_id, status}` to all friends
-- Send `{type: "status_ack", status}` to sender
+| Lines | Code |
+|-------|------|
+| 486 | `async def check_connectivity(websocket, user: Users, db: Session):` |
+| 487 | `user_id = user.user_id` |
+| 490-497 | Fetches friend_ids from `Friends` table: `user_friends = db.query(Friends).filter(or_(Friends.user_id == user_id, Friends.friend_id == user_id)).all()` / `friend_ids = [found_friend.friend_id if found_friend.user_id == user_id else found_friend.user_id for found_friend in user_friends]` |
+| 499 | `initial_status = user.status if user.status in VALID_STATUSES and user.status != "offline" else "online"` |
+| 501-502 | `await ConnectivityManager.connect(user_id, websocket)` — accepts WS + adds to connections / `ConnectivityManager.user_status[user_id] = initial_status` |
+| 504-508 | `db.query(Users).filter(Users.user_id == user_id).update({"status": initial_status, "last_seen_at": datetime.now(UTC)})` / `db.commit(); db.close()` |
+| 511-514 | `await ConnectivityManager.broadcast(friend_ids, {"type": "user_status", "user_id": user_id, "status": initial_status})` — notifies friends of online status |
+| 516-522 | `online_friends = [{"user_id": fid, "status": ConnectivityManager.get_status(fid)} for fid in friend_ids if ConnectivityManager.is_online(fid)]` / `if online_friends: await websocket.send_json({"type": "friends_status", "users": online_friends})` |
+| 524-549 | `try: while True: data = await websocket.receive_json()` / `msg_type = data.get("type")` / `if msg_type == "ping": ConnectivityManager.last_seen[user_id] = datetime.now(UTC); await websocket.send_json({"type": "pong"})` / `elif msg_type == "set_status": requested = data.get("status"); applied = ConnectivityManager.set_status(user_id, requested); if applied is None: continue` — opens inner DB session, updates `Users.status`, commits, broadcasts `user_status` to friends, sends `status_ack` to user |
+| 550-572 | `except Exception: pass` / `finally: ConnectivityManager.disconnect(user_id, websocket)` / `if not ConnectivityManager.is_online(user_id):` — updates `Users` to status=offline, broadcasts `user_offline` to friends |
 
-### Disconnect Flow
-1. Remove from ConnectivityManager
-2. If no more connections for this user ID:
-   - Update DB: `status="offline"`, `last_seen_at=now`
-   - Broadcast `{type: "user_offline", user_id, last_seen_at}` to friends
+### `get_online_status` (lines 575-595)
 
-## Background Cleanup Task
+| Lines | Code |
+|-------|------|
+| 575 | `def get_online_status(user_ids: list[int], db: Session) -> dict:` |
+| 577-580 | `persisted = {u.user_id: u for u in db.query(Users).filter(Users.user_id.in_(user_ids)).all()} if user_ids else {}` |
+| 582-595 | `for uid in user_ids: if ConnectivityManager.is_online(uid): status = ConnectivityManager.get_status(uid); last_seen = ConnectivityManager.last_seen.get(uid)` / `else: user_row = persisted.get(uid); status = "offline"; last_seen = user_row.last_seen_at if user_row else None` / `result[uid] = {"online": status != "offline", "status": status, "last_seen_at": last_seen.isoformat() if last_seen else None}` / `return result` |
 
-**Function:** `cleanup_task(db_factory)`
+### `set_my_status_service` (lines 598-629)
 
-- Runs every 10 seconds
-- Checks all users where `last_seen` > 60 seconds ago (no ping received)
-- Removes stale connections from ConnectivityManager
-- Persists `status="offline"` to DB
-- Broadcasts `user_offline` to friends
-
-## REST Endpoints
-
-### GET /online-status?user_ids=1,2,3
-**Service:** `get_online_status`  
-Batch check for comma-separated IDs. Returns per user:
-- `online` (boolean), `status` (string), `last_seen_at` (ISO or null)
-- Uses ConnectivityManager for live status, Users table as fallback
-
-### PUT /me/status
-**Service:** `set_my_status_service`  
-Sets status via REST (user must be WS-connected). Validates status ∈ {online, away, dnd}. Persists to DB. Broadcasts to friends via ConnectivityManager.
+| Lines | Code |
+|-------|------|
+| 598 | `async def set_my_status_service(user: Users, status: str, db: Session):` |
+| 599-600 | `if status not in VALID_STATUSES or status == "offline": raise HTTPException(400, "Invalid status")` |
+| 602-607 | `applied = ConnectivityManager.set_status(user.user_id, status)` / `if applied is None: raise HTTPException(409, "You must be connected to the presence websocket to set status")` |
+| 609-613 | `db.query(Users).filter(Users.user_id == user.user_id).update({"status": applied}); db.commit()` |
+| 615-622 | Queries `Friends` table: `rows = db.query(Friends).filter(or_(Friends.user_id == user.user_id, Friends.friend_id == user.user_id)).all()` / `friend_ids = [r.friend_id if r.user_id == user.user_id else r.user_id for r in rows]` |
+| 624-627 | `await ConnectivityManager.broadcast(friend_ids, {"type": "user_status", "user_id": user.user_id, "status": applied})` |
+| 629 | `return {"status": applied}` |

@@ -1,223 +1,242 @@
-# Organization Flow — Full Code Details
+# Organization Flow — Every Line of Code
 
-## Files
-- **Router:** `backend/routers/org_router.py` (159 lines)
-- **Service:** `backend/services/org_service.py` (718 lines)
-- **Models:** `Organization.py`, `Organization_members.py`, `Pending_members_org.py`, `Organization_payments.py`
-- **Schemas:** `Join_org.py` (fields: `org_name, org_tag`), `Add_members_org.py` (fields: `user_tag, role_user`)
-- **Utils:** `cloudinary_handler.py` (`upload_organization_picture`), `plan_limits.py` (`get_member_limit`), `log_handler.py` (`create_log`)
+## File: `backend/models/Organization.py` (22 lines)
 
----
+| Lines | Code |
+|-------|------|
+| 6-15 | `class Organization(Base):` / `__tablename__="organization"` / `organization_id=Column(Integer,primary_key=True)` / `organization_name=Column(String(20),nullable=False,unique=True,index=True)` / `organaization_picture=Column(String(200),nullable=True)` / `organization_description=Column(Text,nullable=True)` / `organaization_tag=Column(String,nullable=False)` / `organization_plan=Column(String,nullable=True)` / `owner_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)` / `created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
+| 17-22 | `owner = relationship("Users", back_populates="owned_organizations")` / `teams = relationship("Teams", back_populates="organization", cascade="all, delete-orphan")` / `channels = relationship("Channels", back_populates="organization", cascade="all, delete-orphan")` / `payments = relationship("Organization_payments", back_populates="organization", cascade="all, delete-orphan")` / `members = relationship("Organization_members", back_populates="organization", cascade="all, delete-orphan", passive_deletes=True)` / `logs = relationship("Logs", cascade="all, delete-orphan", overlaps="organization")` |
 
-## Constants & Helpers
+## File: `backend/models/Organization_members.py` (16 lines)
 
-### `ORG_NAME_REGEX = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,19}$"`
+| Lines | Code |
+|-------|------|
+| 7-13 | `class Organization_members(Base):` / `__tablename__="org_memebers"` / `id=Column(Integer,primary_key=True)` / `memmber_id=Column(Integer,ForeignKey("users.user_id"),nullable=False)` / `role_user=Column(String,nullable=False)` / `org_id=Column(Integer,ForeignKey("organization.organization_id",ondelete="CASCADE"),nullable=False)` / `joined_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
+| 15-16 | `user = relationship("Users")` / `organization = relationship("Organization", back_populates="members")` |
 
-### `_validate_org_name(name)`
-```python
-if not re.match(ORG_NAME_REGEX, name):
-    raise HTTPException(
-        status_code=400,
-        detail="Organization name must be 3-20 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores"
-    )
-```
+## File: `backend/models/Pending_members_org.py` (14 lines)
 
----
+| Lines | Code |
+|-------|------|
+| 6-11 | `class Pending_members_org(Base):` / `__tablename__="pending_members_org"` / `id=Column(Integer,primary_key=True)` / `user_id=Column(Integer,ForeignKey('users.user_id'))` / `org_id=Column(Integer,ForeignKey('organization.organization_id'))` / `sent_at=Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
+| 13-14 | `user=relationship("Users",backref="pending_orgs")` / `organization=relationship("Organization",backref=backref("pending_members", cascade="all, delete-orphan"))` |
 
-## POST /create_organization
-**Router:** `create_organization(organization_name: str = Form(...), organization_description: str = Form(None), image: UploadFile = File(...), user: Users = Depends(current_user), db)`
+## File: `backend/models/Organization_payments.py` (17 lines)
 
-**Service:** `create_organization_service(organization_name, organization_description, image, user, db)`
+| Lines | Code |
+|-------|------|
+| 7-14 | `class Organization_payments(Base):` / `__tablename__="organization_payments"` / `subscription_id=Column(Integer,primary_key=True)` / `organization_id=Column(Integer,ForeignKey("organization.organization_id"),nullable=False)` / `stripe_subscription_id = Column(String)` / `stripe_price_id = Column(String)` / `status = Column(String)` / `created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))` |
+| 16 | `organization = relationship("Organization", back_populates="payments")` |
 
-1. `if not user.is_verified: raise HTTPException(403, 'Please verify your account to create an organization')`
-2. `_validate_org_name(organization_name)`
-3. `organaization_tag = str(random.randint(100000, 999999))` — 6-digit tag
-4. Check: `db.query(Organization).filter(Organization.organization_name == organization_name).first()` — if exists: `raise HTTPException(409, "Organization with this name already exists")`
-5. `new_organization = Organization(organization_name=..., organaization_picture=upload_organization_picture(image), organization_description=..., organaization_tag=..., owner_id=user.user_id)`
-6. `db.add(new_organization)`, `db.commit()`, `db.refresh(new_organization)`
-7. `new_org_mem = Organization_members(memmber_id=user.user_id, org_id=new_organization.organization_id, role_user="OWNER")`
-8. Returns the organization object
+## File: `backend/utils/plan_limits.py` (29 lines)
 
----
+| Lines | Code |
+|-------|------|
+| 1 | `FREE_MAX_CHANNELS = 5` |
+| 2 | `FREE_MAX_FILE_SIZE_MB = 10` |
+| 3 | `FREE_MAX_FILE_SIZE_BYTES = FREE_MAX_FILE_SIZE_MB * 1024 * 1024` = 10,485,760 |
+| 5 | `FREE_MAX_MEMBERS = 10` |
+| 7-9 | `PRO_MAX_CHANNELS = None` / `PRO_MAX_FILE_SIZE_BYTES = None` / `PRO_MAX_MEMBERS = None` |
+| 12-15 | `def get_member_limit(plan): if plan and plan.upper() == "PRO": return PRO_MAX_MEMBERS; return FREE_MAX_MEMBERS` |
+| 18-21 | `def get_channel_limit(plan): if plan and plan.upper() == "PRO": return PRO_MAX_CHANNELS; return FREE_MAX_CHANNELS` |
+| 24-27 | `def get_file_size_limit(plan): if plan and plan.upper() == "PRO": return PRO_MAX_FILE_SIZE_BYTES; return FREE_MAX_FILE_SIZE_BYTES` |
 
-## GET /get_org_for_admin_org
-**Service:** `fetch_organization_service(user, db)`
+## File: `backend/utils/log_handler.py` (17 lines)
 
-```python
-orgs_enrolled_in = db.query(Organization).join(
-    Organization_members, Organization.organization_id == Organization_members.org_id
-).filter(Organization_members.memmber_id == user_id).all()
+| Lines | Code |
+|-------|------|
+| 6-17 | `def create_log(db, org_id, actor_id, action, target_id=None, target_type=None, metadata=None):` / `log = Logs(org_id=org_id, actor_id=actor_id, action=action, target_id=target_id, target_type=target_type, log_metadata=json.dumps(metadata) if metadata else None)` / `db.add(log); db.commit(); return log` |
 
-return [{organization_id, organization_name, organaization_picture, organaization_tag,
-         organization_description, organization_plan, owner_id, created_at} for org in orgs_enrolled_in]
-```
+## File: `backend/routers/org_router.py` (159 lines)
 
----
+| Lines | Code |
+|-------|------|
+| 1-24 | Imports: `from services.org_service import (...)` 15 services; `router = APIRouter()` |
+| 27-34 | `@router.post("/stripe/webhook")` / `async def stripe_webhook(request, stripe_signature: str \| None = Header(default=None, alias="stripe-signature"), db=Depends(connect_databse)):` / `payload = await request.body()` / `return handle_stripe_webhook_service(payload, stripe_signature, db)` |
+| 37-45 | `@router.post("/create_organization")` / `async def create_organization(organization_name=Form(...), organization_description=Form(None), image=File(...), user=Depends(current_user), db=Depends(connect_databse)):` / `return create_organization_service(organization_name, organization_description, image, user, db)` |
+| 48-53 | `@router.get("/get_org_for_admin_org")` / `async def get_org_for_admin(user=Depends(current_user), db=Depends(connect_databse)):` / `return fetch_organization_service(user, db)` |
+| 56-63 | `@router.post("/organization/{org_id}/add_member")` / `async def add_member_to_org(org_id: int, valid: Add_members_org, user=Depends(current_user), db=Depends(connect_databse)):` / `return add_members_to_org_service(org_id, valid, user, db)` |
+| 66-76 | `@router.put("/organization/{org_id}")` / `async def update_organization(org_id, organization_name=Form(...), organization_description=Form(None), organization_plan=Form(...), image=File(None), user=Depends(current_user), db=Depends(connect_databse)):` / `return update_organization_service(org_id, organization_name, organization_description, organization_plan, image, user, db)` |
+| 79-85 | `@router.delete("/organization/{org_id}")` / `async def delete_organization(org_id, user=Depends(current_user), db=Depends(connect_databse)):` / `return delete_organization_service(org_id, user, db)` |
+| 88-94 | `@router.get("/organization/{org_id}/members")` / `async def get_organization_members(org_id, user=Depends(current_user), db=Depends(connect_databse)):` / `return fetch_org_members(org_id, user, db)` |
+| 97-103 | `@router.post("/organization/join")` / `async def join_organization(data: Join_org, user=Depends(current_user), db=Depends(connect_databse)):` / `return join_org_service(data, user, db)` |
+| 106-112 | `@router.get("/organization/{org_id}/join-requests")` / `async def get_organization_join_requests(org_id, user=Depends(current_user), db=Depends(connect_databse)):` / `return fetch_pending_org_requests_service(org_id, user, db)` |
+| 115-121 | `@router.post("/organization/{org_id}/subscribe")` / `async def subscribe_organization(org_id, user=Depends(current_user), db=Depends(connect_databse)):` / `return create_subscritpion_service(org_id, user, db)` |
+| 124-131 | `@router.post("/organization/{org_id}/confirm-upgrade")` / `async def confirm_upgrade(org_id, session_id: str \| None = Query(default=None), user=Depends(current_user), db=Depends(connect_databse)):` / `return confirm_upgrade_service(org_id, session_id, user, db)` |
+| 134-140 | `@router.post("/organization/{org_id}/cancel-subscription")` / `async def cancel_subscription(org_id, user=Depends(current_user), db=Depends(connect_databse)):` / `return cancel_subscription_service(org_id, user, db)` |
+| 143-159 | `@router.post("/organization/{org_id}/join-requests/{request_id}")` / `async def handle_organization_join_request(org_id, request_id, action, role_user="MEMBER", user=Depends(current_user), db=Depends(connect_databse)):` / `return accept_or_reject_service(org_id=org_id, request_id=request_id, action=action, role_user=role_user, user=user, db=db)` |
 
-## POST /organization/{org_id}/add_member
-**Router:** `add_member_to_org(org_id, valid: Add_members_org, user, db)`
+## File: `backend/services/org_service.py` (718 lines)
 
-**Service:** `add_members_to_org_service(org_id, valid, user, db)`
+### Constants & Helpers (lines 1-31)
+| Line | Code |
+|------|------|
+| 7 | `stripe.api_key = os.getenv("STRIPE_SECRET_KEY")` |
+| 23 | `ORG_NAME_REGEX = r"^[a-zA-Z0-9][a-zA-Z0-9\s_-]{2,19}$"` |
+| 26-31 | `def _validate_org_name(name): if not re.match(ORG_NAME_REGEX, name): raise HTTPException(400, detail="Organization name must be 3-20 characters, start with a letter or number, and contain only letters, numbers, spaces, hyphens, or underscores")` |
 
-1. `organization = db.query(Organization).filter(Organization.organization_id == org_id).first()` — if None: 404
-2. `found_user_at_org = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` — if None: 403 "You are not a member of this organization"
-3. `if found_user_at_org.role_user not in ["OWNER", "ADMIN"]`: 403 "Only owners and admins can add members"
-4. `member_to_add = db.query(Users).filter(Users.user_tag == valid.user_tag).first()` — if None: 404 "User not found"
-5. `existing_member = db.query(Organization_members).filter(Organization_members.memmber_id == member_to_add.user_id, Organization_members.org_id == org_id).first()` — if exists: 409 "User already in organization"
-6. Plan limit check:
-```python
-member_limit = get_member_limit(organization.organization_plan)  # FREE→10, PRO→None
-if member_limit is not None:
-    current_count = db.query(Organization_members).filter(Organization_members.org_id == org_id).count()
-    if current_count >= member_limit:
-        raise HTTPException(403, f"Free plan allows a maximum of {member_limit} members. Upgrade to Pro for unlimited members.")
-```
-7. `new_member = Organization_members(memmber_id=member_to_add.user_id, org_id=org_id, role_user=valid.role_user)`
-8. `create_log(db, org_id=org_id, actor_id=user_id, action="member_added", target_id=member_to_add.user_id, target_type="user", metadata={"role": valid.role_user})`
-9. Returns `{"msg": "member has been added sucessfully", "user_id": ...}`
+### `create_organization_service` (lines 34-74)
+| Line | Code |
+|------|------|
+| 41-42 | `if not user.is_verified: raise HTTPException(403, 'Please verify your account to create an organization')` |
+| 44 | `_validate_org_name(organization_name)` |
+| 46 | `organaization_tag = str(random.randint(100000, 999999))` |
+| 48-51 | `existing_organization = db.query(Organization).filter(Organization.organization_name == organization_name).first()` / `if existing_organization: raise HTTPException(409, "Organization with this name already exists")` |
+| 53-59 | `new_organization = Organization(organization_name=organization_name, organaization_picture=upload_organization_picture(image), organization_description=organization_description, organaization_tag=organaization_tag, owner_id=user.user_id)` |
+| 61-63 | `db.add(new_organization); db.commit(); db.refresh(new_organization)` |
+| 65-69 | `new_org_mem = Organization_members(memmber_id=user.user_id, org_id=new_organization.organization_id, role_user="OWNER")` |
+| 71-72 | `db.add(new_org_mem); db.commit()` |
+| 74 | `return new_organization` |
 
----
+### `create_subscritpion_service` (lines 77-109)
+| Line | Code |
+|------|------|
+| 78 | `user_id = user.user_id` |
+| 80-86 | `found_organization = db.query(Organization).filter(Organization.organization_id == org_id, Organization.owner_id == user_id).first()` / `if not found_organization: raise HTTPException(404, "Organization not found or you are not the owner")` |
+| 88-89 | `if found_organization.organization_plan == "PRO": raise HTTPException(400, "Organization is already on the Pro plan")` |
+| 91-93 | `pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")` / `if not pro_price_id: raise HTTPException(500, "Billing is not configured")` |
+| 95-107 | `session = stripe.checkout.Session.create(payment_method_types=["card"], mode="subscription", line_items=[{"price": pro_price_id, "quantity": 1}], success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/success?org_id={org_id}&session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/cancel", metadata={"org_id": str(org_id), "user_id": str(user_id)}, subscription_data={"metadata": {"org_id": str(org_id), "user_id": str(user_id)}}, client_reference_id=str(org_id))` |
+| 109 | `return session.url` |
 
-## PUT /organization/{org_id}
-**Router:** `update_organization(org_id, organization_name, organization_description, organization_plan, image, user, db)`
+### `confirm_upgrade_service` (lines 112-176)
+| Line | Code |
+|------|------|
+| 113 | `logger.info("confirm_upgrade invoked", extra={"org_id": org_id, "session_id": session_id})` |
+| 114 | `user_id = user.user_id` |
+| 116-122 | `org = db.query(Organization).filter(Organization.organization_id == org_id, Organization.owner_id == user_id).first()` / `if not org: raise HTTPException(404, "Organization not found")` |
+| 124-130 | `payment = db.query(Organization_payments).filter(Organization_payments.organization_id == org_id, Organization_payments.status == "active").first()` / `if org.organization_plan == "PRO" and payment and payment.stripe_subscription_id: return {"status": "active", "plan": org.organization_plan}` |
+| 134-176 | `if session_id: try: session = stripe.checkout.Session.retrieve(session_id)` / `meta_org_id = (session.get("metadata") or {}).get("org_id") or session.get("client_reference_id")` / `if meta_org_id_int != org_id: return {"status": "pending", "plan": org.organization_plan}` / `if session.get("payment_status") != "paid" or session.get("mode") != "subscription": return {"status": "pending"}` / `subscription_id = session.get("subscription")` / `if not subscription_id: return {"status": "pending"}` / `subscription = stripe.Subscription.retrieve(subscription_id)` / `items = subscription.get("items", {}).get("data", [])` / `price_id = items[0]["price"]["id"] if items else None` / `if pro_price_id and price_id != pro_price_id: return {"status": "pending"}` / `_activate_pro_for_org(db, org_id, subscription_id, price_id); db.refresh(org); return {"status": "active", "plan": org.organization_plan}` / `except Exception: logger.exception(...); return {"status": "pending", "plan": org.organization_plan}` / `return {"status": "pending", "plan": org.organization_plan}` |
 
-**Service:** `update_organization_service(org_id, organization_name, organization_description, organization_plan, image, user, db)`
+### `_resolve_org_id_from_subscription` (lines 179-187)
+| Line | Code |
+|------|------|
+| 180-187 | `metadata = subscription.get("metadata") or {}; org_id_raw = metadata.get("org_id"); if org_id_raw: try: return int(org_id_raw); except (TypeError, ValueError): return None; return None` |
 
-1. `organization = db.query(Organization).filter(Organization.organization_id == org_id).first()` — if None: 404
-2. `if organization.owner_id != user_id`: 403 "Only the owner can edit this organization"
-3. If name changed: `_validate_org_name(organization_name)`, check uniqueness (excluding self)
-4. If description: `organization.organization_description = organization_description`
-5. If image: `organization.organaization_picture = upload_organization_picture(image)`
-6. `create_log(db, ..., action="org_updated")`
-7. Returns `{"msg": "Organization updated successfully", "organization": {...}}`
+### `_activate_pro_for_org` (lines 190-220)
+| Line | Code |
+|------|------|
+| 191-194 | `org = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not org: logger.warning(...); return` |
+| 196-214 | `payment = db.query(Organization_payments).filter(Organization_payments.organization_id == org_id, Organization_payments.stripe_subscription_id == stripe_subscription_id).first()` / `if payment: payment.status = "active"; payment.stripe_price_id = stripe_price_id or payment.stripe_price_id` / `else: db.query(Organization_payments).filter(Organization_payments.organization_id == org_id, Organization_payments.status == "active").update({Organization_payments.status: "superseded"}); db.add(Organization_payments(organization_id=org_id, stripe_subscription_id=stripe_subscription_id, stripe_price_id=stripe_price_id, status="active"))` |
+| 216-218 | `if org.organization_plan != "PRO": org.organization_plan = "PRO"; create_log(db, org_id=org_id, actor_id=org.owner_id, action="plan_upgraded", target_id=org_id, target_type="organization", metadata={"plan": "PRO"})` |
+| 220 | `db.commit()` |
 
----
+### `_deactivate_pro_for_subscription` (lines 223-238)
+| Line | Code |
+|------|------|
+| 224-229 | `payment = db.query(Organization_payments).filter(Organization_payments.stripe_subscription_id == stripe_subscription_id).first(); if not payment: logger.info(...); return` |
+| 231 | `payment.status = new_status` |
+| 233-236 | `org = db.query(Organization).filter(Organization.organization_id == payment.organization_id).first(); if org and org.organization_plan == "PRO": org.organization_plan = "FREE"; create_log(db, ..., action="plan_downgraded", metadata={"plan": "FREE", "reason": new_status})` |
+| 238 | `db.commit()` |
 
-## DELETE /organization/{org_id}
-**Service:** `delete_organization_service(org_id, user, db)`
+### `handle_stripe_webhook_service` (lines 241-327)
+| Line | Code |
+|------|------|
+| 242-248 | `webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET"); if not webhook_secret: raise HTTPException(500, "Webhook not configured"); if not sig_header: raise HTTPException(400, "Missing Stripe signature")` |
+| 250-255 | `try: event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)` / `except ValueError: raise HTTPException(400, "Invalid payload")` / `except stripe.error.SignatureVerificationError: raise HTTPException(400, "Invalid signature")` |
+| 257-259 | `event_type = event["type"]; data_object = event["data"]["object"]; pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")` |
+| 263-298 | `if event_type == "checkout.session.completed": if data_object.get("mode") != "subscription": return {"received": True}; if data_object.get("payment_status") != "paid": return {"received": True}; metadata = data_object.get("metadata") or {}; org_id_raw = metadata.get("org_id") or data_object.get("client_reference_id"); if not org_id_raw: return {"received": True}; org_id = int(org_id_raw); subscription_id = data_object.get("subscription"); subscription = stripe.Subscription.retrieve(subscription_id); items = subscription.get("items",{}).get("data",[]); price_id = items[0]["price"]["id"] if items else None; if pro_price_id and price_id != pro_price_id: return {"received": True}; _activate_pro_for_org(db, org_id, subscription_id, price_id); return {"received": True}` |
+| 300-320 | `if event_type in ("customer.subscription.updated", "customer.subscription.created"): subscription_id = data_object.get("id"); status = data_object.get("status"); items = data_object.get("items",{}).get("data",[]); price_id = items[0]["price"]["id"] if items else None; if pro_price_id and price_id != pro_price_id: return {"received": True}; if status in ("active", "trialing"): org_id = _resolve_org_id_from_subscription(data_object); existing = db.query(Organization_payments).filter(Organization_payments.stripe_subscription_id == subscription_id).first(); if org_id is None and existing: org_id = existing.organization_id; if org_id is not None: _activate_pro_for_org(db, org_id, subscription_id, price_id); elif status in ("canceled", "unpaid", "past_due", "incomplete_expired"): _deactivate_pro_for_subscription(db, subscription_id, status); return {"received": True}` |
+| 322-325 | `if event_type == "customer.subscription.deleted": subscription_id = data_object.get("id"); _deactivate_pro_for_subscription(db, subscription_id, "cancelled"); return {"received": True}` |
+| 327 | `return {"received": True}` |
 
-1. `organization = db.query(Organization).filter(...).first()` — 404 if not found
-2. `if organization.owner_id != user_id`: 403 "Only the owner can delete this organization"
-3. `create_log(db, ..., action="org_deleted")`
-4. `db.query(Organization_members).filter(Organization_members.org_id == org_id).delete()`
-5. `db.delete(organization)`, `db.commit()`
-6. Returns `{"msg": "Organization deleted successfully"}`
+### `cancel_subscription_service` (lines 330-363)
+| Line | Code |
+|------|------|
+| 331 | `user_id = user.user_id` |
+| 333-339 | `org = db.query(Organization).filter(Organization.organization_id == org_id, Organization.owner_id == user_id).first(); if not org: raise HTTPException(404, "Organization not found or you are not the owner")` |
+| 341-342 | `if org.organization_plan != "PRO": raise HTTPException(400, "Organization does not have an active Pro plan")` |
+| 344-350 | `payment = db.query(Organization_payments).filter(Organization_payments.organization_id == org_id, Organization_payments.status == "active").first(); if not payment or not payment.stripe_subscription_id: raise HTTPException(404, "No active subscription found for this organization")` |
+| 352-355 | `try: stripe.Subscription.cancel(payment.stripe_subscription_id); except stripe.StripeError as e: raise HTTPException(502, f"Stripe error: {str(e)}")` |
+| 357-359 | `payment.status = "cancelled"; org.organization_plan = "FREE"; db.commit()` |
+| 361 | `create_log(db, org_id=org_id, actor_id=user_id, action="subscription_cancelled", target_id=org_id, target_type="organization")` |
+| 363 | `return {"message": "Subscription cancelled. Your organization has been downgraded to the Free plan."}` |
 
----
+### `fetch_organization_service` (lines 366-385)
+| Line | Code |
+|------|------|
+| 367 | `user_id = user.user_id` |
+| 369-371 | `orgs_enrolled_in = db.query(Organization).join(Organization_members, Organization.organization_id == Organization_members.org_id).filter(Organization_members.memmber_id == user_id).all()` |
+| 373-385 | Returns `[{organization_id, organization_name, organaization_picture, organaization_tag, organization_description, organization_plan, owner_id, created_at.isoformat()...}]` |
 
-## GET /organization/{org_id}/members
-**Service:** `fetch_org_members(org_id, user, db)`
+### `add_members_to_org_service` (lines 388-443)
+| Line | Code |
+|------|------|
+| 389 | `user_id = user.user_id` |
+| 391-393 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not organization: raise HTTPException(404, "Organization not found")` |
+| 395-401 | `found_user_at_org = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first(); if not found_user_at_org: raise HTTPException(403, "You are not a member of this organization")` |
+| 403-404 | `if found_user_at_org.role_user not in ["OWNER", "ADMIN"]: raise HTTPException(403, "Only owners and admins can add members")` |
+| 406-409 | `member_to_add = db.query(Users).filter(Users.user_tag == valid.user_tag).first(); if not member_to_add: raise HTTPException(404, "User not found")` |
+| 411-417 | `existing_member = db.query(Organization_members).filter(Organization_members.memmber_id == member_to_add.user_id, Organization_members.org_id == org_id).first(); if existing_member: raise HTTPException(409, "User already in organization")` |
+| 419-426 | `member_limit = get_member_limit(organization.organization_plan); if member_limit is not None: current_count = db.query(Organization_members).filter(Organization_members.org_id == org_id).count(); if current_count >= member_limit: raise HTTPException(403, f"Free plan allows a maximum of {member_limit} members. Upgrade to Pro for unlimited members.")` |
+| 428-436 | `new_member = Organization_members(memmber_id=member_to_add.user_id, org_id=org_id, role_user=valid.role_user); db.add(new_member); db.commit(); db.refresh(new_member)` |
+| 438 | `create_log(db, org_id=org_id, actor_id=user_id, action="member_added", target_id=member_to_add.user_id, target_type="user", metadata={"role": valid.role_user})` |
+| 440-443 | `return {"msg": "member has been added sucessfully", "user_id": member_to_add.user_id}` |
 
-1. Checks org exists + user is member
-2. ```python
-   org_members = db.query(Organization_members).join(
-       Users, Organization_members.memmber_id == Users.user_id
-   ).filter(Organization_members.org_id == org_id).all()
-   ```
-3. Returns list of `{user_id, first_name, last_name, user_tag, email, profile_picture, role_user, joined_at}`
+### `update_organization_service` (lines 446-497)
+| Line | Code |
+|------|------|
+| 455 | `user_id = user.user_id` |
+| 457-459 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not organization: raise HTTPException(404, "Organization not found")` |
+| 461-462 | `if organization.owner_id != user_id: raise HTTPException(403, "Only the owner can edit this organization")` |
+| 464-475 | `if organization_name and organization_name != organization.organization_name: _validate_org_name(organization_name); existing_org = db.query(Organization).filter(Organization.organization_name == organization_name, Organization.organization_id != org_id).first(); if existing_org: raise HTTPException(409, "Organization with this name already exists"); organization.organization_name = organization_name` |
+| 477-478 | `if organization_description is not None: organization.organization_description = organization_description` |
+| 480-481 | `if image: organization.organaization_picture = upload_organization_picture(image)` |
+| 483-484 | `db.commit(); db.refresh(organization)` |
+| 486 | `create_log(db, org_id=org_id, actor_id=user_id, action="org_updated", target_id=org_id, target_type="organization")` |
+| 488-497 | Returns `{"msg": "Organization updated successfully", "organization": {organization_id, organization_name, organaization_picture, organization_description, organization_plan}}` |
 
----
+### `delete_organization_service` (lines 500-517)
+| Line | Code |
+|------|------|
+| 501 | `user_id = user.user_id` |
+| 503-505 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not organization: raise HTTPException(404, "Organization not found")` |
+| 507-508 | `if organization.owner_id != user_id: raise HTTPException(403, "Only the owner can delete this organization")` |
+| 510 | `create_log(db, org_id=org_id, actor_id=user_id, action="org_deleted", target_id=org_id, target_type="organization")` |
+| 512 | `db.query(Organization_members).filter(Organization_members.org_id == org_id).delete()` |
+| 514-515 | `db.delete(organization); db.commit()` |
+| 517 | `return {"msg": "Organization deleted successfully"}` |
 
-## POST /organization/join
-**Router:** `join_organization(data: Join_org, user, db)`
+### `fetch_org_members` (lines 520-551)
+| Line | Code |
+|------|------|
+| 521 | `user_id = user.user_id` |
+| 523-525 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not organization: raise HTTPException(404, "Organization not found")` |
+| 527-533 | `found_user_at_org = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first(); if not found_user_at_org: raise HTTPException(404, "Organization not found")` |
+| 535-537 | `org_members = db.query(Organization_members).join(Users, Organization_members.memmber_id == Users.user_id).filter(Organization_members.org_id == org_id).all()` |
+| 539-551 | Returns `[{user_id, first_name, last_name, user_tag, email, profile_picture, role_user, joined_at.isoformat()...}]` |
 
-**Service:** `join_org_service(data, user, db)`
+### `join_org_service` (lines 554-596)
+| Line | Code |
+|------|------|
+| 555 | `user_id = user.user_id` |
+| 557-563 | `found_org = db.query(Organization).filter(Organization.organization_name == data.org_name, Organization.organaization_tag == str(data.org_tag)).first(); if not found_org: raise HTTPException(404, "Organization not found")` |
+| 565-571 | `existing_member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == found_org.organization_id).first(); if existing_member: raise HTTPException(409, "You are already a member of this organization")` |
+| 573-579 | `existing_request = db.query(Pending_members_org).filter(Pending_members_org.user_id == user_id, Pending_members_org.org_id == found_org.organization_id).first(); if existing_request: raise HTTPException(409, "Join request already sent")` |
+| 581-588 | `new_invite = Pending_members_org(user_id=user_id, org_id=found_org.organization_id); db.add(new_invite); db.commit(); db.refresh(new_invite)` |
+| 590 | `create_log(db, org_id=found_org.organization_id, actor_id=user_id, action="join_request_sent", target_id=user_id, target_type="user")` |
+| 592-596 | `return {"msg": "Join request sent successfully", "request_id": new_invite.id, "organization_id": found_org.organization_id}` |
 
-1. `found_org = db.query(Organization).filter(Organization.organization_name == data.org_name, Organization.organaization_tag == str(data.org_tag)).first()` — if None: 404 "Organization not found"
-2. `existing_member = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == found_org.organization_id).first()` — if exists: 409 "You are already a member"
-3. `existing_request = db.query(Pending_members_org).filter(Pending_members_org.user_id == user_id, Pending_members_org.org_id == found_org.organization_id).first()` — if exists: 409 "Join request already sent"
-4. `new_invite = Pending_members_org(user_id=user_id, org_id=found_org.organization_id)`
-5. `create_log(db, ..., action="join_request_sent")`
-6. Returns `{"msg": "Join request sent successfully", "request_id": ..., "organization_id": ...}`
+### `fetch_pending_org_requests_service` (lines 599-631)
+| Line | Code |
+|------|------|
+| 600 | `user_id = user.user_id` |
+| 602-604 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not organization: raise HTTPException(404, "Organization not found")` |
+| 606-612 | `requester_membership = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first(); if not requester_membership or requester_membership.role_user not in ["OWNER", "ADMIN"]: raise HTTPException(403, "Only organization owners and admins can view join requests")` |
+| 614-616 | `pending_requests = db.query(Pending_members_org).join(Users, Pending_members_org.user_id == Users.user_id).filter(Pending_members_org.org_id == org_id).all()` |
+| 618-631 | Returns `[{request_id, user_id, org_id, sent_at.isoformat()..., first_name, last_name, email, user_tag, profile_picture}]` |
 
----
-
-## GET /organization/{org_id}/join-requests
-**Service:** `fetch_pending_org_requests_service(org_id, user, db)`
-
-1. Check org exists
-2. `requester_membership = db.query(Organization_members).filter(Organization_members.memmber_id == user_id, Organization_members.org_id == org_id).first()` — if not OWNER/ADMIN: 403
-3. ```python
-   pending_requests = db.query(Pending_members_org).join(
-       Users, Pending_members_org.user_id == Users.user_id
-   ).filter(Pending_members_org.org_id == org_id).all()
-   ```
-4. Returns list of `{request_id, user_id, org_id, sent_at, first_name, last_name, email, user_tag, profile_picture}`
-
----
-
-## POST /organization/{org_id}/join-requests/{request_id}?action=accept&role_user=MEMBER
-**Router:** `handle_organization_join_request(org_id, request_id, action, role_user="MEMBER", user, db)`
-
-**Service:** `accept_or_reject_service(org_id, request_id, action, role_user, user, db)`
-
-1. Check org exists
-2. `requester_membership = db.query(Organization_members).filter(Organization_members.memmber_id == requester_user_id, Organization_members.org_id == org_id).first()` — if not OWNER/ADMIN: 403
-3. `pending_request = db.query(Pending_members_org).filter(Pending_members_org.id == request_id, Pending_members_org.org_id == org_id).first()` — if None: 404 "Join request not found"
-4. If action == "reject": `db.delete(pending_request)`, `db.commit()`, `create_log(db, ..., action="join_request_rejected")`, return success message
-5. If action != "accept": `raise HTTPException(400, "Action must be either 'accept' or 'reject'")`
-6. `if role_user not in ["ADMIN", "MEMBER"]`: 400 "Role must be either ADMIN or MEMBER"
-7. Check user not already member
-8. Plan limit check (same as add_members_to_org_service)
-9. Creates Organization_members row, deletes pending request
-10. `create_log(db, ..., action="join_request_accepted")`
-
----
-
-## Stripe Subscription Helpers
-
-### `_activate_pro_for_org(db, org_id, subscription_id, price_id)`
-```python
-org = db.query(Organization).filter(Organization.organization_id == org_id).first()
-if not org: return
-
-payment = db.query(Organization_payments).filter(
-    Organization_payments.organization_id == org_id,
-    Organization_payments.stripe_subscription_id == subscription_id,
-).first()
-
-if payment:
-    payment.status = "active"
-    payment.stripe_price_id = price_id or payment.stripe_price_id
-else:
-    db.query(Organization_payments).filter(
-        Organization_payments.organization_id == org_id,
-        Organization_payments.status == "active",
-    ).update({Organization_payments.status: "superseded"})
-    db.add(Organization_payments(...))
-
-if org.organization_plan != "PRO":
-    org.organization_plan = "PRO"
-    create_log(db, ..., action="plan_upgraded", metadata={"plan": "PRO"})
-```
-
-### `_deactivate_pro_for_subscription(db, subscription_id, new_status)`
-```python
-payment = db.query(Organization_payments).filter(
-    Organization_payments.stripe_subscription_id == subscription_id,
-).first()
-if not payment: return
-payment.status = new_status
-org = db.query(Organization).filter(...).first()
-if org and org.organization_plan == "PRO":
-    org.organization_plan = "FREE"
-    create_log(db, ..., action="plan_downgraded", metadata={"plan": "FREE", "reason": new_status})
-```
-
----
-
-## Plan Limits (plan_limits.py)
-
-```python
-FREE_MAX_CHANNELS = 5
-FREE_MAX_FILE_SIZE_MB = 10
-FREE_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10,485,760
-FREE_MAX_MEMBERS = 10
-PRO_MAX_CHANNELS = None     # unlimited
-PRO_MAX_FILE_SIZE_BYTES = None  # unlimited
-PRO_MAX_MEMBERS = None      # unlimited
-
-def get_member_limit(plan): return PRO_MAX_MEMBERS if plan and plan.upper() == "PRO" else FREE_MAX_MEMBERS
-def get_channel_limit(plan): return PRO_MAX_CHANNELS if plan and plan.upper() == "PRO" else FREE_MAX_CHANNELS
-def get_file_size_limit(plan): return PRO_MAX_FILE_SIZE_BYTES if plan and plan.upper() == "PRO" else FREE_MAX_FILE_SIZE_BYTES
-```
+### `accept_or_reject_service` (lines 634-718)
+| Line | Code |
+|------|------|
+| 642 | `requester_user_id = user.user_id` |
+| 644-646 | `organization = db.query(Organization).filter(Organization.organization_id == org_id).first(); if not organization: raise HTTPException(404, "Organization not found")` |
+| 648-654 | `requester_membership = db.query(Organization_members).filter(Organization_members.memmber_id == requester_user_id, Organization_members.org_id == org_id).first(); if not requester_membership or requester_membership.role_user not in ["OWNER", "ADMIN"]: raise HTTPException(403, "Only organization owners and admins can handle join requests")` |
+| 656-662 | `pending_request = db.query(Pending_members_org).filter(Pending_members_org.id == request_id, Pending_members_org.org_id == org_id).first(); if not pending_request: raise HTTPException(404, "Join request not found")` |
+| 664-672 | `if action == "reject": db.delete(pending_request); db.commit(); create_log(db, ..., action="join_request_rejected"); return {"msg": "Join request rejected successfully", ...}` |
+| 674-675 | `if action != "accept": raise HTTPException(400, "Action must be either 'accept' or 'reject'")` |
+| 677-678 | `if role_user not in ["ADMIN", "MEMBER"]: raise HTTPException(400, "Role must be either ADMIN or MEMBER")` |
+| 680-688 | `existing_member = db.query(Organization_members).filter(Organization_members.memmber_id == pending_request.user_id, Organization_members.org_id == org_id).first(); if existing_member: db.delete(pending_request); db.commit(); raise HTTPException(409, "User is already a member of this organization")` |
+| 690-697 | `member_limit = get_member_limit(organization.organization_plan); if member_limit is not None: current_count = db.query(Organization_members).filter(Organization_members.org_id == org_id).count(); if current_count >= member_limit: raise HTTPException(403, f"Free plan allows a maximum of {member_limit} members. Upgrade to Pro for unlimited members.")` |
+| 699-708 | `new_member = Organization_members(memmber_id=pending_request.user_id, org_id=org_id, role_user=role_user); db.add(new_member); db.delete(pending_request); db.commit(); db.refresh(new_member)` |
+| 710 | `create_log(db, org_id=org_id, actor_id=requester_user_id, action="join_request_accepted", target_id=new_member.memmber_id, target_type="user", metadata={"role": role_user})` |
+| 712-718 | `return {"msg": "Join request accepted successfully", "request_id": request_id, "organization_id": org_id, "user_id": new_member.memmber_id, "role_user": new_member.role_user}` |

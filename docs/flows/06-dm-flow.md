@@ -1,265 +1,297 @@
-# Direct Message Flow — Full Code Details
+# Direct Message Flow — Every Line of Code
 
-## Files
-- **Router:** `backend/routers/direct_messages_router.py` (108 lines)
-- **Service:** `backend/services/direct_messages_service.py` (1152 lines)
-- **Models:** `Direct_messages.py`, `Users.py`, `Friends.py`, `Blocked_users.py`, `Organization_members.py`, `Notifications.py`
-- **Schemas:** `Direct_messages_schema.py` (`sender_id, receiver_id, content, parent_id?`), `Direct_message_file_input.py` (`receiver_id, file_name, file_size, file_base64, mime_type, parent_id?`), `Direct_message_edit_input.py` (`content`)
-- **WS Managers:** `DMWebSocketManager`, `notification_manager`
+## File: `backend/models/Direct_messages.py` (20 lines)
 
----
+| Lines | Code |
+|-------|------|
+| 6-7 | `class Direct_messages(Base):` / `__tablename__ = "direct_messages"` |
+| 9 | `id = Column(Integer, primary_key=True, index=True)` |
+| 11 | `sender_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` |
+| 12 | `receiver_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)` |
+| 13 | `content = Column(Text, nullable=False)` |
+| 14 | `is_deleted = Column(Boolean, default=False)` |
+| 15 | `sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))` |
+| 16 | `edited_at = Column(DateTime(timezone=True), nullable=True)` |
+| 17 | `parent_id = Column(Integer, nullable=True)` |
+| 18-19 | `sender = relationship("Users", foreign_keys=[sender_id])` / `receiver = relationship("Users", foreign_keys=[receiver_id])` |
+| 20 | `notifications = relationship("Notifications", back_populates="dm_message", cascade="all, delete-orphan")` |
 
-## Constants
+## File: `backend/models/Notifications.py` (referenced)
 
-```python
-DM_FILE_PREFIX = "__FILE__::"
-DEFAULT_DIRECT_MESSAGE_LIMIT = 50
-MAX_DIRECT_MESSAGE_LIMIT = 200
-FREE_MAX_FILE_SIZE_MB = 10
-FREE_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10,485,760
-```
+| Lines | Code |
+|-------|------|
+| 13 | `dm_message_id = Column(Integer, ForeignKey("direct_messages.id"), nullable=True)` |
 
----
+## File: `backend/schemas/Direct_messages_schema.py` (8 lines)
 
-## Permission: `can_direct_message(db, sender_id, receiver_id)`
+| Lines | Code |
+|-------|------|
+| 4-8 | `class Direct_messages_schema(BaseModel):` / `sender_id: int` / `receiver_id: int` / `content: str` / `parent_id: Optional[int] = None` |
 
-```python
-if sender_id == receiver_id:
-    return False, "Cannot send direct message to yourself"
+## File: `backend/schemas/Direct_message_file_input.py` (11 lines)
 
-# Check blocked (either direction)
-blocked = db.query(Blocked_users).filter(
-    ((Blocked_users.blocker_id == sender_id) & (Blocked_users.blocked_id == receiver_id)) |
-    ((Blocked_users.blocker_id == receiver_id) & (Blocked_users.blocked_id == sender_id))
-).first()
-if blocked:
-    return False, "You cannot send messages to this user"
+| Lines | Code |
+|-------|------|
+| 5-11 | `class Direct_message_file_input(BaseModel):` / `receiver_id: int` / `file_name: str` / `file_size: int` / `file_base64: str` / `mime_type: str \| None = None` / `parent_id: Optional[int] = None` |
 
-# Check friendship
-friendship = db.query(Friends).filter(
-    ((Friends.user_id == sender_id) & (Friends.friend_id == receiver_id)) |
-    ((Friends.user_id == receiver_id) & (Friends.friend_id == sender_id))
-).first()
-if friendship:
-    return True, None
+## File: `backend/utils/Websocket_manager.py` — DMWebSocketManager class (lines 98-127)
 
-# Check shared org membership
-shared_org = db.query(Organization_members).filter(
-    Organization_members.memmber_id == sender_id,
-    Organization_members.org_id.in_(
-        db.query(Organization_members.org_id).filter(
-            Organization_members.memmber_id == receiver_id
-        )
-    )
-).first()
-if shared_org:
-    return True, None
+| Lines | Code |
+|-------|------|
+| 98-100 | `class DMWebSocketManager:` / `def __init__(self):` / `self.active_connections: Dict[int, List[WebSocket]] = {}` |
+| 102-106 | `async def connect(self, user_id: int, websocket: WebSocket):` / accepts WS, stores in `active_connections[user_id]` |
+| 108-113 | `def disconnect(self, user_id: int, websocket: WebSocket):` / removes WS from `active_connections[user_id]`, cleans up empty keys |
+| 115-120 | `async def send_to_user(self, user_id: int, message: dict):` / iterates `active_connections[user_id]`, calls `ws.send_json(message)`, disconnects on exception |
+| 122-127 | `async def send_to_users(self, user_ids: List[int], message: dict):` / deduplicates user_ids, calls `asyncio.gather(*(send_to_user(...)))` |
 
-return False, "You can only message friends or members of your organization"
-```
+## File: `backend/routers/direct_messages_router.py` (108 lines)
 
----
+| Lines | Code |
+|-------|------|
+| 1-22 | Imports: `Direct_messages_schema`, `Direct_message_file_input`, 8 service functions, `DEFAULT_DIRECT_MESSAGE_LIMIT`, `MAX_DIRECT_MESSAGE_LIMIT`; `router = APIRouter()` |
+| 25-31 | `@router.post("/direct-messages")` / `async def send_direct_message(data: Direct_messages_schema, user=Depends(current_user), db=Depends(connect_databse)):` / `return messages_users_service(data, user, db)` |
+| 34-42 | `@router.get("/direct-messages/{receiver_id}")` / `async def get_direct_messages(receiver_id, limit=Query(DEFAULT..., ge=1, le=MAX...), offset=Query(0, ge=0), user=Depends(current_user), db=Depends(connect_databse)):` / `return fetch_direct_messages_service(receiver_id, user, db, limit=limit, offset=offset)` |
+| 45-54 | `@router.get("/direct-messages/{receiver_id}/search")` / `async def search_direct_messages(receiver_id, q=Query(""), limit=Query(...), offset=Query(...), user=Depends(current_user), db=Depends(connect_databse)):` / `return search_direct_messages_service(receiver_id, q, user, db, limit=limit, offset=offset)` |
+| 57-62 | `@router.get("/direct-messages")` / `async def get_direct_conversations(user=Depends(current_user), db=Depends(connect_databse)):` / `return fetch_direct_conversations_service(user, db)` |
+| 65-72 | `@router.put("/direct-messages/{message_id}")` / `async def edit_direct_message(message_id, data: dict=Body(...), user=Depends(current_user), db=Depends(connect_databse)):` / `return edit_direct_message_service(message_id, str(data.get("content", "")), user, db)` |
+| 75-81 | `@router.delete("/direct-messages/{message_id}")` / `async def delete_direct_message(message_id, user=Depends(current_user), db=Depends(connect_databse)):` / `return delete_direct_message_service(message_id, user, db)` |
+| 84-99 | `@router.post("/direct-messages/file")` / `async def send_direct_file(data: Direct_message_file_input, user=Depends(current_user), db=Depends(connect_databse)):` / `return send_direct_file_service(receiver_id=data.receiver_id, file_name=data.file_name, file_size=data.file_size, file_base64=data.file_base64, mime_type=data.mime_type, parent_id=data.parent_id, user=user, db=db)` |
+| 102-108 | `@router.websocket("/ws/direct-messages")` / `async def direct_messages_ws(websocket: WebSocket, token: str = Query(...), db=Depends(connect_databse)):` / `return await send_direct_messages_realtime(websocket, f"Bearer {token}", db)` |
 
-## POST /direct-messages
-**Router:** `send_direct_message(data, user, db)`
+## File: `backend/services/direct_messages_service.py` (1152 lines)
 
-**Service:** `messages_users_service(data, user, db)`
+### Constants & Helpers (lines 1-78)
 
-1. `if data.sender_id != user_id: raise HTTPException(403, "You can only send messages as the authenticated user")`
-2. Find sender + receiver in Users table — 404 if missing
-3. `allowed, reason = can_direct_message(db, user_id, data.receiver_id)` — 403 if not allowed
-4. `message_content = data.content.strip()` — if empty: 400
-5. Parent reply validation:
-   - `parent_id = data.parent_id`
-   - If provided: check message exists, not deleted, and belongs to same conversation (either direction)
-6. `new_message = Direct_messages(sender_id=user_id, receiver_id=data.receiver_id, content=message_content, parent_id=parent_id)`
-7. `db.add(new_message)`, `db.commit()`, `db.refresh(new_message)`
-8. `create_direct_message_notification(db, data.receiver_id, new_message.id)` — creates Notifications row with `type="direct_message", dm_message_id=...`
-9. Returns serialized message
+| Line | Code |
+|------|------|
+| 21-50 | `def can_direct_message(db, sender_id, receiver_id):` / checks self (22-23), Blocked_users (25-30), Friends (32-37), shared Organization_members subquery (39-48), default deny (50) |
+| 52 | `dm_manager = DMWebSocketManager()` |
+| 53 | `DM_FILE_PREFIX = "__FILE__::"` |
+| 54 | `logger = logging.getLogger(__name__)` |
+| 55 | `DEFAULT_DIRECT_MESSAGE_LIMIT = 50` |
+| 56 | `MAX_DIRECT_MESSAGE_LIMIT = 200` |
+| 59-78 | `def _normalize_direct_message_pagination(limit, offset):` / validates int, >0, <=MAX_DIRECT_MESSAGE_LIMIT, >=0; raises HTTPException on invalid |
 
----
+### `_serialize_direct_message` (lines 81-109)
 
-## POST /direct-messages/file
-**Router:** `send_direct_file(data, user, db)`
+| Line | Code |
+|------|------|
+| 82 | `is_file = bool(message.content and message.content.startswith(DM_FILE_PREFIX))` |
+| 85-89 | If `is_file`: parses JSON suffix after `DM_FILE_PREFIX` as `file_attachment` |
+| 91-109 | Returns dict with `message_id`, `sender_id`, `receiver_id`, `parent_id`, `content` (empty for files), `is_file`, `file_attachment`, `is_deleted`, `sent_at`, `edited_at`, `sender` sub-dict |
 
-**Service:** `send_direct_file_service(receiver_id, file_name, file_size, file_base64, mime_type, user, db, parent_id)`
+### `create_direct_message_notification` (lines 112-126)
 
-1. Access check: sender found, receiver found, `can_direct_message()` passes
-2. Validate file_name, file_size (must be > 0, must be ≤ `FREE_MAX_FILE_SIZE_BYTES`)
-3. Parent validation (same as text message)
-4. **Duplicate check**: scans all existing file messages in this conversation:
-```python
-existing_file_msg = db.query(Direct_messages).filter(
-    Direct_messages.is_deleted == False,
-    Direct_messages.content.like(DM_FILE_PREFIX + "%"),
-    or_(and_(Direct_messages.sender_id == user_id, Direct_messages.receiver_id == receiver_id),
-        and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id))
-).all()
-for msg in existing_file_msg:
-    payload = json.loads(msg.content[len(DM_FILE_PREFIX):])
-    if payload.get("file_name") == file_name:
-        raise HTTPException(409, f"A file named '{file_name}' has already been uploaded...")
-```
-5. `file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)`
-6. `file_payload = {"file_name": file_name, "file_url": file_url, "file_size": file_size}`
-7. `new_message = Direct_messages(..., content=DM_FILE_PREFIX + json.dumps(file_payload))`
-8. Creates notification
+| Line | Code |
+|------|------|
+| 113-118 | `notif_kwargs = {"user_id": receiver_id, "type": "direct_message", "dm_message_id": message_id, "created_at": datetime.now(UTC)}` |
+| 120-123 | If `Notifications` has `is_read` or `is_seen`, sets to `False` |
+| 125-126 | `db.add(Notifications(**notif_kwargs)); db.commit()` |
 
----
+### `_push_direct_message_notification` (lines 129-141)
 
-## GET /direct-messages/{receiver_id}?limit=50&offset=0
-**Service:** `fetch_direct_messages_service(receiver_id, user, db, limit, offset)`
+| Line | Code |
+|------|------|
+| 130-141 | `await notification_manager.send(receiver_id, {"type": "new_notification", "notification": {"type": "direct_message", "message_id": message_id, "sender_id": sender_id, "created_at": ...}})` |
 
-```python
-query = db.query(Direct_messages, Users).join(
-    Users, Direct_messages.sender_id == Users.user_id
-).filter(
-    or_(
-        and_(Direct_messages.sender_id == user_id, Direct_messages.receiver_id == receiver_id),
-        and_(Direct_messages.sender_id == receiver_id, Direct_messages.receiver_id == user_id),
-    ),
-    Direct_messages.is_deleted == False
-).order_by(Direct_messages.sent_at.desc(), Direct_messages.id.desc())
+### `messages_users_service` (lines 143-226)
 
-rows = query.offset(offset).limit(limit + 1).all()
-has_more = len(rows) > limit
-rows = rows[:limit]
-rows.reverse()  # chronological
-```
+| Line | Code |
+|------|------|
+| 144 | `user_id = user.user_id` |
+| 146-147 | `if data.sender_id != user_id: raise HTTPException(403, "You can only send messages as the authenticated user")` |
+| 149-151 | `sender = db.query(Users).filter(Users.user_id == user_id).first(); if not sender: raise HTTPException(404, "Sender not found")` |
+| 153-155 | `receiver = db.query(Users).filter(Users.user_id == data.receiver_id).first(); if not receiver: raise HTTPException(404, "Receiver not found")` |
+| 157-159 | `allowed, reason = can_direct_message(db, user_id, data.receiver_id); if not allowed: raise HTTPException(403, detail=reason)` |
+| 161-163 | `message_content = data.content.strip(); if not message_content: raise HTTPException(400, detail="Message content cannot be empty")` |
+| 165-185 | `parent_id = data.parent_id; if parent_id is not None:` validates int, queries `Direct_messages.id == parent_id` AND `is_deleted == False`, checks parent is in same conversation (sender/receiver match); raises 404/400 |
+| 187-196 | `new_message = Direct_messages(sender_id=user_id, receiver_id=data.receiver_id, content=message_content, parent_id=parent_id); db.add(new_message); db.commit(); db.refresh(new_message)` |
+| 198-206 | `try: create_direct_message_notification(db, data.receiver_id, new_message.id); except Exception: logger.exception(...); db.rollback()` |
+| 208-226 | Returns `{message_id, sender_id, receiver_id, parent_id, content, is_file=False, file_attachment=None, is_deleted, sent_at, edited_at, sender{...}}` |
 
----
+### `send_direct_file_service` (lines 229-356)
 
-## GET /direct-messages/{receiver_id}/search?q=
-**Service:** `search_direct_messages_service(receiver_id, q, user, db, limit, offset)`
+| Line | Code |
+|------|------|
+| 230 | `user_id = user.user_id` |
+| 232-235 | `try: receiver_id = int(receiver_id); except (TypeError, ValueError): raise HTTPException(400, "receiver_id must be a valid integer")` |
+| 237-239 | `sender = db.query(Users).filter(Users.user_id == user_id).first(); if not sender: raise HTTPException(404, "Sender not found")` |
+| 241-243 | `receiver = db.query(Users).filter(Users.user_id == receiver_id).first(); if not receiver: raise HTTPException(404, "Receiver not found")` |
+| 245-247 | `allowed, reason = can_direct_message(db, user_id, receiver_id); if not allowed: raise HTTPException(403, detail=reason)` |
+| 249-250 | `if not file_name: raise HTTPException(400, "file_name is required")` |
+| 252-258 | Validates `file_size` is provided and is a valid int |
+| 260-261 | `if file_size <= 0: raise HTTPException(400, "file_size must be greater than 0")` |
+| 263-267 | `if file_size > FREE_MAX_FILE_SIZE_BYTES: raise HTTPException(413, detail=f"File size exceeds the {FREE_MAX_FILE_SIZE_MB} MB limit.")` |
+| 269-288 | `parent_id` validation: same pattern as `messages_users_service` — validates int, checks existence, checks conversation membership |
+| 290-307 | Queries all non-deleted file messages in conversation (`DM_FILE_PREFIX`), parses each JSON payload, raises 409 if `file_name` already exists |
+| 309 | `file_url = upload_chat_file_from_base64(file_name=file_name, file_base64=file_base64, mime_type=mime_type)` |
+| 311-315 | `file_payload = {"file_name": file_name, "file_url": file_url, "file_size": file_size}` |
+| 317-322 | `new_message = Direct_messages(sender_id=user_id, receiver_id=receiver_id, content=DM_FILE_PREFIX + json.dumps(file_payload), parent_id=parent_id); db.add(new_message); db.commit(); db.refresh(new_message)` |
+| 328-336 | `try: create_direct_message_notification(db, receiver_id, new_message.id); except Exception: logger.exception(...); db.rollback()` |
+| 338-356 | Returns `{message_id, sender_id, receiver_id, parent_id, content="", is_file=True, file_attachment=file_payload, is_deleted, sent_at, edited_at, sender{...}}` |
 
-If query empty: falls back to `fetch_direct_messages_service()`. Otherwise:
-```python
-search_term = f"%{query}%"
-query_stmt = db.query(Direct_messages, Users).join(...).filter(
-    ...,  # same conversation filter
-    Direct_messages.is_deleted == False,
-    or_(
-        Users.first_name.ilike(search_term),
-        Users.last_name.ilike(search_term),
-        Users.user_tag.ilike(search_term),
-        Direct_messages.content.ilike(search_term),
-    ),
-).order_by(Direct_messages.sent_at.desc(), Direct_messages.id.desc())
-```
+### `fetch_direct_messages_service` (lines 359-412)
 
----
+| Line | Code |
+|------|------|
+| 366 | `user_id = user.user_id` |
+| 368-370 | `requester = db.query(Users).filter(Users.user_id == user_id).first(); if not requester: raise HTTPException(404, "User not found")` |
+| 372-374 | `receiver = db.query(Users).filter(Users.user_id == receiver_id).first(); if not receiver: raise HTTPException(404, "Receiver not found")` |
+| 376 | `limit, offset = _normalize_direct_message_pagination(limit, offset)` |
+| 378-387 | Query: joins `Direct_messages` with `Users` on sender_id, filters by (sender_id=user & receiver_id=receiver) OR (sender_id=receiver & receiver_id=user), `is_deleted == False`, ordered by `sent_at DESC, id DESC` |
+| 389-392 | `rows = query.offset(offset).limit(limit + 1).all(); has_more = len(rows) > limit; rows = rows[:limit]; rows.reverse()` |
+| 394-412 | Returns `{conversation: {user_id, first_name, last_name, avatar_url, user_tag}, messages: [_serialize_direct_message(m, s) for m, s in rows], pagination: {limit, offset, returned, has_more}}` |
 
-## GET /direct-messages
-**Service:** `fetch_direct_conversations_service(user, db)`
+### `search_direct_messages_service` (lines 415-483)
 
-1. `rows = db.query(Direct_messages).filter(or_(sender_id==user_id, receiver_id==user_id), is_deleted==False).order_by(sent_at.desc()).all()`
-2. Groups by `other_user_id` (the one who is NOT current user), keeping only the latest message from each
-3. Returns `{"conversations": [{user: {...}, last_message: {...}}]}`
+| Line | Code |
+|------|------|
+| 423 | `user_id = user.user_id` |
+| 425-427 | `requester = db.query(Users).filter(Users.user_id == user_id).first(); if not requester: raise HTTPException(404, "User not found")` |
+| 429-431 | `receiver = db.query(Users).filter(Users.user_id == receiver_id).first(); if not receiver: raise HTTPException(404, "Receiver not found")` |
+| 433 | `limit, offset = _normalize_direct_message_pagination(limit, offset)` |
+| 435-437 | `query = str(q or "").strip().lower(); if not query: return fetch_direct_messages_service(...)` |
+| 439 | `search_term = f"%{query}%"` |
+| 441-456 | Query: same conversation filter + `is_deleted == False` + `OR` across `Users.first_name`, `Users.last_name`, `Users.user_tag`, `Direct_messages.content` using `ilike` |
+| 458-461 | `rows = query_stmt.offset(offset).limit(limit + 1).all(); has_more = len(rows) > limit; rows = rows[:limit]; rows.reverse()` |
+| 463-483 | Returns `{conversation: {...}, messages: [...], pagination: {limit, offset, returned, has_more}}` |
 
----
+### `fetch_direct_conversations_service` (lines 486-552)
 
-## PUT /direct-messages/{message_id}
-**Service:** `edit_direct_message_service(message_id, content, user, db)`
+| Line | Code |
+|------|------|
+| 487 | `user_id = user.user_id` |
+| 489-491 | `requester = db.query(Users).filter(Users.user_id == user_id).first(); if not requester: raise HTTPException(404, "User not found")` |
+| 493-499 | Gets all `Direct_messages` where user is sender or receiver, `is_deleted == False`, ordered by `sent_at DESC` |
+| 501-505 | Builds `latest_by_other_user: dict[int, Direct_messages]`: for each message, deduplicates by `other_user_id` (keeps first/latest due to DESC order) |
+| 507-508 | `if not latest_by_other_user: return {"conversations": []}` |
+| 510-512 | `other_ids = list(latest_by_other_user.keys()); users = db.query(Users).filter(Users.user_id.in_(other_ids)).all(); users_by_id = {user.user_id: user for user in users}` |
+| 514-550 | For each conversation: extracts `other_user`, checks `is_file` / parses `file_attachment` / sets `content_preview`, appends `{user: {...}, last_message: {message_id, sender_id, receiver_id, parent_id, content, is_file, file_attachment, sent_at, edited_at}}` |
+| 552 | `return {"conversations": conversations}` |
 
-- Only own messages
-- Cannot edit file messages (content starts with "__FILE__::")
-- Sets `message.content` and `message.edited_at = datetime.now(UTC)`
+### `edit_direct_message_service` (lines 555-599)
 
----
+| Line | Code |
+|------|------|
+| 556 | `user_id = user.user_id` |
+| 558-561 | `message = db.query(Direct_messages).filter(Direct_messages.id == message_id, Direct_messages.is_deleted == False).first()` |
+| 563-564 | `if not message: raise HTTPException(404, "Message not found")` |
+| 566-567 | `if message.sender_id != user_id: raise HTTPException(403, "You can only edit your own messages")` |
+| 569-570 | `if message.content and message.content.startswith(DM_FILE_PREFIX): raise HTTPException(400, "File messages cannot be edited")` |
+| 572-574 | `new_content = str(content).strip(); if not new_content: raise HTTPException(400, "Message content cannot be empty")` |
+| 576-578 | `message.content = new_content; message.edited_at = datetime.now(UTC); db.commit(); db.refresh(message)` |
+| 581-599 | Returns `{message_id, sender_id, receiver_id, parent_id, content, is_file=False, file_attachment=None, is_deleted, sent_at, edited_at, sender{...}}` |
 
-## DELETE /direct-messages/{message_id}
-**Service:** `delete_direct_message_service(message_id, user, db)`
+### `delete_direct_message_service` (lines 602-622)
 
-- Only own messages
-- `message.is_deleted = True`
+| Line | Code |
+|------|------|
+| 603 | `user_id = user.user_id` |
+| 605-608 | `message = db.query(Direct_messages).filter(Direct_messages.id == message_id, Direct_messages.is_deleted == False).first()` |
+| 610-611 | `if not message: raise HTTPException(404, "Message not found")` |
+| 613-614 | `if message.sender_id != user_id: raise HTTPException(403, "You can only delete your own messages")` |
+| 616-617 | `message.is_deleted = True; db.commit()` |
+| 619-622 | Returns `{"detail": "Message deleted successfully", "message_id": message_id}` |
 
----
+### `send_direct_messages_realtime` — WebSocket handler (lines 625-1152)
 
-## WebSocket: /ws/direct-messages?token=
+**Setup & Connection (lines 625-648)**
 
-**Service:** `send_direct_messages_realtime(websocket, authorization, db)`
+| Line | Code |
+|------|------|
+| 632 | `user = await authenticate_ws(websocket, authorization, db)` |
+| 633-634 | `if not user: return` |
+| 638-644 | `user_info = {user_id, first_name, last_name, avatar_url, user_tag}` |
+| 646 | `db.close()` |
+| 648 | `await dm_manager.connect(user_id, websocket)` |
 
-### Connection
-1. `user = await authenticate_ws(websocket, authorization, db)` — if None: return
-2. Build `user_info` dict
-3. `db.close()` — close auth DB session (new sessions created per operation)
-4. `await dm_manager.connect(user_id, websocket)`
+**Main loop (lines 650-1152)**
 
-### Message Types
+| Line | Code |
+|------|------|
+| 652 | `data = await websocket.receive_json()` |
+| 654 | `message_type = data.get("type")` |
 
-#### `send_message`
-1. Extract: `receiver_id`, `content`, `parent_id`
-2. Validate: receiver_id int, not self, receiver exists
-3. `allowed, reason = can_direct_message(op_db, user_id, receiver_id)`
-4. Validate content non-empty
-5. Validate parent reply (if any)
-6. Create `Direct_messages` row
-7. `create_direct_message_notification(op_db, receiver_id, new_message.id)`
-8. `await _push_direct_message_notification(receiver_id, user_id, new_message.id)` — real-time WS push via `notification_manager`
-9. `await dm_manager.send_to_users([user_id, receiver_id], {"type": "new_direct_message", "message": {...}})`
+**WS type: `send_message` (lines 656-790)**
 
-#### `typing`
-1. Validate receiver_id
-2. Check `can_direct_message()` permission
-3. `await dm_manager.send_to_user(receiver_id, {"type": "direct_typing", "sender_id": ..., "receiver_id": ..., "is_typing": ..., "sender": user_info})`
+| Line | Code |
+|------|------|
+| 657 | `op_db = SessionLocal()` |
+| 659-670 | Extracts `receiver_id`, validates int; sends error JSON on failure |
+| 672-677 | `if receiver_id == user_id: ... continue` (self-message guard) |
+| 679-685 | Queries `Users` for receiver; sends error JSON if not found |
+| 687-693 | `can_direct_message` check; sends error JSON if not allowed |
+| 695-701 | Validates non-empty content |
+| 703-734 | Validates `parent_id`: int check, existence, conversation membership |
+| 736-745 | Creates `Direct_messages`, `db.add`, `db.commit`, `db.refresh` |
+| 747-755 | `create_direct_message_notification` with rollback on failure |
+| 757-768 | `_push_direct_message_notification` via `notification_manager` |
+| 770-787 | Builds `message_data = {"type": "new_direct_message", "message": {...}}` |
+| 787 | `await dm_manager.send_to_users([user_id, receiver_id], message_data)` |
+| 789-790 | `finally: op_db.close()` |
 
-#### `send_file`
-1. Validate receiver_id, file_name, file_base64, file_size
-2. Validate receiver exists, `can_direct_message()`
-3. File size check: `if file_size > FREE_MAX_FILE_SIZE_BYTES`
-4. Parent validation
-5. Duplicate filename check (same as REST)
-6. Upload to Cloudinary
-7. Save DM with `__FILE__::` prefix
-8. Create + push notification
-9. `await dm_manager.send_to_users([user_id, receiver_id], {"type": "new_direct_message", ...})`
+**WS type: `typing` (lines 792-824)**
 
-#### `edit_message`
-1. Validate message_id, fetch message, check ownership
-2. Cannot edit file messages
-3. Update content + edited_at
-4. `await dm_manager.send_to_users([user_id, other_user_id], {"type": "direct_message_edited", ...})`
+| Line | Code |
+|------|------|
+| 793-802 | Extracts `receiver_id`, validates int, sends error JSON on failure |
+| 804-805 | `if receiver_id == user_id: continue` (skip self-typing) |
+| 807-813 | Queries `can_direct_message` in temp `SessionLocal`; skips if not allowed |
+| 815-821 | `typing_payload = {"type": "direct_typing", "sender_id": ..., "receiver_id": ..., "is_typing": bool(data.get("is_typing", False)), "sender": user_info}` |
+| 823 | `await dm_manager.send_to_user(receiver_id, typing_payload)` |
 
-#### `delete_message`
-1. Validate message_id, ownership
-2. `message.is_deleted = True`
-3. `await dm_manager.send_to_users([user_id, other_user_id], {"type": "direct_message_deleted", "message_id": message_id})`
+**WS type: `send_file` (lines 826-1017)**
 
----
+| Line | Code |
+|------|------|
+| 827 | `op_db = SessionLocal()` |
+| 829-834 | Extracts `receiver_id`, `file_name`, `file_size`, `file_base64`, `mime_type`, `parent_id` |
+| 836-843 | Validates `receiver_id` int |
+| 845-851 | Queries receiver; sends error if not found |
+| 853-859 | `can_direct_message` check |
+| 861-866 | Validates `file_name` and `file_base64` are present |
+| 868-875 | Validates `file_size` int |
+| 877-882 | `if file_size <= 0: ... continue` |
+| 884-889 | `if file_size > FREE_MAX_FILE_SIZE_BYTES: ... continue` |
+| 891-922 | `parent_id` validation: int, existence, conversation membership |
+| 924-946 | Duplicate file name check: queries all file messages in conversation, parses JSON, compares `file_name` |
+| 948-955 | `file_url = upload_chat_file_from_base64(...)` with error handling |
+| 957-972 | Creates `Direct_messages` with `DM_FILE_PREFIX + json.dumps(file_payload)` |
+| 974-982 | `create_direct_message_notification` with rollback on failure |
+| 984-995 | `_push_direct_message_notification` |
+| 997-1014 | Builds message_data with `is_file=True, file_attachment=file_payload`; `send_to_users([user_id, receiver_id], message_data)` |
+| 1016-1017 | `finally: op_db.close()` |
 
-## DMWebSocketManager (Websocket_manager.py)
+**WS type: `edit_message` (lines 1019-1094)**
 
-```python
-class DMWebSocketManager:
-    def __init__(self):
-        self.active_connections: Dict[int, List[WebSocket]] = {}
+| Line | Code |
+|------|------|
+| 1020 | `op_db = SessionLocal()` |
+| 1022-1032 | Validates `message_id` int |
+| 1034-1044 | Queries message by id; sends error if not found |
+| 1046-1051 | Checks `sender_id == user_id` |
+| 1053-1058 | Rejects file message edits |
+| 1060-1066 | Validates non-empty content |
+| 1068-1071 | `message.content = new_content; message.edited_at = datetime.now(UTC); op_db.commit(); op_db.refresh(message)` |
+| 1073-1091 | Builds `edited_payload = {"type": "direct_message_edited", "message": {...}}`; `send_to_users([user_id, other_user_id], edited_payload)` |
+| 1093-1094 | `finally: op_db.close()` |
 
-    async def connect(self, user_id, websocket):
-        await websocket.accept()
-        self.active_connections.setdefault(user_id, []).append(websocket)
+**WS type: `delete_message` (lines 1096-1141)**
 
-    def disconnect(self, user_id, websocket):
-        # removes from list, cleans up empty dict
+| Line | Code |
+|------|------|
+| 1097 | `op_db = SessionLocal()` |
+| 1099-1108 | Validates `message_id` int |
+| 1110-1120 | Queries message; sends error if not found |
+| 1122-1127 | Checks `sender_id == user_id` |
+| 1129-1130 | `message.is_deleted = True; op_db.commit()` |
+| 1132-1138 | Builds `deleted_payload = {"type": "direct_message_deleted", "message_id": message_id}`; `send_to_users([user_id, other_user_id], deleted_payload)` |
+| 1140-1141 | `finally: op_db.close()` |
 
-    async def send_to_user(self, user_id, message):
-        for ws in list(self.active_connections.get(user_id, [])):
-            try: await ws.send_json(message)
-            except Exception: self.disconnect(user_id, ws)
+**Unsupported type & cleanup (lines 1143-1152)**
 
-    async def send_to_users(self, user_ids, message):
-        unique = list(dict.fromkeys(user_ids))
-        await asyncio.gather(*(self.send_to_user(uid, message) for uid in unique))
-```
-
----
-
-## Serialization: `_serialize_direct_message(message, sender)`
-
-```python
-is_file = bool(message.content and message.content.startswith(DM_FILE_PREFIX))
-file_attachment = None
-if is_file:
-    try: file_attachment = json.loads(message.content[len(DM_FILE_PREFIX):])
-    except: pass
-```
-Returns: `{message_id, sender_id, receiver_id, parent_id, content, is_file, file_attachment, is_deleted, sent_at, edited_at, sender: {...}}`
+| Line | Code |
+|------|------|
+| 1143-1146 | Sends `{"type": "error", "detail": "Unsupported websocket message type"}` |
+| 1148-1149 | `except WebSocketDisconnect: pass` |
+| 1150-1151 | `finally: dm_manager.disconnect(user_id, websocket)` |
