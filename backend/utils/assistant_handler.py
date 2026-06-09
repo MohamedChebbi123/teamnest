@@ -110,9 +110,12 @@ def format_context(context: list[dict]) -> str:
             parent_task_id = metadata.get("parent_task_id")
             assignees = metadata.get("assignees")
             subtask_group = metadata.get("subtask_group")
+            priority = metadata.get("priority")
 
             location = f' in {team_name}' if team_name else (f' in team {team_id}' if team_id != "?" else "")
             extra = []
+            if priority:
+                extra.append(f"priority: {priority}")
             if status:
                 extra.append(f"status: {status}")
             if due_date:
@@ -120,7 +123,11 @@ def format_context(context: list[dict]) -> str:
             if assignees:
                 extra.append(f"assigned to: {assignees}")
             if parent_task_id is not None and parent_task_id != "":
-                extra.append(f"parent task: #{_display_id(parent_task_id)}")
+                parent_title = metadata.get("parent_task_title")
+                if parent_title:
+                    extra.append(f'parent task: #{_display_id(parent_task_id)} "{parent_title}"')
+                else:
+                    extra.append(f"parent task: #{_display_id(parent_task_id)}")
             if subtask_group:
                 extra.append(f"group: {subtask_group}")
 

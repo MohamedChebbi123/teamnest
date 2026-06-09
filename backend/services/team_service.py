@@ -67,6 +67,27 @@ def create_team(data: team_creation, user: Users, db: Session):
     db.commit()
     db.refresh(new_team)
 
+    new_member = Team_association(
+        team_id=new_team.team_id,
+        user_id=user_id
+    )
+    db.add(new_member)
+
+    new_role = Team_roles(
+        user_id=user_id,
+        team_id=new_team.team_id,
+        role="LEAD",
+        can_create_channels=True,
+        can_send_messages=True,
+        can_delete_messages=True,
+        can_manage_roles=True,
+        can_kick_members=True,
+        can_make_announcement=True,
+        can_manage_tasks=True
+    )
+    db.add(new_role)
+    db.commit()
+
     create_log(db, org_id=data.org_id, actor_id=user_id, action="team_created", target_id=new_team.team_id, target_type="team", metadata={"team_name": new_team.team_name})
 
     return {
@@ -308,13 +329,18 @@ def fetch_team_members_service(team_id: int, user: Users, db: Session):
         raise HTTPException(status_code=404, detail="Organization not found")
     
     is_owner = found_organization.owner_id == user_id
-    is_org_member = db.query(Organization_members).filter(
+    is_admin = db.query(Organization_members).filter(
         Organization_members.org_id == team.org_id,
-        Organization_members.memmber_id == user_id
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
     ).first()
     
-    if not is_owner and not is_org_member:
-        raise HTTPException(status_code=403, detail="You must be a member of this organization to view team members")
+    if not is_owner and not is_admin and not is_team_member:
+        raise HTTPException(status_code=403, detail="You must be a member of this team to view its members")
     
     team_associations = db.query(Team_association).filter(
         Team_association.team_id == team_id
@@ -377,6 +403,17 @@ def update_member_permissions_service(team_id: int, member_user_id: int, data: U
         Organization_members.memmber_id == user_id,
         Organization_members.role_user == "ADMIN"
     ).first()
+    
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    
+    if not is_owner and not is_admin and not is_team_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of this team to manage roles"
+        )
     
     user_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
@@ -479,6 +516,16 @@ def kick_member_service(team_id: int, member_user_id: int, user: Users, db: Sess
     
     is_owner = found_organization.owner_id == user_id
     
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    
+    if not is_owner and not is_team_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of this team to kick members"
+        )
     
     user_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
@@ -572,6 +619,17 @@ def create_channels_for_teams_service(org_id: int, team_id: int, data: Channels_
     
     is_owner = found_organization.owner_id == user_id
     
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+    
+    if not is_owner and not is_team_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of this team to create channels"
+        )
+    
     user_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
         Team_roles.user_id == user_id
@@ -648,9 +706,10 @@ def fetch_channels_for_teams_service(org_id: int, team_id: int, user: Users, db:
     
     is_owner = found_organization.owner_id == user_id
     
-    is_org_member = db.query(Organization_members).filter(
+    is_admin = db.query(Organization_members).filter(
         Organization_members.org_id == org_id,
-        Organization_members.memmber_id == user_id
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
     ).first()
     
     is_team_member = db.query(Team_association).filter(
@@ -658,10 +717,10 @@ def fetch_channels_for_teams_service(org_id: int, team_id: int, user: Users, db:
         Team_association.user_id == user_id
     ).first()
     
-    if not is_owner and not is_org_member and not is_team_member:
+    if not is_owner and not is_admin and not is_team_member:
         raise HTTPException(
             status_code=403,
-            detail="You don't have access to view channels in this team"
+            detail="You must be a member of this team to view its channels"
         )
     
     channels = db.query(Channels).filter(Channels.team_id == team_id).all()
@@ -771,6 +830,17 @@ def revoke_permissions_from_team_memebers(team_id: int, target_user_id: int, use
         raise HTTPException(status_code=404, detail="Organization not found")
 
     is_owner = found_organization.owner_id == requester_user_id
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == requester_user_id
+    ).first()
+
+    if not is_owner and not is_team_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of this team to revoke permissions"
+        )
 
     requester_role = db.query(Team_roles).filter(
         Team_roles.team_id == team_id,
@@ -1011,6 +1081,17 @@ def delete_team_file(org_id: int, team_id: int, file_id: int, user: Users, db: S
         Organization_members.memmber_id == user_id,
         Organization_members.role_user == "ADMIN"
     ).first()
+
+    is_team_member = db.query(Team_association).filter(
+        Team_association.team_id == team_id,
+        Team_association.user_id == user_id
+    ).first()
+
+    if not is_owner and not is_org_admin and not is_team_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You must be a member of this team to delete files"
+        )
 
     file = db.query(Files).filter(
         Files.id == file_id,

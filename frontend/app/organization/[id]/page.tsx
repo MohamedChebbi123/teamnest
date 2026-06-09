@@ -83,6 +83,7 @@ export default function OrganizationPage() {
   const [addingMember, setAddingMember] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string>("MEMBER")
+  const [members, setMembers] = useState<any[]>([])
   const [pendingJoinRequests, setPendingJoinRequests] = useState<PendingJoinRequest[]>([])
   const [loadingPendingJoinRequests, setLoadingPendingJoinRequests] = useState(false)
   
@@ -108,6 +109,7 @@ export default function OrganizationPage() {
   const [teamDescription, setTeamDescription] = useState("")
   const [creatingTeam, setCreatingTeam] = useState(false)
   const [teams, setTeams] = useState<Team[]>([])
+  const [myTeamIds, setMyTeamIds] = useState<Set<number>>(new Set())
   const [loadingTeams, setLoadingTeams] = useState(false)
   
   // Edit team states
@@ -159,6 +161,7 @@ export default function OrganizationPage() {
 
           if (roleResponse.ok) {
             const membersData = await roleResponse.json()
+            setMembers(membersData)
             const me = membersData.find((member: any) => member.user_id === userData.user_id)
             if (me?.role_user) {
               setCurrentUserRole(me.role_user)
@@ -264,15 +267,21 @@ export default function OrganizationPage() {
         const token = getAccessToken()
         if (!token) return
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        })
+        const [teamsRes, myTeamsRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/teams`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ])
 
-        if (response.ok) {
-          const data = await response.json()
-          setTeams(data)
+        if (teamsRes.ok) {
+          setTeams(await teamsRes.json())
+        }
+        if (myTeamsRes.ok) {
+          const myTeams: Team[] = await myTeamsRes.json()
+          setMyTeamIds(new Set(myTeams.map((t) => t.team_id)))
         }
       } catch (error) {
         console.error('Error fetching teams:', error)
@@ -1114,7 +1123,7 @@ export default function OrganizationPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Members</p>
-                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-2xl font-bold">{members.length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -1182,7 +1191,15 @@ export default function OrganizationPage() {
                     {teams.map((team, index) => (
                       <div key={team.team_id}>
                         <div
-                          onClick={() => router.push(`/organization/${organizationId}/${team.team_id}`)}
+                          onClick={() => {
+                            if (currentUserRole === "OWNER" || myTeamIds.has(team.team_id)) {
+                              router.push(`/organization/${organizationId}/${team.team_id}`)
+                            } else {
+                              toast.error("You are not a member of this channel", {
+                                description: "Join the team to access its content",
+                              })
+                            }
+                          }}
                           className="group flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-muted/50 transition-all duration-200"
                         >
                           <div className="flex items-center gap-3 min-w-0">

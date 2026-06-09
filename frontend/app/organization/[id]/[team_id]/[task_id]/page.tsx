@@ -152,7 +152,6 @@ export default function TasksPage() {
   const [taskTitle, setTaskTitle] = useState("")
   const [taskDescription, setTaskDescription] = useState("")
   const [taskPriority, setTaskPriority] = useState("medium")
-  const [taskStatus, setTaskStatus] = useState("todo")
   const [taskDueDate, setTaskDueDate] = useState("")
   const [isCreating, setIsCreating] = useState(false)
 
@@ -291,7 +290,7 @@ export default function TasksPage() {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: taskTitle, description: taskDescription, priority: taskPriority, status: taskStatus, parent_task_id: null, assignee_ids: taskAssigneeIds, due_date: taskDueDate ? new Date(taskDueDate).toISOString() : null }),
+          body: JSON.stringify({ title: taskTitle, description: taskDescription, priority: taskPriority, status: "todo", parent_task_id: null, assignee_ids: taskAssigneeIds, due_date: taskDueDate ? new Date(taskDueDate).toISOString() : null }),
         }
       )
       const data = await res.json()
@@ -302,7 +301,6 @@ export default function TasksPage() {
         setTaskTitle("")
         setTaskDescription("")
         setTaskPriority("medium")
-        setTaskStatus("todo")
         setTaskAssigneeIds([])
         setTaskDueDate("")
       } else {
@@ -915,10 +913,7 @@ export default function TasksPage() {
                       </div>
                       {canCreate && (
                         <button
-                          onClick={() => {
-                            setTaskStatus(col.key)
-                            setCreateOpen(true)
-                          }}
+                          onClick={() => setCreateOpen(true)}
                           className="rounded p-0.5 hover:bg-muted transition-colors"
                         >
                           <Plus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1624,18 +1619,6 @@ export default function TasksPage() {
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Status</Label>
-                <Select value={taskStatus} onValueChange={setTaskStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

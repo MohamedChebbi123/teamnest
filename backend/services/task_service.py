@@ -86,6 +86,13 @@ def _format_team_name(task, db):
     return None
 
 
+def _format_parent_task_title(task, db):
+    if task.parent_task_id is not None:
+        parent = db.query(Tasks.title).filter(Tasks.id == task.parent_task_id).scalar()
+        return parent
+    return None
+
+
 def _auto_complete_parent_tasks(task: Tasks, org_id: int, actor_id: int, db: Session) -> None:
     parent_id = task.parent_task_id
     while parent_id is not None:
@@ -161,7 +168,7 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
         team_id=team_id,
         created_by=user_id,
         priority=task_data.priority,
-        status=task_data.status,
+        status="todo",
         parent_task_id=task_data.parent_task_id,
         subtask_group=task_data.subtask_group,
         due_date=task_data.due_date,
@@ -187,8 +194,10 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
         status=new_task.status,
         due_date=_format_due_date(new_task),
         parent_task_id=new_task.parent_task_id,
+        parent_task_title=_format_parent_task_title(new_task, db),
         assignee_names=_format_assignee_names(new_task),
         subtask_group=new_task.subtask_group,
+        priority=new_task.priority,
     )
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_created", target_id=new_task.id, target_type="task", metadata={"title": new_task.title, "team_id": team_id})
@@ -291,8 +300,10 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
         status=task.status,
         due_date=_format_due_date(task),
         parent_task_id=task.parent_task_id,
+        parent_task_title=_format_parent_task_title(task, db),
         assignee_names=_format_assignee_names(task),
         subtask_group=task.subtask_group,
+        priority=task.priority,
     )
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_updated", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
@@ -391,8 +402,10 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
         status=task.status,
         due_date=_format_due_date(task),
         parent_task_id=task.parent_task_id,
+        parent_task_title=_format_parent_task_title(task, db),
         assignee_names=_format_assignee_names(task),
         subtask_group=task.subtask_group,
+        priority=task.priority,
     )
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_status_updated", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
@@ -453,8 +466,10 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
         status=task.status,
         due_date=_format_due_date(task),
         parent_task_id=task.parent_task_id,
+        parent_task_title=_format_parent_task_title(task, db),
         assignee_names=_format_assignee_names(task),
         subtask_group=task.subtask_group,
+        priority=task.priority,
     )
 
     create_log(db, org_id=org_id, actor_id=user_id, action=f"task_review_{action}ed", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})

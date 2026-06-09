@@ -37,8 +37,10 @@ def upsert_task(
     status: str | None = None,
     due_date: str | None = None,
     parent_task_id: int | None = None,
+    parent_task_title: str | None = None,
     assignee_names: str | None = None,
     subtask_group: str | None = None,
+    priority: str | None = None,
 ):
     parts = [f"Task: {title}", f"Description: {description}"]
     if status:
@@ -47,6 +49,10 @@ def upsert_task(
         parts.append(f"Assigned to: {assignee_names}")
     if due_date:
         parts.append(f"Due: {due_date}")
+    if priority:
+        parts.append(f"Priority: {priority}")
+    if parent_task_title:
+        parts.append(f"Parent task: {parent_task_title}")
     if subtask_group:
         parts.append(f"Group: {subtask_group}")
     chunk_text = ". ".join(parts)
@@ -67,10 +73,14 @@ def upsert_task(
         record["due_date"] = due_date
     if parent_task_id is not None:
         record["parent_task_id"] = parent_task_id
+    if parent_task_title is not None:
+        record["parent_task_title"] = parent_task_title
     if assignee_names is not None:
         record["assignees"] = assignee_names
     if subtask_group is not None:
         record["subtask_group"] = subtask_group
+    if priority is not None:
+        record["priority"] = priority
     _get_index().upsert_records(
         namespace=f"team-{team_id}",
         records=[record]
@@ -113,6 +123,10 @@ def reindex_all_tasks(db):
 
         due_date = task.due_date.isoformat() if task.due_date else None
         team_name = task.team.team_name if task.team else None
+        parent_task_title = None
+        if task.parent_task_id is not None:
+            parent = db.query(Tasks.title).filter(Tasks.id == task.parent_task_id).scalar()
+            parent_task_title = parent
 
         upsert_task(
             task_id=task.id,
@@ -123,8 +137,10 @@ def reindex_all_tasks(db):
             status=task.status,
             due_date=due_date,
             parent_task_id=task.parent_task_id,
+            parent_task_title=parent_task_title,
             assignee_names=assignee_names,
             subtask_group=task.subtask_group,
+            priority=task.priority,
         )
         count += 1
 

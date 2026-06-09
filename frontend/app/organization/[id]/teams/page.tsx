@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
+
 import Sidebar from "@/components/Sidebar/page"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import { Button } from "@/components/ui/button"
@@ -29,11 +29,13 @@ export default function OrganizationTeamsPage() {
   const organizationId = params.id as string
 
   const [teams, setTeams] = useState<Team[]>([])
+  const [myTeamIds, setMyTeamIds] = useState<Set<number>>(new Set())
+  const [isOrgOwner, setIsOrgOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
 
   useEffect(() => {
-    const fetchTeams = async () => {
+    const fetchData = async () => {
       if (!organizationId) return
       setLoading(true)
       try {
@@ -42,19 +44,44 @@ export default function OrganizationTeamsPage() {
           router.push("/auth/login")
           return
         }
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-        if (response.ok) {
-          setTeams(await response.json())
-        } else if (response.status === 401) {
+        const [teamsRes, myTeamsRes, profileRes, membersRes] = await Promise.all([
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/teams`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/user/teams`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/profile`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/members`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+        ])
+        if (teamsRes.ok) {
+          setTeams(await teamsRes.json())
+        } else if (teamsRes.status === 401) {
           router.push("/auth/login")
+          return
         } else {
-          const data = await response.json().catch(() => null)
+          const data = await teamsRes.json().catch(() => null)
           toast.error("Failed to load teams", {
             description: formatApiError(data?.detail, "Could not fetch teams"),
           })
+        }
+        if (myTeamsRes.ok) {
+          const myTeams: Team[] = await myTeamsRes.json()
+          setMyTeamIds(new Set(myTeams.map((t) => t.team_id)))
+        }
+        if (profileRes.ok && membersRes.ok) {
+          const userData = await profileRes.json()
+          const membersData = await membersRes.json()
+          const me = membersData.find((m: any) => m.user_id === userData.user_id)
+          setIsOrgOwner(me?.role_user === "OWNER")
         }
       } catch (error) {
         console.error("Error fetching teams:", error)
@@ -63,8 +90,19 @@ export default function OrganizationTeamsPage() {
         setLoading(false)
       }
     }
-    fetchTeams()
+    fetchData()
   }, [organizationId, router])
+
+  const handleTeamClick = (e: React.MouseEvent, teamId: number) => {
+    if (isOrgOwner || myTeamIds.has(teamId)) {
+      router.push(`/organization/${organizationId}/${teamId}`)
+    } else {
+      e.preventDefault()
+      toast.error("You are not a member of this channel", {
+        description: "Join the team to access its content",
+      })
+    }
+  }
 
   const filteredTeams = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -140,10 +178,18 @@ export default function OrganizationTeamsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTeams.map((team) => (
-                <Link
+                <div
                   key={team.team_id}
-                  href={`/organization/${organizationId}/${team.team_id}`}
-                  className="group"
+                  onClick={(e) => handleTeamClick(e, team.team_id)}
+                  role="button"
+                  tabIndex={0}
+                  className="group cursor-pointer"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      handleTeamClick(e as unknown as React.MouseEvent, team.team_id)
+                    }
+                  }}
                 >
                   <Card className="h-full transition hover:border-primary hover:shadow-md">
                     <CardHeader className="flex flex-row items-start gap-3 space-y-0">
@@ -177,7 +223,7 @@ export default function OrganizationTeamsPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </Link>
+                </div>
               ))}
             </div>
           )}

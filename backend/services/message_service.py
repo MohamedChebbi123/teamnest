@@ -544,6 +544,17 @@ def fetch_voice_participants_service(channel_id: int, org_id: int, user: Users, 
     if str(channel.channel_category).lower() != "voice":
         raise HTTPException(status_code=400, detail="Channel is not a voice channel")
 
+    if channel.team_id is not None:
+        organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+        is_owner = organization and organization.owner_id == user_id
+        if not is_owner:
+            is_team_member = db.query(Team_association).filter(
+                Team_association.team_id == channel.team_id,
+                Team_association.user_id == user_id
+            ).first()
+            if not is_team_member:
+                raise HTTPException(status_code=403, detail="You must be a member of this team to view voice participants")
+
     participants = voice_manager.get_participants(channel_id)
     return {
         "participants": participants,
@@ -1180,6 +1191,18 @@ async def voice_websocket_endpoint(
         if str(channel.channel_category).lower() != "voice":
             await websocket.close(code=1008, reason="Channel is not a voice channel")
             return
+
+        if channel.team_id is not None:
+            org = auth_db.query(Organization).filter(Organization.organization_id == org_id).first()
+            is_owner = org and org.owner_id == user.user_id
+            if not is_owner:
+                is_team_member = auth_db.query(Team_association).filter(
+                    Team_association.team_id == channel.team_id,
+                    Team_association.user_id == user.user_id
+                ).first()
+                if not is_team_member:
+                    await websocket.close(code=1008, reason="Not a team member")
+                    return
 
         participant = {
             "user_id": user.user_id,

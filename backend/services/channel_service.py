@@ -9,6 +9,7 @@ from models.PInned_messages import Pinned_messages
 from models.Notifications import Notifications
 from models.Teams import Teams
 from models.Team_roles import Team_roles
+from models.Team_association import Team_association
 from models.Users import Users
 from sqlalchemy.orm import Session
 from utils.plan_limits import get_channel_limit
@@ -97,6 +98,14 @@ def fetch_channels_service(org_id: int, user: Users, db: Session):
 
     found_channels = db.query(Channels).filter(Channels.org_id == org_id).all()
 
+    user_teams = set()
+    if not is_owner:
+        user_teams = {
+            row[0] for row in db.query(Team_association.team_id).filter(
+                Team_association.user_id == user_id
+            ).all()
+        }
+
     return [
         {
             "channel_id": channel.channel_id,
@@ -109,6 +118,7 @@ def fetch_channels_service(org_id: int, user: Users, db: Session):
             "created_at": channel.created_at
         }
         for channel in found_channels
+        if channel.team_id is None or is_owner or channel.team_id in user_teams
     ]
 
 
@@ -133,6 +143,14 @@ def fetch_single_channel_service(channel_id: int, user: Users, db: Session):
 
     if not is_owner and not is_member:
         raise HTTPException(status_code=403, detail="You must be a member of this organization to view this channel")
+
+    if channel.team_id is not None:
+        is_team_member = db.query(Team_association).filter(
+            Team_association.team_id == channel.team_id,
+            Team_association.user_id == user_id
+        ).first()
+        if not is_owner and not is_team_member:
+            raise HTTPException(status_code=403, detail="You must be a member of this team to view this channel")
 
     return {
         "channel_id": channel.channel_id,
