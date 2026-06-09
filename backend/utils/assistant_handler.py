@@ -42,14 +42,12 @@ Rules:
   any chunk.
 - Be direct, natural, and concise.
 - NEVER mention the word "context" or say "according to the context".
-- Every factual claim that comes from the provided information MUST be followed by
-  a short source citation in parentheses that names WHO said it, WHERE, and WHEN
-  when that information is available. Examples:
-    "Khaled is going to the mall (message from Jane Doe in #general on Apr 20, 2026 at 03:45 PM)."
+- When listing items inline (e.g. "Task #3 is due Friday"), add a short source
+  citation in parentheses — for example:
     "The deadline is Friday (task #7 in team 3)."
-    "The policy requires two approvals (document #12)."
-  Use the fields that are actually present in the header — do not invent names,
-  channels, dates, or IDs. If a field is missing, omit it rather than guessing.
+- When listing items in a bullet or numbered list using their bracketed headers
+  (e.g. `- [task #3 ...] ...`), do NOT add an extra parenthetical citation — the
+  bracketed header IS the citation.
 - If the user asks "how did you know" or "where did you get that", answer by
   pointing at the same source(s) you already cited.
 - Never claim you do not know something that is clearly present in the provided
@@ -105,11 +103,32 @@ def format_context(context: list[dict]) -> str:
         elif doc_type == "task":
             task_id = _display_id(metadata.get("task_id"))
             team_id = _display_id(metadata.get("team_id"))
+            team_name = metadata.get("team_name")
             title = metadata.get("title")
+            status = metadata.get("status")
+            due_date = metadata.get("due_date")
+            parent_task_id = metadata.get("parent_task_id")
+            assignees = metadata.get("assignees")
+            subtask_group = metadata.get("subtask_group")
+
+            location = f' in {team_name}' if team_name else (f' in team {team_id}' if team_id != "?" else "")
+            extra = []
+            if status:
+                extra.append(f"status: {status}")
+            if due_date:
+                extra.append(f"due: {_display_date(due_date)}")
+            if assignees:
+                extra.append(f"assigned to: {assignees}")
+            if parent_task_id is not None and parent_task_id != "":
+                extra.append(f"parent task: #{_display_id(parent_task_id)}")
+            if subtask_group:
+                extra.append(f"group: {subtask_group}")
+
+            suffix = f" ({', '.join(extra)})" if extra else ""
             if title:
-                header = f'[task #{task_id} "{title}" in team {team_id}]'
+                header = f'[task #{task_id} "{title}"{location}{suffix}]'
             else:
-                header = f"[task #{task_id} in team {team_id}]"
+                header = f"[task #{task_id}{location}{suffix}]"
 
         elif doc_type == "document":
             document_id = _display_id(metadata.get("document_id"))

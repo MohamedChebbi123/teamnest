@@ -1,6 +1,9 @@
-﻿import httpx
+﻿import logging
+import httpx
 from fastapi import HTTPException
-from fastapi.responses import StreamingResponse
+
+logger = logging.getLogger(__name__)
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from models.Users import Users
 from models.Organization import Organization
@@ -16,6 +19,7 @@ from schemas.Update_team_member_role import Update_team_member_role
 from schemas.Channels_input import Channels_input
 from utils.plan_limits import get_channel_limit
 from utils.log_handler import create_log
+from utils.document_handler import delete_document
 
 
 
@@ -965,25 +969,13 @@ def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
 
     client = httpx.Client(timeout=30.0, follow_redirects=True)
     try:
-        upstream = client.stream("GET", file.file_url).__enter__()
+        resp = client.get(file.file_url)
+        resp.raise_for_status()
+        content = resp.content
     except httpx.HTTPError:
-        client.close()
         raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
-
-    if upstream.status_code != 200:
-        upstream.close()
+    finally:
         client.close()
-        raise HTTPException(status_code=502, detail="Failed to fetch file from storage")
-
-    content_length = upstream.headers.get("content-length")
-
-    def iterator():
-        try:
-            for chunk in upstream.iter_bytes(chunk_size=64 * 1024):
-                yield chunk
-        finally:
-            upstream.close()
-            client.close()
 
     quoted_file_name = quote(file.file_name)
     safe_file_name = file.file_name.replace('"', "")
@@ -991,11 +983,62 @@ def view_pdf(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
         "Content-Disposition": f'inline; filename="{safe_file_name}"; filename*=UTF-8\'\'{quoted_file_name}',
         "X-Content-Type-Options": "nosniff",
     }
-    if content_length:
-        response_headers["Content-Length"] = content_length
 
-    return StreamingResponse(
-        iterator(),
+    return Response(
+        content=content,
         media_type="application/pdf",
         headers=response_headers,
     )
+
+
+def delete_team_file(org_id: int, team_id: int, file_id: int, user: Users, db: Session):
+    user_id = user.user_id
+
+    team = db.query(Teams).filter(Teams.team_id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    if team.org_id != org_id:
+        raise HTTPException(status_code=400, detail="Team does not belong to this organization")
+
+    found_organization = db.query(Organization).filter(Organization.organization_id == org_id).first()
+    if not found_organization:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_owner = found_organization.owner_id == user_id
+    is_org_admin = db.query(Organization_members).filter(
+        Organization_members.org_id == org_id,
+        Organization_members.memmber_id == user_id,
+        Organization_members.role_user == "ADMIN"
+    ).first()
+
+    file = db.query(Files).filter(
+        Files.id == file_id,
+        Files.team_id == team_id,
+        Files.is_deleted == False
+    ).first()
+
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    is_sender = file.sender_id == user_id
+    is_team_admin = db.query(Team_roles).filter(
+        Team_roles.team_id == team_id,
+        Team_roles.user_id == user_id,
+        Team_roles.role == "ADMIN"
+    ).first()
+
+    if not is_owner and not is_org_admin and not is_sender and not is_team_admin:
+        raise HTTPException(status_code=403, detail="You don't have permission to delete this file")
+
+    file.is_deleted = True
+    db.commit()
+
+    try:
+        delete_document(document_id=str(file_id), team_id=team_id)
+    except Exception:
+        logger.exception("Failed to delete document embeddings from Pinecone", extra={"file_id": file_id, "team_id": team_id})
+
+    create_log(db, org_id=org_id, actor_id=user_id, action="file_deleted", target_id=file_id, target_type="file", metadata={"file_name": file.file_name, "team_id": team_id})
+
+    return {"message": "File deleted successfully"}

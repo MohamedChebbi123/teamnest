@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Bot, ChevronLeft, ChevronRight, Download, Loader2, Send, User } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getAccessToken } from "@/lib/auth"
+import { getAccessToken, hydrateAccessToken } from "@/lib/auth"
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
@@ -39,19 +39,27 @@ export default function FileViewerPage() {
 
   useEffect(() => {
     if (!fileId) return
-    const token = getAccessToken()
-    if (!token) return
+    let cancelled = false
 
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/team/${teamId}/file/${fileId}/content`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-      .then((res) => {
+    const loadPdf = async () => {
+      const token = getAccessToken() ?? await hydrateAccessToken()
+      if (!token || cancelled) return
+
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/team/${teamId}/file/${fileId}/content`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
         if (!res.ok) throw new Error("fetch failed")
-        return res.arrayBuffer()
-      })
-      .then((buf) => setPdfData(new Uint8Array(buf)))
-      .catch(() => setLoadError(true))
+        const buf = await res.arrayBuffer()
+        if (!cancelled) setPdfData(new Uint8Array(buf))
+      } catch {
+        if (!cancelled) setLoadError(true)
+      }
+    }
+
+    loadPdf()
+    return () => { cancelled = true }
   }, [orgId, teamId, fileId])
 
   useEffect(() => {
@@ -67,7 +75,7 @@ export default function FileViewerPage() {
     const query = input.trim()
     if (!query || chatLoading) return
 
-    const token = getAccessToken()
+    const token = getAccessToken() ?? await hydrateAccessToken()
     if (!token) return
 
     setInput("")

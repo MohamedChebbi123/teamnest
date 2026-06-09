@@ -36,6 +36,7 @@ import {
   Video,
   Paperclip,
   Megaphone,
+  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
@@ -43,8 +44,6 @@ import { getAccessToken } from "@/lib/auth"
 import OrganizationNavBar from "@/components/OrganizationNavBar/page"
 import MembersSidebar from "@/components/MembersSidebar/page"
 import UpgradeModal from "@/components/UpgradeModal"
-import dynamic from "next/dynamic"
-const PdfViewerModal = dynamic(() => import("@/components/PdfViewerModal"), { ssr: false })
 import Sidebar from "@/components/Sidebar/page"
 import {
   Select,
@@ -183,8 +182,41 @@ export default function TeamPage() {
   const [upgradeModal, setUpgradeModal] = useState<{ title: string; description: string } | null>(null)
   const [channels, setChannels] = useState<Channel[]>([])
   const [teamChannelFiles, setTeamChannelFiles] = useState<TeamChannelFile[]>([])
-  const [pdfViewer, setPdfViewer] = useState<{ fileId: number; fileUrl: string; fileName: string } | null>(null)
+  const [deletingFileId, setDeletingFileId] = useState<number | null>(null)
 
+  const handleDeleteFile = async (fileId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (deletingFileId) return
+    setDeletingFileId(fileId)
+
+    try {
+      const token = getAccessToken()
+      if (!token) {
+        toast.error("Not authenticated")
+        return
+      }
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/organization/${organizationId}/team/${teamId}/file/${fileId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || "Failed to delete file")
+      }
+
+      setTeamChannelFiles((prev) => prev.filter((f) => f.id !== fileId))
+      toast.success("File deleted")
+    } catch (err) {
+      toast.error(formatApiError(err))
+    } finally {
+      setDeletingFileId(null)
+    }
+  }
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -992,26 +1024,39 @@ export default function TeamPage() {
                 </div>
               ) : (
                 teamChannelFiles.slice(0, 12).map((file) => (
-                  <button
+                  <div
                     key={`${file.channel_id}-${file.id}`}
-                    type="button"
-                    onClick={() => setPdfViewer({ fileId: file.id, fileUrl: file.file_url, fileName: file.file_name })}
-                    className="group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-muted/70"
+                    className="group flex w-full items-center rounded-lg hover:bg-muted/70"
                   >
-                    <div className="min-w-0 flex items-center gap-3">
-                      <span className="text-muted-foreground"><Paperclip className="h-4 w-4" /></span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{file.file_name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          #{file.channel_name} • {file.sender.first_name} {file.sender.last_name}
-                        </p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/organization/${organizationId}/${teamId}/file/${file.id}?name=${encodeURIComponent(file.file_name)}&url=${encodeURIComponent(file.file_url)}`)}
+                      className="flex min-w-0 flex-1 items-center justify-between px-3 py-2.5 text-left"
+                    >
+                      <div className="min-w-0 flex items-center gap-3">
+                        <span className="text-muted-foreground"><Paperclip className="h-4 w-4" /></span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{file.file_name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            #{file.channel_name} • {file.sender.first_name} {file.sender.last_name}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      <p>{formatFileSize(file.file_size)}</p>
-                      <p>{new Date(file.sent_at).toLocaleDateString()}</p>
-                    </div>
-                  </button>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <p>{formatFileSize(file.file_size)}</p>
+                        <p>{new Date(file.sent_at).toLocaleDateString()}</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteFile(file.id, e)}
+                      disabled={deletingFileId === file.id}
+                      className="flex-shrink-0 px-2 py-2.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 disabled:opacity-50"
+                      title="Delete file"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))
               )}
             </CardContent>
@@ -1446,17 +1491,6 @@ export default function TeamPage() {
         description={upgradeModal?.description ?? ""}
         upgradeUrl={`/organization/${organizationId}/upgrade`}
       />
-      {pdfViewer && (
-        <PdfViewerModal
-          open={!!pdfViewer}
-          onOpenChange={(v) => { if (!v) setPdfViewer(null) }}
-          fileId={pdfViewer.fileId}
-          fileUrl={pdfViewer.fileUrl}
-          fileName={pdfViewer.fileName}
-          contentUrl={`/organization/${organizationId}/team/${teamId}/file/${pdfViewer.fileId}/content`}
-          fullPageUrl={`/organization/${organizationId}/${teamId}/file/${pdfViewer.fileId}?name=${encodeURIComponent(pdfViewer.fileName)}&url=${encodeURIComponent(pdfViewer.fileUrl)}`}
-        />
-      )}
     </div>
   )
 }

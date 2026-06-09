@@ -65,6 +65,27 @@ def task_to_dict(task):
     }
 
 
+def _format_assignee_names(task):
+    names = []
+    for a in task.assignees:
+        name = f"{a.user.first_name} {a.user.last_name}".strip()
+        if name:
+            names.append(name)
+    return ", ".join(names) if names else None
+
+
+def _format_due_date(task):
+    if task.due_date is not None:
+        return task.due_date.isoformat()
+    return None
+
+
+def _format_team_name(task, db):
+    if task.team:
+        return task.team.team_name
+    return None
+
+
 def _auto_complete_parent_tasks(task: Tasks, org_id: int, actor_id: int, db: Session) -> None:
     parent_id = task.parent_task_id
     while parent_id is not None:
@@ -161,7 +182,13 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
         task_id=new_task.id,
         title=new_task.title,
         description=new_task.description,
-        team_id=new_task.team_id
+        team_id=new_task.team_id,
+        team_name=_format_team_name(new_task, db),
+        status=new_task.status,
+        due_date=_format_due_date(new_task),
+        parent_task_id=new_task.parent_task_id,
+        assignee_names=_format_assignee_names(new_task),
+        subtask_group=new_task.subtask_group,
     )
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_created", target_id=new_task.id, target_type="task", metadata={"title": new_task.title, "team_id": team_id})
@@ -254,6 +281,20 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
     db.commit()
     db.refresh(task)
 
+    from utils.vector_db_handler import upsert_task
+    upsert_task(
+        task_id=task.id,
+        title=task.title,
+        description=task.description,
+        team_id=task.team_id,
+        team_name=_format_team_name(task, db),
+        status=task.status,
+        due_date=_format_due_date(task),
+        parent_task_id=task.parent_task_id,
+        assignee_names=_format_assignee_names(task),
+        subtask_group=task.subtask_group,
+    )
+
     create_log(db, org_id=org_id, actor_id=user_id, action="task_updated", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
 
     if marked_done:
@@ -340,6 +381,20 @@ def update_my_task_status_service(task_id: int, team_id: int, org_id: int, statu
     db.commit()
     db.refresh(task)
 
+    from utils.vector_db_handler import upsert_task
+    upsert_task(
+        task_id=task.id,
+        title=task.title,
+        description=task.description,
+        team_id=task.team_id,
+        team_name=_format_team_name(task, db),
+        status=task.status,
+        due_date=_format_due_date(task),
+        parent_task_id=task.parent_task_id,
+        assignee_names=_format_assignee_names(task),
+        subtask_group=task.subtask_group,
+    )
+
     create_log(db, org_id=org_id, actor_id=user_id, action="task_status_updated", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
 
     if task.status == "done":
@@ -387,6 +442,20 @@ def review_tasks(task_id: int, action: str, team_id: int, org_id: int, user: Use
     task.status = "done" if action == "accept" else "in_progress"
     db.commit()
     db.refresh(task)
+
+    from utils.vector_db_handler import upsert_task
+    upsert_task(
+        task_id=task.id,
+        title=task.title,
+        description=task.description,
+        team_id=task.team_id,
+        team_name=_format_team_name(task, db),
+        status=task.status,
+        due_date=_format_due_date(task),
+        parent_task_id=task.parent_task_id,
+        assignee_names=_format_assignee_names(task),
+        subtask_group=task.subtask_group,
+    )
 
     create_log(db, org_id=org_id, actor_id=user_id, action=f"task_review_{action}ed", target_id=task.id, target_type="task", metadata={"status": task.status, "team_id": team_id})
 

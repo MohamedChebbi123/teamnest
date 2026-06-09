@@ -16,7 +16,8 @@ from services.team_service import (
     fetch_members_info,
     revoke_permissions_from_team_memebers,
     fetch_files_for_team_channel_service,
-    view_pdf
+    view_pdf,
+    delete_team_file
 )
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -177,3 +178,14 @@ async def view_team_file_content(
     db: Session = Depends(connect_databse),
 ):
     return view_pdf(org_id, team_id, file_id, user, db)
+
+
+@router.delete("/organization/{org_id}/team/{team_id}/file/{file_id}")
+async def delete_team_file_endpoint(
+    org_id: int,
+    team_id: int,
+    file_id: int,
+    user: Users = Depends(current_user),
+    db: Session = Depends(connect_databse),
+):
+    return delete_team_file(org_id, team_id, file_id, user, db)
