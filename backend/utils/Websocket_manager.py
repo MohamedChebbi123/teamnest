@@ -132,7 +132,7 @@ class NotificationManager:
         self.connections = {}
 
     async def connect(self, user_id, websocket):
-        # Caller already accepted the websocket (see notifications_ws_endpoint).
+       
         self.connections[user_id] = websocket
 
     def disconnect(self, user_id):

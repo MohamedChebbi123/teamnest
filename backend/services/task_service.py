@@ -12,7 +12,7 @@ from schemas.Task_attachment_input import Task_attachment_input
 from models.Teams import Teams
 from utils.plan_limits import get_file_size_limit
 from utils.log_handler import create_log
-
+from utils.vector_db_handler import delete_task
 
 def _validate_team_in_org(team_id: int, org_id: int, user_id: int, db: Session) -> Teams:
     team = db.query(Teams).filter(Teams.team_id == team_id, Teams.org_id == org_id).first()
@@ -285,7 +285,7 @@ def delete_task_service(task_id: int, team_id: int, org_id: int, user: Users, db
     task.is_deleted = True
     db.commit()
 
-    from utils.vector_db_handler import delete_task
+  
     delete_task(task_id=task.id, team_id=task.team_id)
 
     create_log(db, org_id=org_id, actor_id=user_id, action="task_deleted", target_id=task.id, target_type="task", metadata={"title": task.title, "team_id": team_id})
@@ -415,8 +415,7 @@ def add_task_attachment_service(task_id: int, team_id: int, org_id: int, data: T
             detail=f"A file named '{data.file_name}' has already been uploaded to this task. Please rename your file or use the existing one."
         )
 
-    # Estimate file size from base64 payload and enforce plan limit
-    raw_b64 = data.file_base64.split(",", 1)[-1]  # strip data URI prefix if present
+    raw_b64 = data.file_base64.split(",", 1)[-1] 
     estimated_bytes = len(raw_b64) * 3 // 4
     file_size_limit = get_file_size_limit(team.organization.organization_plan)
     if file_size_limit is not None and estimated_bytes > file_size_limit:

@@ -129,8 +129,7 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
     if org.organization_plan == "PRO" and payment and payment.stripe_subscription_id:
         return {"status": "active", "plan": org.organization_plan}
 
-    # Fallback: if the webhook hasn't arrived yet (common in local dev), verify the
-    # checkout session directly with Stripe and activate the plan ourselves.
+
     if session_id:
         try:
             session = stripe.checkout.Session.retrieve(session_id)
