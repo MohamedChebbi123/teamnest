@@ -1,4 +1,5 @@
 from database.connection import connect_databse, Base, engine
+from sqlalchemy import text
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, org_router, channels_router, team_router, direct_messages_router, tasks_router, friends_router, groupe_chat_router, assistant_router, logs_router, search_router
@@ -11,6 +12,18 @@ import asyncio
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.execute(text("""
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='notifications' AND column_name='task_id'
+                ) THEN
+                    ALTER TABLE notifications ADD COLUMN task_id INTEGER REFERENCES tasks(id);
+                END IF;
+            END $$;
+        """))
+        conn.commit()
     asyncio.create_task(cleanup_task(connect_databse))
     yield
 

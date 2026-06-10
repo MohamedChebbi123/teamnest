@@ -15,7 +15,11 @@ from services.task_service import (
     delete_task_attachment_service,
 )
 from models.Users import Users
+from models.Task_assignees import Task_assignees
 from utils.security import current_user
+from utils.Websocket_manager import notification_manager
+from datetime import datetime, UTC
+
 
 router = APIRouter()
 
@@ -28,7 +32,27 @@ async def create_task_endpoint(
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return create_tasks_service(team_id, org_id, task_data, user, db)
+    result = create_tasks_service(team_id, org_id, task_data, user, db)
+    if task_data.assignee_ids:
+        for assignee_id in task_data.assignee_ids:
+            if assignee_id == user.user_id:
+                continue
+            await notification_manager.send(assignee_id, {
+                "type": "new_notification",
+                "notification": {
+                    "type": "task_assigned",
+                    "task_id": result["id"],
+                    "task_title": result["title"],
+                    "team_id": team_id,
+                    "org_id": org_id,
+                    "assigned_by_id": user.user_id,
+                    "assigned_by_first_name": user.first_name,
+                    "assigned_by_last_name": user.last_name,
+                    "assigned_by_avatar_url": user.avatar_url,
+                    "created_at": datetime.now(UTC).isoformat(),
+                },
+            })
+    return result
 
 
 @router.get("/organization/{org_id}/team/{team_id}/tasks")
@@ -50,7 +74,33 @@ async def edit_task_endpoint(
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return edit_task_service(task_id, team_id, org_id, task_data, user, db)
+    if task_data.assignee_ids is not None:
+        old_ids = {a.user_id for a in db.query(Task_assignees).filter(Task_assignees.task_id == task_id).all()}
+        new_ids = [uid for uid in task_data.assignee_ids if uid not in old_ids]
+    else:
+        new_ids = []
+
+    result = edit_task_service(task_id, team_id, org_id, task_data, user, db)
+
+    for assignee_id in new_ids:
+        if assignee_id == user.user_id:
+            continue
+        await notification_manager.send(assignee_id, {
+            "type": "new_notification",
+            "notification": {
+                "type": "task_assigned",
+                "task_id": result["id"],
+                "task_title": result["title"],
+                "team_id": team_id,
+                "org_id": org_id,
+                "assigned_by_id": user.user_id,
+                "assigned_by_first_name": user.first_name,
+                "assigned_by_last_name": user.last_name,
+                "assigned_by_avatar_url": user.avatar_url,
+                "created_at": datetime.now(UTC).isoformat(),
+            },
+        })
+    return result
 
 
 @router.delete("/organization/{org_id}/team/{team_id}/tasks/{task_id}")

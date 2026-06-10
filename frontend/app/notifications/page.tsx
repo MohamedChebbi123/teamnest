@@ -68,9 +68,36 @@ export default function NotificationsPage() {
   } = useMentionNotifications()
   const [user, setUser] = useState<UserData | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>("all")
+  const [fetchedTasks, setFetchedTasks] = useState<TaskAssignmentNotification[]>([])
 
   useEffect(() => {
     markFriendRequestsRead()
+  }, [])
+
+  useEffect(() => {
+    const token = getAccessToken()
+    if (!token) return
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/notifications`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => {
+        if (data.task_assignments) {
+          setFetchedTasks(data.task_assignments.map((n: any) => ({
+            id: `task-${n.id}`,
+            task_id: n.task_id,
+            task_title: n.task_title || "Untitled task",
+            team_id: n.team_id,
+            assigned_by_id: n.assigned_by_id,
+            assigned_by_first_name: n.assigned_by_first_name || "",
+            assigned_by_last_name: n.assigned_by_last_name || "",
+            assigned_by_avatar_url: n.assigned_by_avatar_url ?? null,
+            created_at: n.created_at,
+            read: !!n.is_seen,
+          })))
+        }
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -113,7 +140,8 @@ export default function NotificationsPage() {
   const unreadMentions = mentions.filter((m) => !m.read)
   const unreadAnnouncements = announcements.filter((a) => !a.read)
 
-  const unreadTasks = taskAssignments.filter((t) => !t.read)
+  const unreadTasks = [...fetchedTasks, ...taskAssignments].filter((t) => !t.read)
+    .filter((t, i, arr) => arr.findIndex((x) => x.task_id === t.task_id) === i)
 
   const counts = {
     friend_requests: friendRequestNotifs.length,

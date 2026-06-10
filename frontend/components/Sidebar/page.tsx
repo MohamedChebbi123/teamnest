@@ -99,7 +99,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const { disconnect, myStatus, setMyStatus } = useOnlineStatus()
   const { unreadCount: friendRequestUnread } = useFriendRequests()
   const { unreadDmCount, markDmsRead } = useDirectMessageNotifications()
-  const { unreadCount: mentionUnread } = useMentionNotifications()
+  const { unreadCount: mentionUnread, unreadTaskCount } = useMentionNotifications()
   const toggleMobileSidebar = () => setIsMobileOpen(!isMobileOpen);
 
   useEffect(() => {
@@ -308,7 +308,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   ];
 
   const activeNotifications = notifications.filter(n => n.show);
-  const unreadCount = activeNotifications.length + friendRequestUnread + mentionUnread;
+  const unreadCount = activeNotifications.length + friendRequestUnread + mentionUnread + unreadTaskCount;
 
   return (
     <>

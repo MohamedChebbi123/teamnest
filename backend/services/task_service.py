@@ -14,9 +14,7 @@ from utils.plan_limits import get_file_size_limit
 from utils.log_handler import create_log
 from utils.vector_db_handler import delete_task
 from models.Notifications import Notifications
-from utils.Websocket_manager import notification_manager
 from datetime import datetime, UTC
-import asyncio
 
 def _validate_team_in_org(team_id: int, org_id: int, user_id: int, db: Session) -> Teams:
     team = db.query(Teams).filter(Teams.team_id == team_id, Teams.org_id == org_id).first()
@@ -200,27 +198,6 @@ def create_tasks_service(team_id: int, org_id: int, task_data: Task_input, user:
             ))
         db.commit()
 
-        async def _push():
-            for assignee_id in task_data.assignee_ids:
-                if assignee_id == user_id:
-                    continue
-                await notification_manager.send(assignee_id, {
-                    "type": "new_notification",
-                    "notification": {
-                        "type": "task_assigned",
-                        "task_id": new_task.id,
-                        "task_title": new_task.title,
-                        "team_id": team_id,
-                        "org_id": org_id,
-                        "assigned_by_id": user_id,
-                        "assigned_by_first_name": user.first_name,
-                        "assigned_by_last_name": user.last_name,
-                        "assigned_by_avatar_url": user.avatar_url,
-                        "created_at": datetime.now(UTC).isoformat(),
-                    },
-                })
-        asyncio.ensure_future(_push())
-
     from utils.vector_db_handler import upsert_task
     upsert_task(
         task_id=new_task.id,
@@ -341,27 +318,6 @@ def edit_task_service(task_id: int, team_id: int, org_id: int, task_data: Task_u
                 created_at=datetime.now(UTC),
             ))
         db.commit()
-
-        async def _push():
-            for assignee_id in new_assignee_ids:
-                if assignee_id == user_id:
-                    continue
-                await notification_manager.send(assignee_id, {
-                    "type": "new_notification",
-                    "notification": {
-                        "type": "task_assigned",
-                        "task_id": task.id,
-                        "task_title": task.title,
-                        "team_id": team_id,
-                        "org_id": org_id,
-                        "assigned_by_id": user_id,
-                        "assigned_by_first_name": user.first_name,
-                        "assigned_by_last_name": user.last_name,
-                        "assigned_by_avatar_url": user.avatar_url,
-                        "created_at": datetime.now(UTC).isoformat(),
-                    },
-                })
-        asyncio.ensure_future(_push())
 
     from utils.vector_db_handler import upsert_task
     upsert_task(
