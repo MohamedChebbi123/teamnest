@@ -1,3 +1,5 @@
+import re
+from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from utils.vector_db_handler import search
@@ -58,6 +60,22 @@ def _normalize_hits(hits):
     return normalized
 
 
+def _detect_time_filter(query: str) -> dict | None:
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    q = query.lower().strip()
+
+    if re.search(r'\btoday\b', q):
+        return {"sent_at_ts": {"$gte": today_start.timestamp()}}
+    if re.search(r'\byesterday\b', q):
+        yesterday_start = today_start - timedelta(days=1)
+        return {"sent_at_ts": {"$gte": yesterday_start.timestamp(), "$lt": today_start.timestamp()}}
+    if re.search(r'\bthis week\b', q):
+        week_start = today_start - timedelta(days=today_start.weekday())
+        return {"sent_at_ts": {"$gte": week_start.timestamp()}}
+    return None
+
+
 def ask_assistant_service(query: str, team_id: int, org_id: int, user: Users, db: Session, document_id: int | None = None):
     user_id = user.user_id
 
@@ -86,13 +104,16 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, user: Users, db
         doc_hits.sort(key=_hit_score, reverse=True)
         all_hits = doc_hits[:MAX_CONTEXT_HITS]
     else:
+        time_filter = _detect_time_filter(query)
         task_results = search(query=query.strip(), namespace=f"team-{team_id}", top_k=5)
         doc_results = search_documents(query=query.strip(), team_id=team_id, top_k=5)
-        message_results = search_messages(query=query.strip(), team_id=team_id, top_k=5)
+        message_top_k = 20 if time_filter else 5
+        message_results = search_messages(query=query.strip(), team_id=team_id, top_k=message_top_k, filter=time_filter)
 
         task_hits = [h for h in _extract_hits(task_results) if _hit_score(h) >= SCORE_THRESHOLD]
         doc_hits = [h for h in _extract_hits(doc_results) if _hit_score(h) >= SCORE_THRESHOLD]
-        message_hits = [h for h in _extract_hits(message_results) if _hit_score(h) >= SCORE_THRESHOLD]
+        msg_threshold = 0.0 if time_filter else SCORE_THRESHOLD
+        message_hits = [h for h in _extract_hits(message_results) if _hit_score(h) >= msg_threshold]
 
         merged = (
             _normalize_hits(task_hits)

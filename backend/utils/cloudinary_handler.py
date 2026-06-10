@@ -61,6 +61,7 @@ def upload_chat_file_from_base64(file_name: str, file_base64: str, mime_type: st
         result = cloudinary.uploader.upload(
             data_uri,
             resource_type=resource_type,
+            type="authenticated",
             folder="teamnest/chat_files",
             public_id=public_id,
             overwrite=False,

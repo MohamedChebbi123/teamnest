@@ -102,13 +102,16 @@ def delete_message(message_id: int, team_id: int, org_id: int | None = None):
         )
 
 
-def search_messages(query: str, team_id: int, top_k: int = 5):
+def search_messages(query: str, team_id: int, top_k: int = 5, filter: dict | None = None):
+    query_payload = {
+        "top_k": top_k,
+        "inputs": {"text": query}
+    }
+    if filter:
+        query_payload["filter"] = filter
     results = _get_index().search(
         namespace=f"team-{team_id}",
-        query={
-            "top_k": top_k,
-            "inputs": {"text": query}
-        }
+        query=query_payload
     )
     return results
 
