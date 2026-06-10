@@ -89,6 +89,7 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
   const [organizations, setOrganizations] = useState<OrganizationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const [showAdminDialog, setShowAdminDialog] = useState(false);
   const [orgSearch, setOrgSearch] = useState('');
   const [orgTag, setOrgTag] = useState('');
   const [sendingJoin, setSendingJoin] = useState(false);
@@ -447,6 +448,16 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
             )}
           </Button>
 
+          {/* Contact Admin Button */}
+          <Button
+            variant="ghost"
+            className="w-full h-12 justify-center px-2 transition-all hover:bg-accent/60"
+            title="Contact Admin"
+            onClick={() => setShowAdminDialog(true)}
+          >
+            <Mail className="h-5 w-5 flex-shrink-0" />
+          </Button>
+
           {/* Divider */}
           {organizations.length > 0 && (
             <div className="py-2">
@@ -622,6 +633,24 @@ export default function Sidebar({ className, onUserFetched, onOrganizationFetche
 
       {/* Spacer for content */}
       <div className="hidden lg:block" style={{ width: `${SIDEBAR_WIDTH}px` }} />
+
+      {/* Contact Admin Dialog */}
+      <Dialog open={showAdminDialog} onOpenChange={setShowAdminDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Contact Admin</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Admin Email</p>
+              <p className="text-sm text-muted-foreground break-all">mohamed.chebbi.official@gmail.com</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Join Organization Dialog */}
       <Dialog open={showJoinDialog} onOpenChange={setShowJoinDialog}>

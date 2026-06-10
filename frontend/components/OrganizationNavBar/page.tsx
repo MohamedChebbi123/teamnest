@@ -612,12 +612,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       icon: Users
     },
  
-    {
-      name: "Settings",
-      path: `/organization/${organizationId}/settings`,
-      icon: Settings,
-      adminOnly: true
-    }
+
   ]
 
   const isTabActive = (path: string) => {

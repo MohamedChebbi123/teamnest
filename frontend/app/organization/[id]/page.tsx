@@ -1081,10 +1081,7 @@ export default function OrganizationPage() {
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuLabel>Organization</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Settings className="h-4 w-4 mr-2" />
-                    General Settings
-                  </DropdownMenuItem>
+                 
                   {isOwner && (
                     <>
                       <DropdownMenuSeparator />
