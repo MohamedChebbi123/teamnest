@@ -62,6 +62,7 @@ import {
   Trash2,
   Search,
   Sparkles,
+  ClipboardList,
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatApiError } from "@/lib/utils"
@@ -117,6 +118,8 @@ interface LiveNotification {
   sender_id?: number
   channel_id?: number
   org_id?: number
+  assigned_by_id?: number
+  task_title?: string
   created_at?: string
   read: boolean
 }
@@ -473,6 +476,8 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             sender_id: payload.sender_id,
             channel_id: payload.channel_id,
             org_id: payload.org_id,
+            assigned_by_id: payload.assigned_by_id,
+            task_title: payload.task_title,
             created_at: payload.created_at,
             read: false,
           }
@@ -496,6 +501,10 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
             const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
             const channelName = channel ? `#${channel.channel_name}` : "an announcement channel"
             toast.info(`New announcement from ${senderName}`, { description: `In ${channelName}` })
+          } else if (nextNotification.type === "task_assigned") {
+            const sender = members.find((m) => m.user_id === nextNotification.assigned_by_id)
+            const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
+            toast.info("New task assigned", { description: `${senderName} assigned you: ${nextNotification.task_title || "a task"}` })
           } else {
             toast.info("New notification", { description: "You received a new direct message" })
           }
@@ -860,6 +869,11 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
       const channelName = channel ? `#${channel.channel_name}` : "an announcement channel"
       return { title: `New announcement from ${senderName}`, subtitle: `In ${channelName}` }
     }
+    if (notification.type === "task_assigned") {
+      const sender = members.find((m) => m.user_id === notification.assigned_by_id)
+      const senderName = sender ? `${sender.first_name} ${sender.last_name}` : "Someone"
+      return { title: "New task assigned", subtitle: `${senderName} assigned you: ${notification.task_title || "a task"}` }
+    }
     return {
       title: "New message",
       subtitle: notification.sender_id ? `From user #${notification.sender_id}` : "Direct message notification",
@@ -883,6 +897,10 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
                 router.push(`/channels/${notification.channel_id}`)
                 return
               }
+              if (notification.type === "task_assigned") {
+                router.push("/notifications")
+                return
+              }
               if (notification.sender_id) {
                 router.push(`/direct-messages?dm_user_id=${notification.sender_id}`)
               }
@@ -892,13 +910,16 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
               "mt-0.5 rounded-full p-1.5 flex-shrink-0",
               notification.type === "channel_mention" ? "bg-purple-500/10"
                 : notification.type === "channel_announcement" ? "bg-amber-500/10"
+                : notification.type === "task_assigned" ? "bg-emerald-500/10"
                 : "bg-blue-500/10"
             )}>
               {notification.type === "channel_mention"
                 ? <Hash className="h-3 w-3 text-purple-500" />
                 : notification.type === "channel_announcement"
                   ? <Megaphone className="h-3 w-3 text-amber-500" />
-                  : <MessageCircle className="h-3 w-3 text-blue-500" />
+                  : notification.type === "task_assigned"
+                    ? <ClipboardList className="h-3 w-3 text-emerald-500" />
+                    : <MessageCircle className="h-3 w-3 text-blue-500" />
               }
             </div>
             <div className="flex-1 min-w-0">

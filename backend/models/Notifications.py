@@ -11,9 +11,11 @@ class Notifications(Base):
     type= Column(String, nullable=False)
     message_id=Column(Integer,ForeignKey("messages.message_id"),nullable=True)
     dm_message_id=Column(Integer,ForeignKey("direct_messages.id"),nullable=True)
+    task_id=Column(Integer,ForeignKey("tasks.id"),nullable=True)
     is_seen=Column(Boolean,default=False)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(UTC))
 
     user = relationship("Users", back_populates="notifications")
     message = relationship("Messages", back_populates="notifications")
     dm_message = relationship("Direct_messages", back_populates="notifications")
+    task = relationship("Tasks")

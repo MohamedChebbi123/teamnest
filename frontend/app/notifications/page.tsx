@@ -24,6 +24,7 @@ import {
   AtSign,
   Hash,
   Megaphone,
+  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -36,7 +37,7 @@ interface UserData {
   profile_completed?: boolean
 }
 
-type TabType = "all" | "friend_requests" | "mentions" | "announcements" | "messages" | "system"
+type TabType = "all" | "friend_requests" | "mentions" | "announcements" | "messages" | "tasks" | "system"
 
 const formatTime = (dateStr: string) => {
   if (!dateStr) return ""
@@ -58,9 +59,12 @@ export default function NotificationsPage() {
   const {
     mentions,
     announcements,
+    taskAssignments,
+    unreadTaskCount,
     markAllRead: markMentionsRead,
     dismiss: dismissMention,
     dismissAnnouncement,
+    dismissTaskAssignment,
   } = useMentionNotifications()
   const [user, setUser] = useState<UserData | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>("all")
@@ -109,14 +113,17 @@ export default function NotificationsPage() {
   const unreadMentions = mentions.filter((m) => !m.read)
   const unreadAnnouncements = announcements.filter((a) => !a.read)
 
+  const unreadTasks = taskAssignments.filter((t) => !t.read)
+
   const counts = {
     friend_requests: friendRequestNotifs.length,
     mentions: unreadMentions.length,
     announcements: unreadAnnouncements.length,
     messages: unreadDmNotifs.length,
+    tasks: unreadTasks.length,
     system: systemNotifications.length,
   }
-  const totalCount = counts.friend_requests + counts.mentions + counts.announcements + counts.messages + counts.system
+  const totalCount = counts.friend_requests + counts.mentions + counts.announcements + counts.messages + counts.tasks + counts.system
 
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: "all", label: "All", count: totalCount },
@@ -124,6 +131,7 @@ export default function NotificationsPage() {
     { key: "mentions", label: "Mentions", count: counts.mentions },
     { key: "announcements", label: "Announcements", count: counts.announcements },
     { key: "messages", label: "Messages", count: counts.messages },
+    { key: "tasks", label: "Tasks", count: counts.tasks },
     { key: "system", label: "System", count: counts.system },
   ]
 
@@ -131,6 +139,7 @@ export default function NotificationsPage() {
   const showMentions = activeTab === "all" || activeTab === "mentions"
   const showAnnouncements = activeTab === "all" || activeTab === "announcements"
   const showMessages = activeTab === "all" || activeTab === "messages"
+  const showTasks = activeTab === "all" || activeTab === "tasks"
   const showSystem = activeTab === "all" || activeTab === "system"
 
   const activeCount =
@@ -139,6 +148,7 @@ export default function NotificationsPage() {
     : activeTab === "mentions" ? counts.mentions
     : activeTab === "announcements" ? counts.announcements
     : activeTab === "messages" ? counts.messages
+    : activeTab === "tasks" ? counts.tasks
     : counts.system
 
   const handleMarkAllRead = () => {
@@ -152,6 +162,7 @@ export default function NotificationsPage() {
     markDmsRead()
     mentions.forEach((m) => dismissMention(m.id))
     announcements.forEach((a) => dismissAnnouncement(a.id))
+    taskAssignments.forEach((t) => dismissTaskAssignment(t.id))
   }
 
   return (
@@ -523,6 +534,69 @@ export default function NotificationsPage() {
                           variant="ghost"
                           className="h-8 w-8 text-muted-foreground hover:text-foreground"
                           onClick={(e) => { e.stopPropagation(); dismissDm(dm.sender_id) }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Task Assignments Section */}
+            {showTasks && unreadTasks.length > 0 && (
+              <section>
+                {activeTab === "all" && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <ClipboardList className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Task Assignments
+                    </span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{counts.tasks}</Badge>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {unreadTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm hover:border-border/80 transition-all border-l-4 border-l-emerald-500"
+                    >
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-11 w-11">
+                          <AvatarImage src={task.assigned_by_avatar_url ?? undefined} />
+                          <AvatarFallback className="bg-emerald-500/10 text-emerald-600 font-semibold">
+                            {task.assigned_by_first_name[0]}{task.assigned_by_last_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500/10 border-2 border-background flex items-center justify-center">
+                          <ClipboardList className="h-2.5 w-2.5 text-emerald-500" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {task.assigned_by_first_name} {task.assigned_by_last_name}
+                          <span className="font-normal text-muted-foreground"> assigned you: </span>
+                          <span className="text-emerald-600">{task.task_title}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{formatTime(task.created_at)}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-emerald-500 hover:bg-emerald-600 text-white"
+                          onClick={() => dismissTaskAssignment(task.id)}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1" />
+                          Dismiss
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => dismissTaskAssignment(task.id)}
                         >
                           <X className="h-4 w-4" />
                         </Button>

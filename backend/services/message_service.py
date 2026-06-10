@@ -273,10 +273,38 @@ def fetch_user_notifications_service(user: Users, db: Session):
         reverse=True,
     )
 
+    task_rows = db.query(
+        Notifications, Tasks, Users
+    ).join(
+        Tasks, Notifications.task_id == Tasks.id
+    ).join(
+        Users, Tasks.created_by == Users.user_id
+    ).filter(
+        Notifications.user_id == user_id,
+        Notifications.type == "task_assigned",
+        Tasks.is_deleted == False,
+    ).order_by(Notifications.created_at.desc()).limit(50).all()
+
+    task_assignments = []
+    for notification, task, assigner in task_rows:
+        task_assignments.append({
+            "id": notification.id,
+            "task_id": task.id,
+            "task_title": task.title,
+            "team_id": task.team_id,
+            "assigned_by_id": assigner.user_id,
+            "assigned_by_first_name": assigner.first_name or "",
+            "assigned_by_last_name": assigner.last_name or "",
+            "assigned_by_avatar_url": assigner.avatar_url,
+            "created_at": notification.created_at.isoformat() if notification.created_at else None,
+            "is_seen": bool(notification.is_seen),
+        })
+
     return {
         "mentions": mentions,
         "announcements": announcements,
         "direct_messages": direct_messages,
+        "task_assignments": task_assignments,
     }
 
 
