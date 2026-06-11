@@ -15,6 +15,7 @@ function SuccessContent() {
   const orgId = searchParams.get("org_id")
   const sessionId = searchParams.get("session_id")
   const [confirming, setConfirming] = useState(true)
+  const [upgradeActive, setUpgradeActive] = useState(false)
 
   useEffect(() => {
     const confirmUpgrade = async () => {
@@ -39,8 +40,24 @@ function SuccessContent() {
         const data = await response.json().catch(() => null)
         console.log("[SuccessPage] response:", response.status, data)
 
+        const status = data?.status
+        const plan = data?.plan
+        const error = data?.error
+
         if (!response.ok) {
           toast.error("Upgrade failed", { description: formatApiError(data?.detail, "Could not confirm upgrade") })
+          setConfirming(false)
+          return
+        }
+
+        if (status === "active" && plan === "PRO") {
+          toast.success("Upgraded to Pro!")
+          setUpgradeActive(true)
+        } else {
+          toast.error("Upgrade not yet active", {
+            description: error || `Status: ${status}, Plan: ${plan}. The Stripe webhook may still be processing.`,
+          })
+          setUpgradeActive(false)
         }
       } catch (error) {
         console.error("[SuccessPage] fetch error:", error)
@@ -61,16 +78,20 @@ function SuccessContent() {
         <CardHeader className="pb-4">
           {confirming ? (
             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          ) : (
+          ) : upgradeActive ? (
             <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+          ) : (
+            <CheckCircle2 className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
           )}
           <CardTitle className="text-2xl">
-            {confirming ? "Confirming upgrade..." : "You're now on Pro!"}
+            {confirming ? "Confirming upgrade..." : upgradeActive ? "You're now on Pro!" : "Upgrade pending"}
           </CardTitle>
           <CardDescription>
             {confirming
               ? "Please wait while we activate your plan."
-              : "Your organization has been upgraded to the Pro plan."}
+              : upgradeActive
+              ? "Your organization has been upgraded to the Pro plan."
+              : "Your payment was received but the upgrade hasn't activated yet. Check your organization page."}
           </CardDescription>
         </CardHeader>
         {!confirming && (

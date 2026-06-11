@@ -1175,35 +1175,7 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
           />
           {isExpanded ? (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1 px-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSoundEnabled((prev) => !prev)}
-                      className="h-7 w-7 flex-shrink-0"
-                    >
-                      {soundEnabled
-                        ? <Volume2 className="h-3.5 w-3.5" />
-                        : <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />
-                      }
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{soundEnabled ? "Mute notifications" : "Unmute notifications"}</TooltipContent>
-                </Tooltip>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handlePickNotificationSound}
-                  className="h-7 flex-1 justify-start px-2 text-xs text-muted-foreground hover:text-foreground truncate"
-                  title={customSoundName ? `Current: ${customSoundName}` : "Choose notification sound"}
-                >
-                  <span className="truncate">{customSoundName || "Default sound"}</span>
-                </Button>
-              </div>
+              
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1">

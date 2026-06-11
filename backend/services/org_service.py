@@ -137,10 +137,9 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
                 "session_id": session_id,
                 "payment_status": session.get("payment_status"),
                 "mode": session.get("mode"),
-                "metadata": dict(session.get("metadata") or {}),
             })
 
-            meta_org_id = (session.get("metadata") or {}).get("org_id") or session.get("client_reference_id")
+            meta_org_id = getattr(session.metadata, "org_id", None) or session.get("client_reference_id")
             try:
                 meta_org_id_int = int(meta_org_id) if meta_org_id is not None else None
             except (TypeError, ValueError):
@@ -148,29 +147,30 @@ def confirm_upgrade_service(org_id: int, session_id: str | None, user: Users, db
 
             if meta_org_id_int != org_id:
                 logger.warning("confirm_upgrade: session org_id mismatch", extra={"session_org_id": meta_org_id, "org_id": org_id})
-                return {"status": "pending", "plan": org.organization_plan}
+                return {"status": "pending", "plan": org.organization_plan, "error": "Session org_id mismatch"}
 
             if session.get("payment_status") != "paid" or session.get("mode") != "subscription":
-                return {"status": "pending", "plan": org.organization_plan}
+                return {"status": "pending", "plan": org.organization_plan, "error": f"Session not paid or not subscription: payment_status={session.get('payment_status')}, mode={session.get('mode')}"}
 
             subscription_id = session.get("subscription")
             if not subscription_id:
-                return {"status": "pending", "plan": org.organization_plan}
+                return {"status": "pending", "plan": org.organization_plan, "error": "No subscription ID in session"}
 
             subscription = stripe.Subscription.retrieve(subscription_id)
-            items = subscription.get("items", {}).get("data", [])
-            price_id = items[0]["price"]["id"] if items else None
+            price_id = None
+            if subscription.get("items") and subscription.items.get("data"):
+                price_id = subscription.items.data[0].get("price", {}).get("id")
             pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")
             if pro_price_id and price_id != pro_price_id:
                 logger.warning("confirm_upgrade: non-PRO price", extra={"price_id": price_id, "expected": pro_price_id})
-                return {"status": "pending", "plan": org.organization_plan}
+                return {"status": "pending", "plan": org.organization_plan, "error": f"Price mismatch: got {price_id}, expected {pro_price_id}"}
 
             _activate_pro_for_org(db, org_id, subscription_id, price_id)
             db.refresh(org)
             return {"status": "active", "plan": org.organization_plan}
-        except Exception:
+        except Exception as e:
             logger.exception("confirm_upgrade: fallback failed", extra={"session_id": session_id, "org_id": org_id})
-            return {"status": "pending", "plan": org.organization_plan}
+            return {"status": "pending", "plan": org.organization_plan, "error": str(e)}
 
     return {"status": "pending", "plan": org.organization_plan}
 
@@ -237,93 +237,109 @@ def _deactivate_pro_for_subscription(db: Session, stripe_subscription_id: str, n
     db.commit()
 
 
+def _get_val(obj, *keys):
+    for key in keys:
+        try:
+            obj = obj[key] if isinstance(obj, dict) else getattr(obj, key, None)
+        except (KeyError, IndexError, TypeError, AttributeError):
+            return None
+        if obj is None:
+            return None
+    return obj
+
+
 def handle_stripe_webhook_service(payload: bytes, sig_header: str | None, db: Session):
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    if not webhook_secret:
-        logger.error("STRIPE_WEBHOOK_SECRET not configured")
-        raise HTTPException(status_code=500, detail="Webhook not configured")
-
-    if not sig_header:
-        raise HTTPException(status_code=400, detail="Missing Stripe signature")
-
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+        if not webhook_secret:
+            logger.error("STRIPE_WEBHOOK_SECRET not configured")
+            raise HTTPException(status_code=500, detail="Webhook not configured")
 
-    event_type = event["type"]
-    data_object = event["data"]["object"]
-    pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")
-
-    logger.info("stripe webhook received", extra={"event_type": event_type, "event_id": event.get("id")})
-
-    if event_type == "checkout.session.completed":
-        if data_object.get("mode") != "subscription":
-            return {"received": True}
-        if data_object.get("payment_status") != "paid":
-            logger.info("checkout session not paid, ignoring", extra={"payment_status": data_object.get("payment_status")})
-            return {"received": True}
-
-        metadata = data_object.get("metadata") or {}
-        org_id_raw = metadata.get("org_id") or data_object.get("client_reference_id")
-        if not org_id_raw:
-            logger.warning("checkout.session.completed without org_id metadata")
-            return {"received": True}
-        try:
-            org_id = int(org_id_raw)
-        except (TypeError, ValueError):
-            logger.warning("invalid org_id in metadata", extra={"org_id_raw": org_id_raw})
-            return {"received": True}
-
-        subscription_id = data_object.get("subscription")
-        if not subscription_id:
-            return {"received": True}
+        if not sig_header:
+            raise HTTPException(status_code=400, detail="Missing Stripe signature")
 
         try:
-            subscription = stripe.Subscription.retrieve(subscription_id)
-        except stripe.error.StripeError:
-            logger.exception("failed to retrieve subscription", extra={"subscription_id": subscription_id})
-            raise HTTPException(status_code=502, detail="Stripe error")
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError:
+            raise HTTPException(status_code=400, detail="Invalid signature")
 
-        items = subscription.get("items", {}).get("data", [])
-        price_id = items[0]["price"]["id"] if items else None
-        if pro_price_id and price_id != pro_price_id:
-            logger.warning("checkout completed for non-PRO price", extra={"price_id": price_id, "expected": pro_price_id})
+        event_type = _get_val(event, "type")
+        data_object = _get_val(event, "data", "object")
+        pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID")
+
+        logger.info("stripe webhook received", extra={"event_type": event_type, "event_id": _get_val(event, "id")})
+
+        if event_type == "checkout.session.completed":
+            if _get_val(data_object, "mode") != "subscription":
+                return {"received": True}
+            if _get_val(data_object, "payment_status") != "paid":
+                logger.info("checkout session not paid, ignoring", extra={"payment_status": _get_val(data_object, "payment_status")})
+                return {"received": True}
+
+            org_id_raw = _get_val(data_object, "metadata", "org_id") or _get_val(data_object, "client_reference_id")
+            if not org_id_raw:
+                logger.warning("checkout.session.completed without org_id metadata")
+                return {"received": True}
+            try:
+                org_id = int(org_id_raw)
+            except (TypeError, ValueError):
+                logger.warning("invalid org_id in metadata", extra={"org_id_raw": org_id_raw})
+                return {"received": True}
+
+            subscription_id = _get_val(data_object, "subscription")
+            if not subscription_id:
+                return {"received": True}
+
+            try:
+                subscription = stripe.Subscription.retrieve(subscription_id)
+            except stripe.error.StripeError:
+                logger.exception("failed to retrieve subscription", extra={"subscription_id": subscription_id})
+                raise HTTPException(status_code=502, detail="Stripe error")
+
+            items = _get_val(subscription, "items", "data") or []
+            price_id = _get_val(items[0], "price", "id") if items else None
+            if pro_price_id and price_id != pro_price_id:
+                logger.warning("checkout completed for non-PRO price", extra={"price_id": price_id, "expected": pro_price_id})
+                return {"received": True}
+
+            _activate_pro_for_org(db, org_id, subscription_id, price_id)
             return {"received": True}
 
-        _activate_pro_for_org(db, org_id, subscription_id, price_id)
-        return {"received": True}
+        if event_type in ("customer.subscription.updated", "customer.subscription.created"):
+            subscription_id = _get_val(data_object, "id")
+            status = _get_val(data_object, "status")
+            items = _get_val(data_object, "items", "data") or []
+            price_id = _get_val(items[0], "price", "id") if items else None
 
-    if event_type in ("customer.subscription.updated", "customer.subscription.created"):
-        subscription_id = data_object.get("id")
-        status = data_object.get("status")
-        items = data_object.get("items", {}).get("data", [])
-        price_id = items[0]["price"]["id"] if items else None
+            if pro_price_id and price_id != pro_price_id:
+                return {"received": True}
 
-        if pro_price_id and price_id != pro_price_id:
+            if status in ("active", "trialing"):
+                org_id = _resolve_org_id_from_subscription(data_object)
+                existing = db.query(Organization_payments).filter(
+                    Organization_payments.stripe_subscription_id == subscription_id,
+                ).first()
+                if org_id is None and existing:
+                    org_id = existing.organization_id
+                if org_id is not None:
+                    _activate_pro_for_org(db, org_id, subscription_id, price_id)
+            elif status in ("canceled", "unpaid", "past_due", "incomplete_expired"):
+                _deactivate_pro_for_subscription(db, subscription_id, status)
             return {"received": True}
 
-        if status in ("active", "trialing"):
-            org_id = _resolve_org_id_from_subscription(data_object)
-            existing = db.query(Organization_payments).filter(
-                Organization_payments.stripe_subscription_id == subscription_id,
-            ).first()
-            if org_id is None and existing:
-                org_id = existing.organization_id
-            if org_id is not None:
-                _activate_pro_for_org(db, org_id, subscription_id, price_id)
-        elif status in ("canceled", "unpaid", "past_due", "incomplete_expired"):
-            _deactivate_pro_for_subscription(db, subscription_id, status)
-        return {"received": True}
+        if event_type == "customer.subscription.deleted":
+            subscription_id = _get_val(data_object, "id")
+            _deactivate_pro_for_subscription(db, subscription_id, "cancelled")
+            return {"received": True}
 
-    if event_type == "customer.subscription.deleted":
-        subscription_id = data_object.get("id")
-        _deactivate_pro_for_subscription(db, subscription_id, "cancelled")
         return {"received": True}
-
-    return {"received": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("stripe webhook unhandled error", extra={"error": str(e)})
+        raise HTTPException(status_code=500, detail=f"Webhook error: {str(e)}")
 
 
 def cancel_subscription_service(org_id: int, user: Users, db: Session):
