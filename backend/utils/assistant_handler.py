@@ -50,6 +50,10 @@ Rules:
 - When listing items in a bullet or numbered list using their bracketed headers
   (e.g. `- [task #3 ...] ...`), do NOT add an extra parenthetical citation — the
   bracketed header IS the citation.
+- Resolve pronouns like "it", "that", "this" using the conversation history.
+  For example, if the user asks "how can I do it" after asking about a specific
+  task, "it" refers to that task. Answer with guidance on how to accomplish it
+  using your general knowledge.
 - If the user asks "how did you know" or "where did you get that", answer by
   pointing at the same source(s) you already cited, or say "from general knowledge"
   if it came from the model's training.
@@ -156,7 +160,7 @@ def format_context(context: list[dict]) -> str:
     return "\n".join(formatted)
 
 
-def ask_assistant(query: str, context: list[dict]) -> str:
+def ask_assistant(query: str, context: list[dict], history: list | None = None) -> str:
     context_text = format_context(context)
 
     if context_text.strip():
@@ -171,16 +175,14 @@ Question:
     else:
         user_content = f"Answer the user's question naturally using your general knowledge.\n\nQuestion: {query}"
 
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT
-        },
-        {
-            "role": "user",
-            "content": user_content
-        }
-    ]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if history:
+        for msg in history:
+            role = msg.get("role") if isinstance(msg, dict) else getattr(msg, "role", None)
+            content = msg.get("content") if isinstance(msg, dict) else getattr(msg, "content", "")
+            if role in ("user", "assistant"):
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": user_content})
 
     try:
         completion = client.chat.completions.create(

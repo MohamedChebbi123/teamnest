@@ -76,7 +76,7 @@ def _detect_time_filter(query: str) -> dict | None:
     return None
 
 
-def ask_assistant_service(query: str, team_id: int, org_id: int, user: Users, db: Session, document_id: int | None = None):
+def ask_assistant_service(query: str, team_id: int, org_id: int, user: Users, db: Session, document_id: int | None = None, history: list | None = None):
     user_id = user.user_id
 
     member = db.query(Organization_members).filter(
@@ -126,7 +126,7 @@ def ask_assistant_service(query: str, team_id: int, org_id: int, user: Users, db
 
     context = [{"metadata": _hit_to_dict(hit)} for hit in all_hits]
 
-    answer = ask_assistant(query=query.strip(), context=context)
+    answer = ask_assistant(query=query.strip(), context=context, history=history)
 
     sources = []
     for hit in all_hits:

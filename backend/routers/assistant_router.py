@@ -16,4 +16,4 @@ async def ask_assistant_endpoint(
     user: Users = Depends(current_user),
     db: Session = Depends(connect_databse),
 ):
-    return ask_assistant_service(data.query, data.team_id, org_id, user, db, data.document_id)
+    return ask_assistant_service(data.query, data.team_id, org_id, user, db, data.document_id, data.history)

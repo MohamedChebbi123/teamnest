@@ -58,6 +58,7 @@ export default function AiAssistant() {
     setLoading(true)
 
     try {
+      const history = messages.map((m) => ({ role: m.role, content: m.content }))
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/organization/${orgId}/assistant`,
         {
@@ -69,6 +70,7 @@ export default function AiAssistant() {
           body: JSON.stringify({
             query,
             team_id: Number(teamId),
+            history,
           }),
         }
       )
