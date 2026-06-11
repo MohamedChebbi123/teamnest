@@ -24,7 +24,11 @@ for example:
 Treat those headers as the source of each piece of information.
 
 Rules:
-- Use ONLY the provided information to answer. If the answer is not there, say you don't know.
+- If the provided information answers the question, use it and cite sources.
+- If the question is about something NOT covered by the provided information
+  (e.g. general "how to" advice, explanations, best practices), use your general
+  knowledge to answer helpfully. Do NOT say you don't know just because the exact
+  answer isn't in the provided context.
 - When the user asks what tasks/messages/documents exist, LIST every item of that
   type present in the provided information (using its header AND the content that
   follows it), even if the query does not match any single item's wording exactly.
@@ -37,9 +41,7 @@ Rules:
   "Document: <name> (part N of M)". When the user refers to a document by name
   (with or without extension, matched case-insensitively), treat every chunk
   whose file name matches as part of that document and answer from them —
-  including summarization requests. Do NOT say you don't know a document just
-  because the user's phrasing (e.g. "summarize X") does not literally appear in
-  any chunk.
+  including summarization requests.
 - Be direct, natural, and concise.
 - NEVER mention the word "context" or say "according to the context".
 - When listing items inline (e.g. "Task #3 is due Friday"), add a short source
@@ -49,9 +51,10 @@ Rules:
   (e.g. `- [task #3 ...] ...`), do NOT add an extra parenthetical citation — the
   bracketed header IS the citation.
 - If the user asks "how did you know" or "where did you get that", answer by
-  pointing at the same source(s) you already cited.
+  pointing at the same source(s) you already cited, or say "from general knowledge"
+  if it came from the model's training.
 - Never claim you do not know something that is clearly present in the provided
-  information, and never claim knowledge that is not in it.
+  information, and never claim knowledge that is not in it when it's clearly absent.
 """
 
 
@@ -158,7 +161,7 @@ def ask_assistant(query: str, context: list[dict]) -> str:
 
     if context_text.strip():
         user_content = f"""
-Use the following information to answer:
+Use the following information if it is relevant to the question:
 
 {context_text}
 
@@ -166,7 +169,7 @@ Question:
 {query}
 """
     else:
-        user_content = query
+        user_content = f"Answer the user's question naturally using your general knowledge.\n\nQuestion: {query}"
 
     messages = [
         {
