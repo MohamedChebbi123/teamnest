@@ -696,11 +696,18 @@ export default function OrganizationNavBar({ organizationId, onClose }: Organiza
         setIsDialogOpen(false)
         setNewChannel({ channel_name: "", channel_mode: "orgbased", channel_category: "text", description: "" })
       } else if (response.status === 403) {
-        setIsDialogOpen(false)
-        setUpgradeModal({
-          title: "Channel limit reached",
-          description: formatApiError(data?.detail, "Upgrade to Pro for unlimited channels."),
-        })
+        const detail = data?.detail || ""
+        if (detail.includes("admins can create channels")) {
+          toast.error("Permission denied", {
+            description: detail,
+          })
+        } else {
+          setIsDialogOpen(false)
+          setUpgradeModal({
+            title: "Channel limit reached",
+            description: formatApiError(detail, "Upgrade to Pro for unlimited channels."),
+          })
+        }
       } else {
         toast.error("Error", {
           description: formatApiError(data?.detail, "Failed to create channel")

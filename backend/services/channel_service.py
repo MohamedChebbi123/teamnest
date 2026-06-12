@@ -25,13 +25,16 @@ def create_channel_service(data: Channels_input, org_id: int, user: Users, db: S
         raise HTTPException(status_code=404, detail="Organization not found")
 
     is_owner = found_organization.owner_id == user_id
-    is_member = db.query(Organization_members).filter(
+    member_role = db.query(Organization_members).filter(
         Organization_members.org_id == org_id,
         Organization_members.memmber_id == user_id
     ).first()
 
-    if not is_owner and not is_member:
+    if not is_owner and not member_role:
         raise HTTPException(status_code=403, detail="You must be a member of this organization to create channels")
+
+    if not is_owner and member_role.role_user not in ("ADMIN", "OWNER"):
+        raise HTTPException(status_code=403, detail="Only the organization owner and admins can create channels")
 
     channel_limit = get_channel_limit(found_organization.organization_plan)
     if channel_limit is not None:

@@ -921,6 +921,20 @@ async def send_messages_realtime(
                         })
                         continue
 
+                    if channel_team_id is not None:
+                        org = msg_db.query(Organization).filter(Organization.organization_id == org_id).first()
+                        if not (org and org.owner_id == user_id):
+                            role = msg_db.query(Team_roles).filter(
+                                Team_roles.team_id == channel_team_id,
+                                Team_roles.user_id == user_id
+                            ).first()
+                            if not role or not role.can_send_messages:
+                                await websocket.send_json({
+                                    "type": "error",
+                                    "detail": "You don't have permission to send messages in this channel"
+                                })
+                                continue
+
                     if parent_id is not None:
                         try:
                             parent_id = int(parent_id)
