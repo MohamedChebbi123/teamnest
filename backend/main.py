@@ -20,7 +20,7 @@ app = FastAPI(lifespan=lifespan)
 _frontend_origins = [
     "http://localhost:3000",
     "https://teamnest-4.onrender.com",
-    "https://teamnest-umber.vercel.app/"
+    "https://teamnest-umber.vercel.app"
 ]
 
 app.add_middleware(
