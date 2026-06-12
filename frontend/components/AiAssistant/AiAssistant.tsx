@@ -130,7 +130,7 @@ export default function AiAssistant() {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">TeamNest AI</p>
-              <p className="text-xs text-zinc-400">Ask about tasks</p>
+              <p className="text-xs text-zinc-400">Ask about anything</p>
             </div>
           </div>
 
